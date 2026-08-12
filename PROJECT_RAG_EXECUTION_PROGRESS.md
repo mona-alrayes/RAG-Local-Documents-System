@@ -14,9 +14,13 @@
 
 ```text
 Project Mode: Start From Scratch
+Repository: mona-alrayes/RAG-Local-Documents-System
+Default Branch: main
+Repository Status: Initialized
 Last Completed Task: لا يوجد حتى الآن
 Current Task: A1 — إنشاء Laravel Application
 Current Task Status: TODO
+Expected Task Branch: task/A1-laravel-foundation
 Next Task After Completion: A2 — إعداد Authentication
 Open Blockers: لا يوجد
 Required Context: هذا الملف + الخطة الرئيسية عند الحاجة فقط
@@ -407,6 +411,20 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 - تم إلغاء `P0 Baseline Audit` لأن المشروع سيبدأ من الصفر.
 - لم يتم وضع أي مهمة تقنية على أنها `DONE` حتى الآن.
 - المهمة الحالية: **A1 — إنشاء Laravel Application**.
+
+---
+
+## 2026-08-12 — GitHub Repository Bootstrap
+
+- تم إنشاء وربط المستودع الرسمي: `mona-alrayes/RAG-Local-Documents-System`.
+- تم اعتماد `main` كـDefault Branch.
+- تم رفع ملفات إدارة المشروع والـRAG Notebook المرجعي إلى root المستودع.
+- تم اعتماد GitHub كمصدر الحقيقة للكود بعد بدء التنفيذ.
+- لم يبدأ التنفيذ التقني للمهمة `A1` بعد؛ حالتها ما تزال `TODO`.
+- أول Branch تنفيذي مخطط: `task/A1-laravel-foundation`.
+
+---
+
 
 ---
 
