@@ -17,11 +17,11 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Initialized
-Last Completed Task: A1 — إنشاء Laravel Application
-Current Task: A2 — إعداد Authentication
+Last Completed Task: A2 — إعداد Authentication
+Current Task: A3 — إعداد MySQL
 Current Task Status: TODO
-Expected Task Branch: task/A2-authentication
-Next Task After Completion: A3 — إعداد MySQL
+Expected Task Branch: task/A3-mysql-setup
+Next Task After Completion: A4 — إعداد Redis
 Open Blockers: لا يوجد
 Required Context: هذا الملف + الخطة الرئيسية عند الحاجة فقط
 ```
@@ -101,7 +101,7 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 | المهمة | الحالة |
 |---|---|
 | A1 إنشاء Laravel application | DONE |
-| A2 إعداد Authentication | TODO |
+| A2 إعداد Authentication | DONE |
 | A3 إعداد MySQL | TODO |
 | A4 إعداد Redis | TODO |
 | A5 إعداد Queue | TODO |
@@ -403,6 +403,119 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 
 # 22. سجل الإنجاز
 
+
+## 2026-08-13 — A2 إعداد Authentication
+
+Status: DONE
+
+Task:
+A2
+
+Branch:
+`task/A2-authentication`
+
+Pull Request:
+#3
+
+Merged Commit:
+`62d96a1`
+
+### تم التنفيذ
+
+- تثبيت وإعداد Laravel Fortify.
+- إضافة إنشاء الحساب وتسجيل الدخول والخروج.
+- إضافة استعادة كلمة المرور وإعادة تعيينها.
+- تفعيل التحقق من البريد الإلكتروني.
+- حماية مساحة العمل وإعدادات الحساب بواسطة `auth` و`verified`.
+- إضافة تحديث الاسم والبريد الإلكتروني وكلمة المرور.
+- إعادة طلب التحقق عند تغيير البريد الإلكتروني.
+- إنشاء واجهات عربية RTL للمصادقة والصفحة الرئيسية ومساحة العمل وإعدادات الحساب.
+- إضافة Rate Limiting لمحاولات تسجيل الدخول.
+- إضافة اختبارات Feature لمسارات المصادقة والحماية وإعدادات الحساب.
+
+### الملفات المنشأة أو المعدلة
+
+- `laravel-app/app/Actions/Fortify/`
+- `laravel-app/app/Models/User.php`
+- `laravel-app/app/Providers/FortifyServiceProvider.php`
+- `laravel-app/config/fortify.php`
+- `laravel-app/database/migrations/`
+- `laravel-app/resources/views/auth/`
+- `laravel-app/resources/views/components/`
+- `laravel-app/resources/views/settings/`
+- `laravel-app/resources/views/workspace/`
+- `laravel-app/resources/views/welcome.blade.php`
+- `laravel-app/resources/css/app.css`
+- `laravel-app/routes/web.php`
+- `laravel-app/tests/Feature/Authentication/`
+- `laravel-app/composer.json`
+- `laravel-app/composer.lock`
+- `laravel-app/.env.example`
+
+### الأوامر المهمة
+
+- `php artisan migrate`
+- `php artisan migrate:status`
+- `php artisan route:list -vv`
+- `php artisan test`
+- `npm run build`
+- `git diff --check`
+
+### الاختبارات والتحقق
+
+- PASS — إنشاء الحساب.
+- PASS — تسجيل الدخول ببيانات صحيحة.
+- PASS — رفض بيانات الدخول الخاطئة.
+- PASS — تسجيل الخروج.
+- PASS — التحقق من البريد الإلكتروني.
+- PASS — رفض رابط تحقق غير موقّع.
+- PASS — استعادة كلمة المرور وإعادة تعيينها.
+- PASS — حماية مساحة العمل وإعدادات الحساب.
+- PASS — تحديث بيانات الحساب وكلمة المرور.
+- PASS — كامل PHPUnit test suite.
+- PASS — Vite production build.
+- PASS — الاختبار اليدوي لجميع تدفقات المصادقة.
+
+Review Result:
+تم دمج PR #3؛ تم تجاوز المراجعة الرسمية بقرار مالكة المشروع.
+
+### القرارات
+
+- استخدام Fortify كطبقة Backend للمصادقة مع واجهات Blade مخصصة.
+- اشتراط تسجيل الدخول والتحقق من البريد للوصول إلى مساحة العمل.
+- إبقاء المصادقة الثنائية وPasskeys غير مفعّلتين ضمن نطاق A2.
+- الاحتفاظ بالـmigrations التي أنشأها Fortify لهذه الميزات.
+
+Open Issues:
+- None
+
+Next Task:
+A3 — إعداد MySQL
+
+---
+
+## 2026-08-12 — إنشاء سجل التنفيذ واعتماد البدء من الصفر
+
+- تم اعتماد ملف الخطة الرئيسية كمرجع معماري ثابت.
+- تم اعتماد هذا الملف كسجل الحالة التنفيذية ومرجع الـhandoff بين المحادثات.
+- تم اعتماد سياسة: **Task واحدة = Chat مستقل**.
+- تم إلغاء `P0 Baseline Audit` لأن المشروع سيبدأ من الصفر.
+- لم يتم وضع أي مهمة تقنية على أنها `DONE` حتى الآن.
+- المهمة الحالية: **A1 — إنشاء Laravel Application**.
+
+---
+
+## 2026-08-12 — GitHub Repository Bootstrap
+
+- تم إنشاء وربط المستودع الرسمي: `mona-alrayes/RAG-Local-Documents-System`.
+- تم اعتماد `main` كـDefault Branch.
+- تم رفع ملفات إدارة المشروع والـRAG Notebook المرجعي إلى root المستودع.
+- تم اعتماد GitHub كمصدر الحقيقة للكود بعد بدء التنفيذ.
+- لم يبدأ التنفيذ التقني للمهمة `A1` بعد؛ حالتها ما تزال `TODO`.
+- أول Branch تنفيذي مخطط: `task/A1-laravel-foundation`.
+
+---
+
 ## 2026-08-13 — A1 إنشاء Laravel Application
 
 Status: DONE
@@ -458,30 +571,6 @@ Next Task:
 A2 — إعداد Authentication
 
 ---
-
-## 2026-08-12 — إنشاء سجل التنفيذ واعتماد البدء من الصفر
-
-- تم اعتماد ملف الخطة الرئيسية كمرجع معماري ثابت.
-- تم اعتماد هذا الملف كسجل الحالة التنفيذية ومرجع الـhandoff بين المحادثات.
-- تم اعتماد سياسة: **Task واحدة = Chat مستقل**.
-- تم إلغاء `P0 Baseline Audit` لأن المشروع سيبدأ من الصفر.
-- لم يتم وضع أي مهمة تقنية على أنها `DONE` حتى الآن.
-- المهمة الحالية: **A1 — إنشاء Laravel Application**.
-
----
-
-## 2026-08-12 — GitHub Repository Bootstrap
-
-- تم إنشاء وربط المستودع الرسمي: `mona-alrayes/RAG-Local-Documents-System`.
-- تم اعتماد `main` كـDefault Branch.
-- تم رفع ملفات إدارة المشروع والـRAG Notebook المرجعي إلى root المستودع.
-- تم اعتماد GitHub كمصدر الحقيقة للكود بعد بدء التنفيذ.
-- لم يبدأ التنفيذ التقني للمهمة `A1` بعد؛ حالتها ما تزال `TODO`.
-- أول Branch تنفيذي مخطط: `task/A1-laravel-foundation`.
-
----
-
-
 ---
 
 # 23. القرارات المعمارية
@@ -504,13 +593,13 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-A2 — إعداد Authentication
+A3 — إعداد MySQL
 Status: TODO
 ```
 
 ## الهدف
 
-إعداد نظام Authentication في Laravel وفق الخطة الرئيسية.
+إعداد اتصال MySQL في Laravel والتحقق من عمل قاعدة البيانات والمهاجرات بنجاح.
 
 ## ملاحظة البدء
 
