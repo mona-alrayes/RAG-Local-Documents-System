@@ -1,9 +1,28 @@
 @import 'tailwindcss';
+@import '../../vendor/livewire/flux/dist/flux.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: Tahoma, 'Segoe UI', Arial, ui-sans-serif, system-ui, sans-serif;
+
+    --color-navy-950: #010f1f;
+    --color-navy-900: #051424;
+    --color-cyan-400: #00e5ff;
+    --color-ice-100: #d4e4fa;
+    --color-mist-300: #bac9cc;
+    --color-danger-300: #ffb4ab;
+}
+
+@layer base {
+    html {
+        color-scheme: dark;
+    }
+
+    body {
+        @apply bg-navy-950 text-ice-100 antialiased;
+    }
 }
