@@ -17,13 +17,13 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Initialized
-Verified Main Commit: 7c23997004c9355c5af6fc8cdb41d9793913d3cf
-Last Merged PR: #10 — [B1] Create documents migration
-Last Completed Task: B2 — Document model والعلاقات الأساسية
-Current Task: B3 — FileType وDocumentStatus enums/casts
+Verified Main Commit: 52d4beeceffa81260a94704621a8542988c4bab9
+Last Merged PR: #11 — [B2] Add Document model and user relationships
+Last Completed Task: B3 — FileType وDocumentStatus enums/casts
+Current Task: B4 — DocumentPolicy واختبارات ownership
 Current Task Status: TODO
-Expected Task Branch: task/B3-document-enums-casts
-Next Task After Completion: B4 — DocumentPolicy واختبارات ownership
+Expected Task Branch: task/B4-document-policy
+Next Task After Completion: B5 — Documents index/details Blade skeleton
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -118,7 +118,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 |---|---|
 | B1 documents migration وفق Master Plan 174.7.1 | DONE |
 | B2 Document model والعلاقات الأساسية | DONE |
-| B3 FileType وDocumentStatus enums/casts | TODO |
+| B3 FileType وDocumentStatus enums/casts | DONE |
 | B4 DocumentPolicy واختبارات ownership | TODO |
 | B5 Documents index/details Blade skeleton | TODO |
 | B6 Upload validation لملف واحد | TODO |
@@ -437,6 +437,56 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-15 — B3 FileType وDocumentStatus enums/casts
+
+Status: DONE
+
+Task:
+B3
+
+Branch:
+`task/B3-document-enums-casts`
+
+Pull Request:
+#12
+
+Reviewed Commit:
+`b82528525455e9d1f980a51d6d76b3c8568b8ab6`
+
+### تم التنفيذ
+
+- إنشاء `FileType` كـstring-backed enum لأنواع الملفات المدعومة.
+- إنشاء `DocumentStatus` كـstring-backed enum للحالات التجميعية المعتمدة.
+- ربط `file_type` و`status` بالـEnums المناسبة عبر `Document::casts()`.
+- الإبقاء على أعمدة قاعدة البيانات من نوع string.
+- الحفاظ على استبعاد `user_id` و`status` من Mass Assignment.
+- عدم إضافة Transition Logic أو UI helpers أو Business Logic.
+
+### الملفات المنشأة أو المعدلة
+
+- `laravel-app/app/Enums/FileType.php`
+- `laravel-app/app/Enums/DocumentStatus.php`
+- `laravel-app/app/Models/Document.php`
+
+### التحقق والاختبارات
+
+- نجحت اختبارات Laravel الحالية.
+- نجح `git diff --cached --check`.
+- تم التحقق من حفظ الملفات بترميز UTF-8 دون BOM.
+- تمت مراجعة الـdiff والتأكد من اقتصاره على الملفات الثلاثة المقصودة.
+- لم تُضف Tests جديدة لأن التنفيذ يعتمد على سلوك PHP Enum وEloquent casts القياسي.
+
+Review Result:
+APPROVED
+
+Open Issues:
+- None
+
+Next Task:
+B4 — DocumentPolicy واختبارات ownership
+
+---
 
 ## 2026-08-15 — B2 Document model والعلاقات الأساسية
 
@@ -932,17 +982,17 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B3 — FileType وDocumentStatus enums/casts
+B4 — DocumentPolicy واختبارات ownership
 Status: TODO
 ```
 
 ## الهدف
 
-إنشاء `FileType` و`DocumentStatus` enums وإضافة casts المناسبة إلى `Document`، دون تنفيذ Policies أو status transitions أو Upload logic.
+إنشاء `DocumentPolicy` واختبارات ownership لضمان أن المستخدم لا يستطيع عرض أو تعديل أو حذف وثائق مستخدم آخر، دون تنفيذ Upload أو Processing logic.
 
 ## ملاحظة البدء
 
-تُراجع متطلبات B3 من القسم `174.16` ومن قيم أنواع الملفات وحالات الوثائق في الخطة الرئيسية قبل التنفيذ.
+تُراجع متطلبات B4 من القسم `174.16` ومتطلبات Ownership وIDOR في الخطة الرئيسية، مع فحص أسلوب تسجيل Policies والاختبارات الحالي في المشروع قبل التنفيذ.
 
 ---
 
