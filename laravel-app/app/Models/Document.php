@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\DocumentStatus;
+use App\Enums\FileType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +25,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class Document extends Model
 {
+    /**
+     * Get the attributes that should be cast.
+     *
+     * تحويل نوع الملف وحالة الوثيقة.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'file_type' => FileType::class,
+            'status' => DocumentStatus::class,
+        ];
+    }
+
     /**
      * Get the user who owns the document.
      *
