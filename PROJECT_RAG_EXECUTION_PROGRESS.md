@@ -2,7 +2,7 @@
 
 > **المرجع:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** توثيق التنفيذ الفعلي خطوة بخطوة دون تعديل الخطة المعمارية الأصلية.  
-> **آخر تحديث:** 2026-08-13
+> **آخر تحديث:** 2026-08-15
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -17,11 +17,11 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Initialized
-Last Completed Task: A3 — إعداد MySQL
-Current Task: A4 — إعداد Redis
+Last Completed Task: A4 — إعداد Redis
+Current Task: A5 — إعداد Queue
 Current Task Status: TODO
-Expected Task Branch: task/A4-redis-setup
-Next Task After Completion: A5 — إعداد Queue
+Expected Task Branch: task/A5-queue-setup
+Next Task After Completion: B1 — إنشاء documents migration
 Open Blockers: لا يوجد
 Required Context: هذا الملف + الخطة الرئيسية عند الحاجة فقط
 ```
@@ -103,7 +103,7 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 | A1 إنشاء Laravel application | DONE |
 | A2 إعداد Authentication | DONE |
 | A3 إعداد MySQL | DONE |
-| A4 إعداد Redis | TODO |
+| A4 إعداد Redis | DONE |
 | A5 إعداد Queue | TODO |
 
 **معيار انتهاء المرحلة:** المستخدم يستطيع التسجيل والدخول، والـQueue تعمل بنجاح.
@@ -403,6 +403,80 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 
 # 22. سجل الإنجاز
 
+## 2026-08-15 — A4 إعداد Redis
+
+Status: DONE
+
+Task:
+A4
+
+Branch:
+`task/A4-redis-setup`
+
+Pull Request:
+#7
+
+Reviewed Commit:
+`9ba1908d37cd934e8d59defafa7afd5f7b6dbcfc`
+
+Merge Commit:
+`419444c838168da2071c6e41e3af6836b3c4670e`
+
+### تم التنفيذ
+
+* إضافة خدمة Redis 8.10 Alpine إلى Docker Compose.
+* إضافة Health Check باستخدام `redis-cli ping`.
+* تقييد المنفذ المنشور على `127.0.0.1`.
+* إضافة متغير البيئة `REDIS_FORWARD_PORT`.
+* إضافة Docker named volume دائم باسم `redis_data`.
+* تفعيل AOF باستخدام `appendonly yes`.
+* اعتماد `appendfsync everysec`.
+* إبقاء Queue وCache وSessions بدون تغيير ضمن نطاق A4.
+
+### الملفات المعدلة
+
+* `laravel-app/.env.example`
+* `laravel-app/compose.yaml`
+
+### الاختبارات والتحقق
+
+* PASS — `docker compose config --quiet`.
+* PASS — `docker compose up -d --wait redis`.
+* PASS — انتقال حاوية Redis إلى `healthy`.
+* PASS — ظهور الربط `127.0.0.1:6379->6379/tcp`.
+* PASS — `redis-cli ping` أعاد `PONG`.
+* PASS — التحقق من أن `appendonly` يساوي `yes`.
+* PASS — التحقق من أن `appendfsync` يساوي `everysec`.
+* PASS — بقاء مفتاح الاختبار بعد إعادة تشغيل Redis.
+* PASS — تفعيل امتداد PhpRedis في PHP.
+* PASS — اتصال Laravel بـRedis وإعادة `true` من `ping()`.
+* PASS — تنظيف مفتاح اختبار Persistence.
+* PASS — `php artisan test`: عدد 22 اختبارًا و75 assertion.
+* PASS — إعادة التحقق من الاختبارات وRedis على Merge Commit.
+* PASS — التأكد من أن `.env` مستبعد بواسطة `.gitignore`.
+* PASS — `git diff --check`.
+
+Review Result:
+APPROVED — تمت مراجعة PR #7 يدويًا بعد الدمج وفق GitHub Review Protocol، ولم تظهر مشاكل من مستوى BLOCKER أو MAJOR. لا توجد GitHub Actions أو مراجعات GitHub مسجلة؛ اعتمد القرار على مراجعة الـdiff وأدلة التحقق المحلي وإعادة التحقق على النسخة المدمجة.
+
+### القرارات
+
+* استخدام Redis 8.10 Alpine.
+* استخدام AOF مع `appendfsync everysec` لتحقيق توازن بين المتانة والأداء.
+* حفظ بيانات Redis في Docker named volume دائم.
+* نشر منفذ Redis على Loopback فقط في التطوير المحلي.
+* عدم إضافة Redis authentication محليًا بسبب تقييد المنفذ على Loopback؛ وفي Production يبقى Redis داخل الشبكة الداخلية دون منفذ عام.
+* تأجيل تفعيل Redis كـQueue backend وتشغيل Queue Worker إلى A5.
+
+Open Issues:
+
+* None
+
+Next Task:
+A5 — إعداد Queue
+
+---
+
 ## 2026-08-15 — A3 إعداد MySQL
 
 Status: DONE
@@ -662,17 +736,17 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-A3 — إعداد MySQL
+A5 — إعداد Queue
 Status: TODO
 ```
 
 ## الهدف
 
-إعداد اتصال MySQL في Laravel والتحقق من عمل قاعدة البيانات والمهاجرات بنجاح.
+إعداد Laravel Queue لاستخدام Redis، والتحقق من أن Queue Worker يستطيع تنفيذ Job بنجاح.
 
 ## ملاحظة البدء
 
-تُراجع متطلبات A2 من الخطة الرئيسية في محادثة مستقلة قبل التنفيذ.
+تُراجع متطلبات A5 من الخطة الرئيسية في محادثة مستقلة قبل التنفيذ.
 
 ---
 
