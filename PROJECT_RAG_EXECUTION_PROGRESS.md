@@ -17,11 +17,11 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Initialized
-Last Completed Task: A4 — إعداد Redis
-Current Task: A5 — إعداد Queue
+Last Completed Task: A5 — إعداد Queue
+Current Task: B1 — إنشاء documents migration
 Current Task Status: TODO
-Expected Task Branch: task/A5-queue-setup
-Next Task After Completion: B1 — إنشاء documents migration
+Expected Task Branch: task/B1-documents-migration
+Next Task After Completion: B2 — Document model
 Open Blockers: لا يوجد
 Required Context: هذا الملف + الخطة الرئيسية عند الحاجة فقط
 ```
@@ -104,7 +104,7 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 | A2 إعداد Authentication | DONE |
 | A3 إعداد MySQL | DONE |
 | A4 إعداد Redis | DONE |
-| A5 إعداد Queue | TODO |
+| A5 إعداد Queue | DONE |
 
 **معيار انتهاء المرحلة:** المستخدم يستطيع التسجيل والدخول، والـQueue تعمل بنجاح.
 
@@ -402,6 +402,57 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-15 — A5 إعداد Queue
+
+Status: DONE
+
+Task:
+A5
+
+Branch:
+`task/A5-queue-setup`
+
+Pull Request:
+#9
+
+Reviewed Commit:
+`d068820a557322b5af112c74bbcf6ca6861e87ed`
+
+### تم التنفيذ
+
+- اعتماد Redis كاتصال Laravel Queue الافتراضي.
+- تحديث `QUEUE_CONNECTION` من `database` إلى `redis` في ملف البيئة النموذجي.
+- التحقق من اتصال Laravel بـRedis ومن سلامة Queue الافتراضية.
+- إرسال Job اختبارية إلى Redis وتشغيلها بنجاح بواسطة Queue Worker.
+- حذف Job الاختبارية بعد اكتمال التحقق، دون ترك كود مؤقت في المشروع.
+
+### الملفات المنشأة أو المعدلة
+
+- `laravel-app/.env.example`
+
+### التحقق والاختبارات
+
+- أعاد Redis الأمر `PONG` وكانت الحاوية في حالة `healthy`.
+- أظهر `queue:monitor` أن اتصال `[redis] default` سليم.
+- دخلت Job الاختبارية إلى Redis وأصبح عدد المهام المعلقة `1`.
+- نفّذ Worker الـJob بنجاح، ثم عاد عدد المهام المعلقة إلى `0`.
+- أكد السجل تنفيذ Job باستخدام الاتصال `redis`.
+- لم توجد Jobs فاشلة.
+- نجحت اختبارات Laravel: `22 passed (75 assertions)`.
+- نجح `git diff --check`.
+- لا يوجد CI مهيأ للـCommit على GitHub.
+
+Review Result:
+APPROVED
+
+Open Issues:
+- None
+
+Next Task:
+B1 — إنشاء documents migration
+
+---
 
 ## 2026-08-15 — A4 إعداد Redis
 
@@ -736,17 +787,17 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-A5 — إعداد Queue
+B1 — إنشاء documents migration
 Status: TODO
 ```
 
 ## الهدف
 
-إعداد Laravel Queue لاستخدام Redis، والتحقق من أن Queue Worker يستطيع تنفيذ Job بنجاح.
+إنشاء migration لجدول `documents` وفق متطلبات Documents Domain في الخطة الرئيسية.
 
 ## ملاحظة البدء
 
-تُراجع متطلبات A5 من الخطة الرئيسية في محادثة مستقلة قبل التنفيذ.
+تُراجع متطلبات B1 من الخطة الرئيسية في محادثة مستقلة قبل التنفيذ.
 
 ---
 
