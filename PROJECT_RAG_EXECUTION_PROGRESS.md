@@ -17,13 +17,13 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Initialized
-Verified Main Commit: f0f5c35071ce29057bee0266961c66370f627ca3
-Last Merged PR: #9 — [A5] Queue Setup
-Last Completed Task: B1 — إنشاء documents migration
-Current Task: B2 — Document model والعلاقات الأساسية
+Verified Main Commit: 7c23997004c9355c5af6fc8cdb41d9793913d3cf
+Last Merged PR: #10 — [B1] Create documents migration
+Last Completed Task: B2 — Document model والعلاقات الأساسية
+Current Task: B3 — FileType وDocumentStatus enums/casts
 Current Task Status: TODO
-Expected Task Branch: task/B2-document-model
-Next Task After Completion: B3 — FileType وDocumentStatus enums/casts
+Expected Task Branch: task/B3-document-enums-casts
+Next Task After Completion: B4 — DocumentPolicy واختبارات ownership
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -117,7 +117,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | المهمة | الحالة |
 |---|---|
 | B1 documents migration وفق Master Plan 174.7.1 | DONE |
-| B2 Document model والعلاقات الأساسية | TODO |
+| B2 Document model والعلاقات الأساسية | DONE |
 | B3 FileType وDocumentStatus enums/casts | TODO |
 | B4 DocumentPolicy واختبارات ownership | TODO |
 | B5 Documents index/details Blade skeleton | TODO |
@@ -437,6 +437,54 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-15 — B2 Document model والعلاقات الأساسية
+
+Status: DONE
+
+Task:
+B2
+
+Branch:
+`task/B2-document-model`
+
+Pull Request:
+#11
+
+Reviewed Commit:
+`17656baf066e6cc5c9c6c80d4dc9f492e021702a`
+
+### تم التنفيذ
+
+- إنشاء `Document` model لتمثيل الوثائق المملوكة للمستخدمين.
+- إضافة علاقة `Document::user()` من نوع `BelongsTo`.
+- إضافة علاقة `User::documents()` من نوع `HasMany`.
+- إضافة Return Types صريحة للعلاقات.
+- اعتماد Mass Assignment allowlist لبيانات الوثيقة.
+- استبعاد `user_id` و`status` من Mass Assignment.
+- إضافة توثيق مختصر بالإنجليزية والعربية.
+
+### الملفات المنشأة أو المعدلة
+
+- `laravel-app/app/Models/Document.php`
+- `laravel-app/app/Models/User.php`
+
+### التحقق والاختبارات
+
+- نجحت اختبارات Laravel الحالية.
+- نجح `git diff --cached --check`.
+- تمت مراجعة الـdiff والتأكد من اقتصاره على الملفين المقصودين.
+
+Review Result:
+APPROVED
+
+Open Issues:
+- None
+
+Next Task:
+B3 — FileType وDocumentStatus enums/casts
+
+---
 
 ## 2026-08-15 — B1 إنشاء documents migration
 
@@ -884,17 +932,17 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B2 — Document model والعلاقات الأساسية
+B3 — FileType وDocumentStatus enums/casts
 Status: TODO
 ```
 
 ## الهدف
 
-إنشاء `Document` model وربطه بالمستخدم وفق Schema المنفذ في B1، دون إضافة Enums أو Policy أو Upload logic.
+إنشاء `FileType` و`DocumentStatus` enums وإضافة casts المناسبة إلى `Document`، دون تنفيذ Policies أو status transitions أو Upload logic.
 
 ## ملاحظة البدء
 
-تُراجع متطلبات B2 من القسم `174.16` ومن علاقات Documents في الخطة الرئيسية في محادثة مستقلة قبل التنفيذ.
+تُراجع متطلبات B3 من القسم `174.16` ومن قيم أنواع الملفات وحالات الوثائق في الخطة الرئيسية قبل التنفيذ.
 
 ---
 
