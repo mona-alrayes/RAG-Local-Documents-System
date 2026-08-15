@@ -19,11 +19,11 @@ Default Branch: main
 Repository Status: Initialized
 Verified Main Commit: f0f5c35071ce29057bee0266961c66370f627ca3
 Last Merged PR: #9 — [A5] Queue Setup
-Last Completed Task: A5 — إعداد Queue
-Current Task: B1 — إنشاء documents migration
+Last Completed Task: B1 — إنشاء documents migration
+Current Task: B2 — Document model والعلاقات الأساسية
 Current Task Status: TODO
-Expected Task Branch: task/B1-documents-migration
-Next Task After Completion: B2 — Document model
+Expected Task Branch: task/B2-document-model
+Next Task After Completion: B3 — FileType وDocumentStatus enums/casts
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -116,7 +116,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 
 | المهمة | الحالة |
 |---|---|
-| B1 documents migration وفق Master Plan 174.7.1 | TODO |
+| B1 documents migration وفق Master Plan 174.7.1 | DONE |
 | B2 Document model والعلاقات الأساسية | TODO |
 | B3 FileType وDocumentStatus enums/casts | TODO |
 | B4 DocumentPolicy واختبارات ownership | TODO |
@@ -437,6 +437,56 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-15 — B1 إنشاء documents migration
+
+Status: DONE
+
+Task:
+B1
+
+Branch:
+`task/B1-documents-migration`
+
+Pull Request:
+#10
+
+Reviewed Commit:
+`4ffb6bd407fc3ebdca95c83f7bed0bdd93f2a5ef`
+
+### تم التنفيذ
+
+- إنشاء migration لجدول `documents` وفق القسم `174.7.1` من الخطة الرئيسية.
+- إضافة ملكية الوثيقة عبر `user_id` مع `ON DELETE RESTRICT`.
+- إضافة بيانات الملف الخاص: الاسم الأصلي، الاسم المخزن، العنوان، المسار، النوع، MIME، الحجم وSHA-256.
+- إضافة الحالة التجميعية للوثيقة بقيمة افتراضية `pending`.
+- إضافة فهارس مركبة للحالة وSHA-256 وتاريخ الإنشاء ضمن نطاق المستخدم.
+- إبقاء Processing Runs وQdrant وAI metrics خارج نطاق B1.
+
+### الملفات المنشأة أو المعدلة
+
+- `laravel-app/database/migrations/2026_08_15_172815_create_documents_table.php`
+
+### التحقق والاختبارات
+
+- نجح فحص PHP syntax.
+- تمت مراجعة SQL الناتجة بواسطة `migrate --pretend`.
+- نجح تنفيذ migration.
+- نجح Rollback.
+- نجحت إعادة تنفيذ migration بعد Rollback.
+- نجحت اختبارات Laravel.
+- نجح `git diff --cached --check`.
+
+Review Result:
+APPROVED
+
+Open Issues:
+- None
+
+Next Task:
+B2 — Document model والعلاقات الأساسية
+
+---
 
 ## 2026-08-15 — A5 إعداد Queue
 
@@ -834,67 +884,17 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B1 — إنشاء documents migration
+B2 — Document model والعلاقات الأساسية
 Status: TODO
 ```
 
 ## الهدف
 
-إنشاء migration لجدول `documents` وفق القسم `174.7.1` من الخطة الرئيسية، دون إدخال حقول Processing Runs أو منطق مهام لاحقة.
+إنشاء `Document` model وربطه بالمستخدم وفق Schema المنفذ في B1، دون إضافة Enums أو Policy أو Upload logic.
 
 ## ملاحظة البدء
 
-متطلبات B1 المعتمدة:
-
-```text
-id
-user_id                 FK users + restrictOnDelete
-original_name           varchar(255)
-stored_name             varchar(255)
-title                    varchar(255) nullable
-file_path                varchar(1024)
-file_type                varchar(16)
-mime_type                varchar(255)
-file_size                unsigned big integer
-sha256                   char(64)
-status                   varchar(32), default pending
-created_at / updated_at
-```
-
-الفهارس:
-
-```text
-(user_id, status)
-(user_id, sha256)        non-unique
-(user_id, created_at)
-```
-
-خارج نطاق B1:
-
-```text
-selected_processing_run_id
-document_processing_runs
-document_processing_comparisons
-failure_reason
-total_pages
-total_chunks
-qdrant_collection
-processed_at
-models / timings / reports
-Enums / Model / Policy / Upload UI
-```
-
-لا تعتبر B1 منجزة قبل:
-
-- مراجعة اسم ملف migration وTimestamp.
-- مراجعة أنواع الأعمدة وForeign Key وسياسة الحذف والفهارس.
-- نجاح `php artisan migrate:fresh` في بيئة الاختبار المخصصة.
-- نجاح `php artisan migrate:rollback --step=1` ثم إعادة migration.
-- نجاح اختبارات Laravel الحالية.
-- نجاح `git diff --check`.
-- مراجعة `git diff` و`git status` والتأكد أن التغيير يخص B1 فقط.
-- Review Result = `APPROVED`.
-- تحديث هذا الملف في Commit توثيق منفصل بعد اعتماد كود المهمة.
+تُراجع متطلبات B2 من القسم `174.16` ومن علاقات Documents في الخطة الرئيسية في محادثة مستقلة قبل التنفيذ.
 
 ---
 
