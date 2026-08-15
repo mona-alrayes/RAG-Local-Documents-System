@@ -17,13 +17,13 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Initialized
-Verified Main Commit: ba582b25fa153a950101277df7ccd7bba685555b
-Last Merged PR: #12 — [B3] Add document enums and casts
-Last Completed Task: B4 — DocumentPolicy واختبارات ownership
-Current Task: B5 — Documents index/details Blade skeleton
+Verified Main Commit: f805e846b094661437eb45c92b35ef458006994b
+Last Merged PR: #13 — [B4] Add document ownership policy
+Last Completed Task: B5 — Documents index/details Blade skeleton
+Current Task: B6 — Upload validation لملف واحد
 Current Task Status: TODO
-Expected Task Branch: task/B5-documents-blade-skeleton
-Next Task After Completion: B6 — Upload validation لملف واحد
+Expected Task Branch: task/B6-upload-validation
+Next Task After Completion: B7 — Private storage/download authorization
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -120,7 +120,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | B2 Document model والعلاقات الأساسية | DONE |
 | B3 FileType وDocumentStatus enums/casts | DONE |
 | B4 DocumentPolicy واختبارات ownership | DONE |
-| B5 Documents index/details Blade skeleton | TODO |
+| B5 Documents index/details Blade skeleton | DONE |
 | B6 Upload validation لملف واحد | TODO |
 | B7 Private storage/download authorization | TODO |
 | B8 SHA-256 وسياسة duplicate في Application | TODO |
@@ -437,6 +437,61 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-15 — B5 Documents index/details Blade skeleton
+
+Status: DONE
+
+Task:
+B5
+
+Branch:
+`task/B5-documents-blade-skeleton`
+
+Pull Request:
+#14
+
+Reviewed Commit:
+`b7bb41ede04a787d32452c2798d132316ddf4ffd`
+
+### تم التنفيذ
+
+- إنشاء `DocumentController` بمسؤوليتي `index` و`show`.
+- إضافة Routes محمية بـ`auth` و`verified` لفهرس الوثائق وتفاصيل الوثيقة.
+- تصفية قائمة الوثائق عبر علاقة `documents` للمستخدم الحالي.
+- تطبيق `DocumentPolicy::viewAny` عند عرض القائمة.
+- تطبيق `DocumentPolicy::view` عند عرض تفاصيل الوثيقة.
+- إنشاء صفحتي Blade للفهرس والتفاصيل باستخدام App layout الحالي.
+- إضافة Pagination وEmpty state ورابط الانتقال إلى التفاصيل.
+- عرض بيانات الوثيقة الحالية دون إضافة Upload أو Processing.
+
+### الملفات المنشأة أو المعدلة
+
+- `laravel-app/app/Http/Controllers/DocumentController.php`
+- `laravel-app/resources/views/documents/index.blade.php`
+- `laravel-app/resources/views/documents/show.blade.php`
+- `laravel-app/routes/web.php`
+- `laravel-app/tests/Feature/Documents/DocumentPagesTest.php`
+
+### التحقق والاختبارات
+
+- نجحت اختبارات B5: 3 اختبارات و6 assertions.
+- نجحت مجموعة Laravel الكاملة: 27 اختبارًا و87 assertions.
+- نجح Laravel Pint.
+- نجح `git diff --check`.
+- تم التحقق من منع المستخدم من عرض تفاصيل وثيقة لا يملكها.
+- لم يُضف Upload أو Processing أو Storage أو Services أو AI integration.
+
+Review Result:
+APPROVED
+
+Open Issues:
+- None
+
+Next Task:
+B6 — Upload validation لملف واحد
+
+---
 
 ## 2026-08-15 — B4 DocumentPolicy واختبارات ownership
 
@@ -1033,17 +1088,17 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B5 — Documents index/details Blade skeleton
+B6 — Upload validation لملف واحد
 Status: TODO
 ```
 
 ## الهدف
 
-إنشاء الهيكل الأولي لصفحتي فهرس الوثائق وتفاصيل الوثيقة باستخدام Blade، مع الالتزام بملكية المستخدم وتفويض الوصول، دون تنفيذ Upload أو Processing logic.
+إضافة Validation لرفع ملف واحد من نوع PDF أو DOCX أو TXT، مع التحقق من امتداد الملف وMIME الفعلي والحجم المسموح، دون تنفيذ التخزين الدائم أو ClamAV أو Queue أو أي معالجة للوثيقة.
 
 ## ملاحظة البدء
 
-تُراجع متطلبات B5 من القسم `174.16` وتصميم شاشات الوثائق في الخطة الرئيسية، مع فحص Routes وBlade layouts الحالية وكيفية تطبيق `DocumentPolicy` وتصفية استعلامات الوثائق حسب المستخدم قبل التنفيذ.
+تُراجع متطلبات رفع الوثائق في القسمين `174.4` و`174.16` من الخطة الرئيسية، ثم تُفحص أنماط Form Requests والاختبارات والواجهة الحالية قبل التنفيذ. يجب وضع حد الحجم في Configuration بدل Hardcoding، وعدم اعتبار امتداد الملف وحده دليلًا كافيًا على نوعه، مع إبقاء التخزين والفحص الأمني والمعالجة خارج نطاق B6.
 
 ---
 
