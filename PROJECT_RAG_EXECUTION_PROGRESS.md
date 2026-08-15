@@ -17,13 +17,13 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Initialized
-Verified Main Commit: 52d4beeceffa81260a94704621a8542988c4bab9
-Last Merged PR: #11 — [B2] Add Document model and user relationships
-Last Completed Task: B3 — FileType وDocumentStatus enums/casts
-Current Task: B4 — DocumentPolicy واختبارات ownership
+Verified Main Commit: ba582b25fa153a950101277df7ccd7bba685555b
+Last Merged PR: #12 — [B3] Add document enums and casts
+Last Completed Task: B4 — DocumentPolicy واختبارات ownership
+Current Task: B5 — Documents index/details Blade skeleton
 Current Task Status: TODO
-Expected Task Branch: task/B4-document-policy
-Next Task After Completion: B5 — Documents index/details Blade skeleton
+Expected Task Branch: task/B5-documents-blade-skeleton
+Next Task After Completion: B6 — Upload validation لملف واحد
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -119,7 +119,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | B1 documents migration وفق Master Plan 174.7.1 | DONE |
 | B2 Document model والعلاقات الأساسية | DONE |
 | B3 FileType وDocumentStatus enums/casts | DONE |
-| B4 DocumentPolicy واختبارات ownership | TODO |
+| B4 DocumentPolicy واختبارات ownership | DONE |
 | B5 Documents index/details Blade skeleton | TODO |
 | B6 Upload validation لملف واحد | TODO |
 | B7 Private storage/download authorization | TODO |
@@ -437,6 +437,57 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-15 — B4 DocumentPolicy واختبارات ownership
+
+Status: DONE
+
+Task:
+B4
+
+Branch:
+`task/B4-document-policy`
+
+Pull Request:
+#13
+
+Reviewed Commit:
+`62b2fb5679f5beafa4c140022e17490a063975a7`
+
+### تم التنفيذ
+
+- إنشاء `DocumentPolicy` وفق naming conventions القياسية في Laravel.
+- السماح للمستخدم المصادق له بقدرتَي `viewAny` و`create`.
+- تقييد قدرات `view` و`update` و`delete` بملكية الوثيقة عبر `document.user_id`.
+- الاعتماد على Laravel كمصدر الحقيقة للـOwnership.
+- استخدام Policy discovery التلقائي دون تسجيل يدوي أو تعديل `bootstrap/app.php`.
+- إضافة اختبارَي ownership فقط: السماح للمالك والمنع عن المستخدم الآخر.
+- التحقق من القدرات الثلاث داخل كل اختبار باستخدام loop واضح.
+
+### الملفات المنشأة أو المعدلة
+
+- `laravel-app/app/Policies/DocumentPolicy.php`
+- `laravel-app/tests/Feature/Policies/DocumentPolicyTest.php`
+
+### التحقق والاختبارات
+
+- نجحت مجموعة اختبارات Laravel الحالية.
+- نجح `git diff --check`.
+- تم إثبات Policy discovery ضمنيًا عبر `Gate::forUser(...)` في اختبارات ownership.
+- تمت مراجعة الـdiff والتأكد من اقتصاره على الملفين المقصودين.
+- لم يُنشأ `DocumentFactory` أو Migration أو Route أو Controller أو UI.
+- لم يتغير `Document.php` أو `User.php`.
+
+Review Result:
+APPROVED
+
+Open Issues:
+- None
+
+Next Task:
+B5 — Documents index/details Blade skeleton
+
+---
 
 ## 2026-08-15 — B3 FileType وDocumentStatus enums/casts
 
@@ -982,17 +1033,17 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B4 — DocumentPolicy واختبارات ownership
+B5 — Documents index/details Blade skeleton
 Status: TODO
 ```
 
 ## الهدف
 
-إنشاء `DocumentPolicy` واختبارات ownership لضمان أن المستخدم لا يستطيع عرض أو تعديل أو حذف وثائق مستخدم آخر، دون تنفيذ Upload أو Processing logic.
+إنشاء الهيكل الأولي لصفحتي فهرس الوثائق وتفاصيل الوثيقة باستخدام Blade، مع الالتزام بملكية المستخدم وتفويض الوصول، دون تنفيذ Upload أو Processing logic.
 
 ## ملاحظة البدء
 
-تُراجع متطلبات B4 من القسم `174.16` ومتطلبات Ownership وIDOR في الخطة الرئيسية، مع فحص أسلوب تسجيل Policies والاختبارات الحالي في المشروع قبل التنفيذ.
+تُراجع متطلبات B5 من القسم `174.16` وتصميم شاشات الوثائق في الخطة الرئيسية، مع فحص Routes وBlade layouts الحالية وكيفية تطبيق `DocumentPolicy` وتصفية استعلامات الوثائق حسب المستخدم قبل التنفيذ.
 
 ---
 
@@ -1039,3 +1090,4 @@ Status: DONE
 ```
 
 3. لا حاجة لرفع الخطة الرئيسية في كل مرة، إلا إذا كانت المهمة تحتاج الرجوع إلى تفاصيل معمارية أو قرارات موجودة فيها.
+
