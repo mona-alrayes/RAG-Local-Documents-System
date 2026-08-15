@@ -17,11 +17,11 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Initialized
-Last Completed Task: A2 — إعداد Authentication
-Current Task: A3 — إعداد MySQL
+Last Completed Task: A3 — إعداد MySQL
+Current Task: A4 — إعداد Redis
 Current Task Status: TODO
-Expected Task Branch: task/A3-mysql-setup
-Next Task After Completion: A4 — إعداد Redis
+Expected Task Branch: task/A4-redis-setup
+Next Task After Completion: A5 — إعداد Queue
 Open Blockers: لا يوجد
 Required Context: هذا الملف + الخطة الرئيسية عند الحاجة فقط
 ```
@@ -102,7 +102,7 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 |---|---|
 | A1 إنشاء Laravel application | DONE |
 | A2 إعداد Authentication | DONE |
-| A3 إعداد MySQL | TODO |
+| A3 إعداد MySQL | DONE |
 | A4 إعداد Redis | TODO |
 | A5 إعداد Queue | TODO |
 
@@ -403,6 +403,75 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 
 # 22. سجل الإنجاز
 
+## 2026-08-15 — A3 إعداد MySQL
+
+Status: DONE
+
+Task:
+A3
+
+Branch:
+`task/A3-mysql-setup`
+
+Pull Request:
+#5
+
+Reviewed Commit:
+`d5b07049f63a71953a359e435fedb6e344903bb2`
+
+Merge Commit:
+`e14a70cbae750e4af63df0179d78521418021547`
+
+### تم التنفيذ
+
+- تحويل اتصال Laravel الافتراضي من SQLite إلى MySQL.
+- إضافة إعدادات MySQL الآمنة إلى `.env.example`.
+- إضافة خدمة MySQL 8.4 في `laravel-app/compose.yaml`.
+- إضافة Health Check لخدمة MySQL.
+- إضافة Volume دائم باسم `mysql_data`.
+- اعتماد `utf8mb4` و`utf8mb4_unicode_ci`.
+- تقييد المنفذ المنشور على `127.0.0.1`.
+- التأكد من عدم تتبع ملف `.env` أو كلمات المرور المحلية.
+
+### الملفات المعدلة
+
+- `laravel-app/.env.example`
+- `laravel-app/config/database.php`
+- `laravel-app/compose.yaml`
+
+### الاختبارات والتحقق
+
+- PASS — `docker compose config --quiet`.
+- PASS — تشغيل MySQL وانتقال الحاوية إلى `healthy`.
+- PASS — ظهور الربط `127.0.0.1:3306->3306/tcp`.
+- PASS — نجاح `Test-NetConnection` إلى المنفذ 3306.
+- PASS — `php artisan config:clear`.
+- PASS — `php artisan migrate`.
+- PASS — `php artisan migrate:status`.
+- PASS — التحقق من استخدام Driver بقيمة `mysql`.
+- PASS — التحقق من قاعدة `rag_local_documents`.
+- PASS — التحقق من `utf8mb4` و`utf8mb4_unicode_ci`.
+- PASS — `php artisan test`.
+- PASS — اختبار الموقع يدويًا.
+- PASS — `git diff --check`.
+
+Review Result:
+تم دمج PR #5؛ تم تجاوز المراجعة الرسمية النهائية بقرار مالكة المشروع بعد نجاح الاختبارات والتحقق المحلي.
+
+### القرارات
+
+- استخدام MySQL 8.4 لخدمة قاعدة البيانات المحلية.
+- حفظ البيانات في Docker named volume دائم.
+- نشر منفذ MySQL على Loopback فقط.
+- استخدام شبكة Compose الافتراضية في بيئة التطوير، لأن الشبكة `internal` منعت Docker Desktop من نشر المنفذ إلى Windows host.
+
+Open Issues:
+- None
+
+Next Task:
+A4 — إعداد Redis
+
+---
 
 ## 2026-08-13 — A2 إعداد Authentication
 
