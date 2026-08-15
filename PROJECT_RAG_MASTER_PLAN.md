@@ -10,10 +10,14 @@
 > **الواجهة الأمامية:** Blade + Livewire + Flux + Tailwind CSS + JavaScript  
 > **لوحة الإدارة:** Filament  
 > **المعالجة الخلفية:** Laravel Queue + Redis  
-> **المرجع التقني لمسار RAG:** الملف `cloud_first_rag_colab_fixed_interactive.ipynb`
-> **إستراتيجية LLM:** مساران قابلان للتبديل: Cloud LLM أو Self-hosted Local LLM
+> **المراجع التقنية لمساري RAG:** الملفان `cloud_first_rag_colab_fixed_interactive.ipynb` و`hybrid_cloud_parse_local_rag_simple_colab(1).ipynb`
+> **إستراتيجية المعالجة:** Cloud أو Hybrid Local أو Compare في البيئة المحلية، وCloud فقط في النشر Online
+> **إستراتيجية LLM:** `Qwen/Qwen3.5-9B` عبر Hugging Face Router في Cloud، و`qwen3.5:4b` عبر Ollama محلياً
 > **خطة النشر المرجعية:** Oracle Cloud Always Free + Docker Compose
-> **آخر تحديث للخطة:** 2026-08-12
+> **آخر تحديث للخطة:** 2026-08-15
+
+> [!IMPORTANT]
+> القسم **174 — التعديل المعماري المعتمد** هو المرجع الأحدث والملزم لكل ما يخص مسارات المعالجة، قواعد البيانات، Qdrant، المحادثة، صفحات Blade، Filament والنشر. عند وجود تعارض مع قسم أقدم، تكون الأولوية للقسم 174. أبقينا الأقسام السابقة لحفظ سياق القرارات وعدم فقدان أي معلومة تاريخية.
 
 ---
 
@@ -5615,3 +5619,1085 @@ via llama.cpp
 ولا يتغير أي جزء آخر من الـRAG أو Laravel عند التبديل بين المسارين.
 
 هذه هي البنية التي يجب اعتمادها في تنفيذ المشروع من الآن فصاعداً.
+
+---
+
+# 174. التعديل المعماري المعتمد — Cloud / Hybrid Local / Compare
+
+## 174.1 حالة القرار ونطاقه
+
+هذا القسم قرار معماري نهائي معتمد بتاريخ 2026-08-15، وليس فكرة مؤجلة. وهو يوسّع الخطة الأصلية دون تغيير نقطة التنفيذ الحالية:
+
+```text
+Last Completed Task: A5 — إعداد Queue
+Current Task: B1 — إنشاء documents migration
+Current Task Status: TODO
+Expected Task Branch: task/B1-documents-migration
+```
+
+لا تُنفّذ في B1 مسؤوليات B2 أو المعالجة أو الواجهة أو FastAPI. لكن يجب أن يكون Schema الذي تنشئه B1 متوافقاً مع هذه المعمارية حتى لا نضطر إلى إعادة تصميم جدول `documents` لاحقاً.
+
+## 174.2 المصطلحات الرسمية
+
+| المصطلح | المعنى |
+|---|---|
+| `cloud` | LlamaParse Cloud ثم Jina Embeddings وJina Reranker عبر API، والتوليد بواسطة `Qwen/Qwen3.5-9B` عبر Hugging Face Router |
+| `hybrid_local` | LlamaParse Cloud فقط للـParsing، ثم Chunking وBGE-M3 وBM25 وBGE Reranker محلياً، والتوليد بواسطة Ollama `qwen3.5:4b` |
+| `compare` | تشغيل `cloud` و`hybrid_local` للملف نفسه، عرض تقرير مقارنة وسؤال اختبار، ثم اعتماد مسار واحد فقط |
+| selected run | نتيجة المعالجة التي اختارها المستخدم وأصبحت النسخة الرسمية للوثيقة |
+| temporary artifacts | Chunks وvectors ونتائج وسيطة خاصة غير دائمة تحفظ داخل FastAPI حتى الاختيار أو انتهاء TTL |
+| persistent index | الـPoints النهائية للـselected run داخل Qdrant |
+
+`hybrid_local` ليس Offline بالكامل لأن Parsing ما زال يستخدم LlamaParse Cloud. لا يجوز وصفه في الواجهة أو التقرير بأنه Fully Local.
+
+## 174.3 أوضاع التشغيل والقدرات
+
+### Online / Cloud deployment
+
+```text
+RAG_DEPLOYMENT_MODE=cloud
+LLM_PROVIDER=cloud
+```
+
+- يظهر للمستخدم خيار `cloud` فقط.
+- تختفي خيارات `hybrid_local` و`compare` من Blade.
+- يرفض Laravel أي Request معدّل يطلب Local أو Compare بحالة `422`.
+- يتحقق FastAPI أيضاً من Capability المسموحة ولا يعتمد على الواجهة.
+- لا تُثبّت ولا تُحمّل أوزان Embedding أو Reranker محلية.
+- لا تُشغّل Ollama، ولا تُضمّن Torch/Transformers أو ملفات Qwen/BGE أو GPU runtimes في Image النشر.
+- تبقى Qdrant محلية داخل بنية Docker وبـPersistent Volume.
+
+### Local demonstration
+
+```text
+RAG_DEPLOYMENT_MODE=local
+LLM_PROVIDER=local
+LOCAL_LLM_BASE_URL=http://ollama:11434/v1
+LOCAL_LLM_MODEL=qwen3.5:4b
+```
+
+- تظهر الخيارات `cloud` و`hybrid_local` و`compare`.
+- يحتاج Cloud وCompare مفاتيح LlamaParse وJina وHugging Face حسب المرحلة.
+- يستخدم Hybrid Local النموذج المثبت فعلياً في Ollama: `qwen3.5:4b`.
+- لا يوجد Fallback صامت بين Providers. الإعداد غير المتوافق يفشل مبكراً برسالة واضحة.
+
+### إعداد Cloud LLM
+
+```text
+CLOUD_LLM_BASE_URL=https://router.huggingface.co/v1
+CLOUD_LLM_MODEL=Qwen/Qwen3.5-9B
+HF_TOKEN=...
+```
+
+اسم نموذج Hugging Face الرسمي المعتمد مأخوذ من الـNotebook المرجعي:
+`Qwen/Qwen3.5-9B`.
+
+### فصل الاعتمادات
+
+ينشأ FastAPI بملفات Dependencies أو Docker stages منفصلة:
+
+```text
+base/cloud  = FastAPI + HTTP clients + Qdrant client + parsing utilities
+local       = base + local embedding/reranker dependencies
+ollama      = خدمة مستقلة ولا تدخل داخل FastAPI image
+```
+
+الهدف أن تبقى النسخة Online خفيفة وقابلة للنشر ضمن Free Tier قدر الإمكان. الخدمات الخارجية نفسها قد تخضع لحصص أو Credits، لذلك لا نعد بأن سلسلة AI مجانية بلا حدود.
+
+### مصفوفة Providers المعتمدة
+
+| المرحلة | Cloud profile | Hybrid Local profile |
+|---|---|---|
+| Parsing | LlamaParse Cloud | LlamaParse Cloud |
+| Chunking | إعداد Profile قابل للضبط، baseline `800/80` | SentenceSplitter baseline `800/80` |
+| Dense embedding | `jina-embeddings-v3` عبر Jina API، dimension 1024 | `BAAI/bge-m3` محلي، dimension 1024 |
+| Sparse | Qdrant/BM25 multilingual | BM25 محلي |
+| Fusion | RRF | RRF |
+| Reranker | `jina-reranker-v2-base-multilingual` عبر Jina API | `BAAI/bge-reranker-v2-m3` محلي |
+| Generation | HF Router `Qwen/Qwen3.5-9B` | Ollama `qwen3.5:4b` |
+
+أي تغيير لاحق في Model name أو dimension يحتاج Migration/Collection strategy موثقة، ولا يغيّر قيمة Environment بصمت على Collection موجودة.
+
+### Environment variables المرجعية
+
+Laravel:
+
+```text
+RAG_DEPLOYMENT_MODE=cloud|local
+AI_SERVICE_BASE_URL=http://fastapi:8000
+AI_SERVICE_API_KEY=...
+AI_SERVICE_TIMEOUT=600
+QUEUE_CONNECTION=redis
+CLAMAV_HOST=clamav
+CLAMAV_PORT=3310
+```
+
+FastAPI المشتركة:
+
+```text
+RAG_DEPLOYMENT_MODE=cloud|local
+QDRANT_URL=http://qdrant:6333
+QDRANT_CLOUD_COLLECTION=rag_documents_cloud
+QDRANT_HYBRID_LOCAL_COLLECTION=rag_documents_hybrid_local
+TEMP_ARTIFACT_ROOT=/app/data/artifacts
+TEMP_ARTIFACT_TTL_HOURS=24
+CHUNK_SIZE=800
+CHUNK_OVERLAP=80
+DENSE_CANDIDATES=12
+SPARSE_CANDIDATES=12
+RRF_TOP_K=12
+RERANK_TOP_N=5
+```
+
+Cloud providers:
+
+```text
+LLAMA_CLOUD_API_KEY=...
+JINAAI_API_KEY=...
+HF_TOKEN=...
+CLOUD_EMBED_MODEL=jina-embeddings-v3
+CLOUD_RERANK_MODEL=jina-reranker-v2-base-multilingual
+CLOUD_LLM_BASE_URL=https://router.huggingface.co/v1
+CLOUD_LLM_MODEL=Qwen/Qwen3.5-9B
+```
+
+Local providers:
+
+```text
+LOCAL_EMBED_MODEL=BAAI/bge-m3
+LOCAL_RERANK_MODEL=BAAI/bge-reranker-v2-m3
+LOCAL_LLM_BASE_URL=http://ollama:11434/v1
+LOCAL_LLM_MODEL=qwen3.5:4b
+```
+
+لا توجد مفاتيح حقيقية داخل Git. يقرأ Frontend القدرات من Laravel configuration/Capabilities service، لا من Environment مباشرة.
+
+## 174.4 تجربة رفع الوثيقة
+
+- يرفع المستخدم ملفاً واحداً في كل عملية Upload.
+- الأنواع: PDF وDOCX وTXT.
+- يمر الملف دائماً بـValidation ثم Private Temporary Storage ثم ClamAV.
+- لا يصل ملف غير نظيف إلى FastAPI.
+- بعد نجاح الفحص يختار المستخدم مسار المعالجة من القدرات المتاحة في البيئة.
+- لا يرتبط اختيار مسار المعالجة باختيار وثائق المحادثة لاحقاً.
+
+### Cloud فقط أو Hybrid Local فقط
+
+يُنشأ Processing Run واحد. عند نجاحه:
+
+1. تتحقق FastAPI من عدد الـchunks والـvectors.
+2. ترفع النتائج إلى Collection الدائمة الصحيحة.
+3. يتحقق count بعد الرفع.
+4. يصبح Run هو selected run.
+5. تصبح الوثيقة `ready`.
+
+### Compare
+
+1. يُنفّذ LlamaParse مرة واحدة قدر الإمكان وتُستخدم النتيجة الطبيعية المشتركة كمدخل للمسارين.
+2. ينشأ Run للـCloud وRun للـHybrid Local.
+3. لكل Run يُنفّذ Chunking وEmbedding وبناء Sparse representation الخاصة به.
+4. تحفظ النتائج مؤقتاً داخل FastAPI ولا ترفع بعد إلى Persistent Qdrant.
+5. ترسل FastAPI إلى Laravel تقريراً مضغوطاً لكل Run، دون قيم الـvectors.
+6. يكتب المستخدم سؤال اختبار اختياري لكنه موصى به قبل القرار.
+7. يعرض النظام أفضل المقاطع ومصادرها لكل Run.
+8. يضغط المستخدم `اعتماد هذا المسار`.
+9. ترفع FastAPI نتيجة الفائز فقط إلى Qdrant بشكل idempotent.
+10. بعد نجاح الرفع والتحقق تُحذف artifacts للخاسر، ويُحتفظ بتقرير Audit في MySQL.
+
+### انتهاء المقارنة
+
+- TTL الافتراضي للـtemporary artifacts هو 24 ساعة وقابل للضبط.
+- إذا لم يختر المستخدم قبل انتهاء TTL تصبح المقارنة `expired`.
+- لا يُفهرس أي مسار تلقائياً عند انتهاء الوقت.
+- يستطيع المستخدم إعادة المعالجة لإنشاء مقارنة جديدة.
+- لا يُحذف الخاسر قبل نجاح Promotion للفائز والتحقق من العدد.
+
+## 174.5 تقرير المقارنة
+
+يتضمن التقرير لكل مسار:
+
+- اسم Profile.
+- Providers والنماذج وإصداراتها أو Configuration snapshot.
+- عدد الصفحات عندما يكون قابلاً للتحديد.
+- عدد الـchunks.
+- عينات محدودة من الـchunks مع `chunk_index` وبدايات ونهايات التقسيم.
+- زمن Parsing وChunking وEmbedding وبناء Sparse index والاختبار والإجمالي.
+- الأخطاء والتحذيرات.
+- أبعاد الـvectors وعددها، من دون إرسال قيم vectors إلى Laravel.
+- سؤال الاختبار.
+- أفضل المقاطع المسترجعة ومصادرها ودرجات الصلة.
+
+لا يحتوي التقرير ولا شاشة المقارنة على تقدير تكلفة Cloud.
+
+## 174.6 حدود المسؤوليات
+
+### Laravel
+
+- Authentication وAuthorization وOwnership.
+- مصدر الحقيقة للمستخدمين والوثائق وحالة المعالجة والاختيار.
+- تخزين الملف الأصلي الخاص.
+- ClamAV orchestration.
+- Queue وJobs.
+- إنشاء Runs والمقارنة وحفظ التقارير.
+- إرسال الخيارات الموثوقة إلى FastAPI.
+- صفحات Blade/Livewire وFilament.
+- حفظ المحادثات والرسائل والمصادر والأزمنة.
+
+### FastAPI
+
+- Capability validation.
+- Parsing وChunking وEmbedding وSparse representation.
+- Temporary artifact lifecycle.
+- Retrieval وRRF وReranking وContext وGeneration.
+- Promotion idempotent إلى Qdrant والتحقق من count.
+- حذف Points.
+- إرجاع تقارير ومصادر وtimings منظمة.
+
+FastAPI لا يدير المستخدمين ولا المحادثات ولا يصبح مصدر الحقيقة لحالة الأعمال.
+
+### MySQL
+
+يخزن Application state وAudit metadata. لا يخزن raw vectors ولا Qdrant points ولا الملفات المؤقتة الكبيرة.
+
+### قاعدة بيانات FastAPI
+
+لا نضيف قاعدة بيانات علائقية مستقلة لـFastAPI في النسخة الأولى. يستخدم:
+
+- Private temporary storage للـartifacts.
+- Manifest داخلي محدود لكل Artifact.
+- Qdrant للنسخة الدائمة.
+- MySQL عبر Laravel كمصدر الحقيقة للأعمال.
+
+أي Artifact reference يعاد إلى Laravel يجب أن يكون opaque token، لا filesystem path داخلياً.
+
+## 174.7 Schema Laravel المعتمد
+
+### 174.7.1 جدول `documents` — نطاق B1
+
+ينشئ B1 الأعمدة التالية فقط:
+
+| العمود | النوع المقترح | Null | الملاحظة |
+|---|---|---:|---|
+| `id` | BIGINT UNSIGNED | لا | Primary key |
+| `user_id` | BIGINT UNSIGNED | لا | FK إلى users مع `restrictOnDelete` |
+| `original_name` | VARCHAR(255) | لا | الاسم الذي رفعه المستخدم |
+| `stored_name` | VARCHAR(255) | لا | اسم آمن وغير قابل للتخمين |
+| `title` | VARCHAR(255) | نعم | عنوان عرض اختياري |
+| `file_path` | VARCHAR(1024) | لا | مسار Private Storage فقط |
+| `file_type` | VARCHAR(16) | لا | `pdf/docx/txt`، والتحويل إلى Enum في B3 |
+| `mime_type` | VARCHAR(255) | لا | لا يغني عن التحقق الفعلي |
+| `file_size` | BIGINT UNSIGNED | لا | Bytes |
+| `sha256` | CHAR(64) | لا | Hash للملف |
+| `status` | VARCHAR(32) | لا | Default: `pending` |
+| `created_at` / `updated_at` | TIMESTAMP | نعم | Laravel timestamps |
+
+الفهارس:
+
+```text
+INDEX documents_user_status_index (user_id, status)
+INDEX documents_user_sha256_index (user_id, sha256)
+INDEX documents_user_created_index (user_id, created_at)
+```
+
+لا يفرض B1 `UNIQUE(user_id, sha256)`؛ سياسة منع تكرار الملف قرار Application في B8 ولا يجب أن تمنع Re-upload أو حالات الاختبار من مستوى قاعدة البيانات مبكراً.
+
+لا يضع B1 الأعمدة التالية داخل `documents`:
+
+```text
+failure_reason
+total_pages
+total_chunks
+qdrant_collection
+processed_at
+embedding model
+reranker model
+timings
+comparison report
+```
+
+هذه خصائص Processing Run وليست هوية الوثيقة.
+
+سيضاف `selected_processing_run_id` في Migration لاحقة بعد إنشاء جدول Runs، وليس في B1، لتجنب Foreign Key إلى جدول غير موجود.
+
+سياسة الحذف:
+
+- لا نعتمد Cascade مخفياً من user إلى documents لأن للوثيقة ملفاً خاصاً وPoints خارج MySQL.
+- `restrictOnDelete` يجبر التطبيق على تنفيذ DocumentDeletionService أولاً.
+- Service يحذف Qdrant points وtemporary artifacts والملف الخاص والعلاقات ثم السجلات.
+- لا يطبق B1 Soft Deletes دون Task وسياسة Cleanup صريحة.
+
+### 174.7.2 جدول `document_processing_runs`
+
+ينشأ في Task مستقلة بعد B8:
+
+| العمود | الغرض |
+|---|---|
+| `id` | Run ID |
+| `document_id` | FK مع `restrictOnDelete` |
+| `profile` | `cloud` أو `hybrid_local` |
+| `status` | حالة Run |
+| `profile_snapshot` JSON | Providers/models/config الفعلي وقت التشغيل |
+| `total_pages` nullable | عدد الصفحات الموثوق |
+| `total_chunks` | عدد chunks |
+| `vector_count` | عدد vectors |
+| `vector_dimension` nullable | الأبعاد |
+| `stage_timings_ms` JSON | أزمنة المراحل |
+| `warnings` JSON nullable | تحذيرات منظمة |
+| `error_code` nullable | رمز ثابت |
+| `failure_reason` TEXT nullable | رسالة منقحة لا تحتوي Secrets |
+| `comparison_report` JSON nullable | العينات والنتيجة المضغوطة، بلا vectors |
+| `temporary_artifact_ref` nullable | Opaque token |
+| `temporary_expires_at` nullable | TTL |
+| `qdrant_collection` nullable | Collection الفعلية |
+| `indexed_at` nullable | وقت اكتمال الفهرسة |
+| `selected_at` nullable | وقت الاعتماد |
+| `discarded_at` nullable | وقت الاستبعاد |
+| `expired_at` nullable | وقت الانتهاء |
+| timestamps | Audit |
+
+الفهارس:
+
+```text
+(document_id, status)
+(document_id, profile, created_at)
+(status, temporary_expires_at)
+```
+
+حالات Run:
+
+```text
+pending
+processing
+ready_for_comparison
+selected
+indexing
+indexed
+discarded
+failed
+expired
+```
+
+### 174.7.3 ربط selected run
+
+بعد إنشاء Runs، تضيف Migration مستقلة:
+
+```text
+documents.selected_processing_run_id NULL
+FK → document_processing_runs.id
+restrictOnDelete
+INDEX
+```
+
+يتحقق Domain Service أن الـRun يعود إلى الوثيقة نفسها وأن حالته `indexed`. تغيير هذا الحقل وعلامات Run يتم داخل Transaction في Laravel بعد تأكيد FastAPI نجاح Qdrant.
+
+### 174.7.4 جدول `document_processing_comparisons`
+
+| العمود | الغرض |
+|---|---|
+| `id` | Comparison ID |
+| `document_id` | الوثيقة |
+| `user_id` | صاحب القرار، للدفاع والتدقيق |
+| `cloud_run_id` | Run الأول |
+| `hybrid_local_run_id` | Run الثاني |
+| `selected_run_id` nullable | الفائز |
+| `status` | `processing/ready/decided/expired/failed` |
+| `trial_question` TEXT nullable | سؤال المقارنة |
+| `decided_at` nullable | وقت الاعتماد |
+| `expires_at` | نهاية TTL |
+| timestamps | Audit |
+
+تفرض Services أن جميع Runs تعود إلى Document وUser نفسيهما. لا تحفظ Cloud cost.
+
+### 174.7.5 حالات Document التجميعية
+
+```text
+pending
+scanning
+infected
+queued
+processing
+awaiting_selection
+indexing
+ready
+failed
+selection_expired
+```
+
+`ready` تعني حصراً: يوجد selected run حالته `indexed` ويمكن استخدامه في المحادثة.
+
+### 174.7.6 المحادثات والرسائل
+
+يبقى `conversation_document` هو Pivot الذي يحدد وثيقة واحدة أو عدة وثائق لكل محادثة، مع Unique مركب:
+
+```text
+UNIQUE(conversation_id, document_id)
+```
+
+إضافات `messages`:
+
+```text
+document_ids_snapshot JSON NULL
+processing_profiles JSON NULL
+llm_provider VARCHAR(32) NULL
+llm_model VARCHAR(255) NULL
+processing_time_ms BIGINT UNSIGNED NULL
+processing_metrics JSON NULL
+```
+
+`document_ids_snapshot` يحفظ نطاق البحث لحظة السؤال حتى تبقى الرسالة قابلة للتدقيق إذا غيّر المستخدم ملفات المحادثة لاحقاً.
+
+يبقى `message_sources` ويضاف عند الحاجة:
+
+```text
+processing_run_id
+processing_profile
+source_title
+```
+
+`reranker_score` يعني **درجة صلة المصدر بالسؤال**، ولا يسمى دقة الإجابة أو Confidence.
+
+## 174.8 Qdrant Schema
+
+نستخدم Collection منفصلة لكل مساحة Embedding لتجنب مقارنة vectors من نماذج مختلفة:
+
+```text
+rag_documents_cloud
+rag_documents_hybrid_local
+```
+
+كلاهما Dense dimension = 1024 حالياً، لكن تساوي الأبعاد لا يعني توافق فضاءي النموذجين.
+
+Payload كل Chunk:
+
+```text
+user_id
+document_id
+processing_run_id
+processing_profile
+file_type
+source
+page
+section
+chunk_index
+text
+```
+
+Indexes الإلزامية للأمان والأداء:
+
+```text
+user_id
+document_id
+processing_run_id
+processing_profile
+```
+
+معرّف Point يكون UUID ثابتاً مشتقاً أو مسجلاً بطريقة تجعل Promotion/Reprocess idempotent. لا يستخدم `RESET_COLLECTION=True`.
+
+## 174.9 اختيار ملفات المحادثة والبحث المقيّد
+
+تجربة المستخدم المطلوبة:
+
+- يمكن للمستخدم أن يرفع ملفات متعددة عبر عمليات Upload منفصلة.
+- بعد أن تصبح الملفات `ready` تظهر ضمن مكتبته.
+- في أعلى أي محادثة يوجد زر `اختيار الملفات`.
+- يختار المستخدم ملفاً واحداً أو عدة ملفات يملكها.
+- الاختيار لا يعتمد على مكان المعالجة؛ يعتمد على selected runs الموجودة فعلياً في Qdrant.
+
+Laravel لا يأخذ IDs موثوقة من Browser. في كل سؤال:
+
+1. يتحقق من Ownership للمحادثة.
+2. يقرأ `conversation_document` من MySQL.
+3. يتحقق أن كل Document مملوك للمستخدم و`ready`.
+4. يتحقق أن selected run `indexed`.
+5. يبني `document_targets` من بيانات الخادم.
+6. يحفظ Snapshot على الرسالة.
+7. يرسل الطلب إلى FastAPI.
+
+شكل Target:
+
+```json
+{
+  "document_id": 12,
+  "processing_run_id": 81,
+  "processing_profile": "cloud",
+  "qdrant_collection": "rag_documents_cloud"
+}
+```
+
+FastAPI يطبق دائماً:
+
+```text
+user_id = current user
+AND document_id IN selected documents
+AND processing_run_id = selected run for each document
+```
+
+ولا يبحث في كل Qdrant.
+
+### محادثة تحتوي Profiles مختلفة
+
+إذا اختيرت وثيقة Cloud ووثيقة Hybrid Local:
+
+1. يجمع FastAPI Targets حسب Profile/Collection.
+2. ينشئ Query embedding الصحيح لكل مجموعة.
+3. ينفذ Dense + BM25 retrieval داخل كل Collection.
+4. يطبق RRF داخل كل Profile.
+5. يطبق Reranker الموافق للمسار.
+6. يدمج النتائج النهائية بدمج رتبي مثل RRF، لا بمقارنة raw scores من نماذج مختلفة.
+7. يبني Context موحداً مع الحفاظ على مصدر كل Chunk.
+
+لا يطلب من المستخدم اختيار Profile في شاشة المحادثة.
+
+في Cloud-only deployment لا تعرض Blade وثيقة يتطلب selected run الخاص بها Provider غير متاح في تلك البيئة، ويشرح النظام سبب عدم توفرها بدلاً من تنفيذ Fallback.
+
+## 174.10 عقد سؤال RAG
+
+### Request من Laravel إلى FastAPI
+
+```json
+{
+  "user_id": 7,
+  "conversation_id": 51,
+  "message_id": 900,
+  "document_targets": [
+    {
+      "document_id": 12,
+      "processing_run_id": 81,
+      "processing_profile": "cloud",
+      "qdrant_collection": "rag_documents_cloud"
+    }
+  ],
+  "question": "ما أهم النتائج؟"
+}
+```
+
+### Response
+
+```json
+{
+  "answer": "أظهرت الوثيقة ... [المصدر 1]",
+  "llm": {
+    "provider": "hugging_face",
+    "model": "Qwen/Qwen3.5-9B"
+  },
+  "processing_profiles": ["cloud"],
+  "sources": [
+    {
+      "source_number": 1,
+      "document_id": 12,
+      "document_title": "study.pdf",
+      "processing_run_id": 81,
+      "processing_profile": "cloud",
+      "page": 15,
+      "section": null,
+      "chunk_index": 48,
+      "qdrant_point_id": "uuid",
+      "reranker_score": 0.91,
+      "text_preview": "..."
+    }
+  ],
+  "timings_ms": {
+    "query_embedding": 30,
+    "retrieval": 80,
+    "fusion": 5,
+    "reranking": 120,
+    "context_building": 4,
+    "generation": 900,
+    "total": 1139
+  }
+}
+```
+
+`debug` مثل retrieved counts متاح في Development فقط. Laravel يتحقق من DTO schema ولا يحفظ استجابة غير صالحة كإجابة مكتملة.
+
+## 174.11 FastAPI Endpoints المطلوبة
+
+```text
+GET  /api/v1/capabilities
+GET  /api/v1/health
+POST /api/v1/documents/process
+POST /api/v1/document-comparisons/{comparison_id}/query
+POST /api/v1/document-comparisons/{comparison_id}/select
+DELETE /api/v1/documents/{document_id}
+POST /api/v1/rag/ask
+GET  /api/v1/admin/documents/{document_id}/chunks
+```
+
+- `capabilities` يعيد Deployment mode وProfiles المتاحة وصحة Providers دون Secrets.
+- `process` يستقبل Run IDs صادرة من Laravel ولا ينشئ ملكية جديدة.
+- `query` يعيد Top chunks للتجربة دون نقل vectors.
+- `select` ينفذ Promotion idempotent ويعيد count verification.
+- Admin chunks endpoint داخلي، paginated، ويتطلب API authentication وبيانات فلترة موثوقة.
+
+كل endpoint يحمل Correlation ID ويدعم أخطاء منظمة وtimeouts وidempotency keys حيث يلزم.
+
+## 174.12 تصميم صفحات Blade بعد تسجيل الدخول
+
+يُطوّر القالب الحالي `resources/views/components/layouts/app.blade.php` من Header بسيط إلى App Shell RTL responsive.
+
+### Navigation
+
+Desktop sidebar:
+
+- لوحة التحكم.
+- ملفاتي.
+- المحادثات.
+- الإعدادات.
+- رابط Filament يظهر للمشرف فقط.
+
+Mobile:
+
+- زر لفتح Drawer بنفس العناصر.
+- Focus trap وEscape وARIA labels.
+
+Top bar:
+
+- عنوان الصفحة.
+- حالة خدمات مختصرة عند الحاجة.
+- اسم المستخدم.
+- الإعدادات.
+- تسجيل الخروج.
+
+### لوحة التحكم `/workspace`
+
+تحل محل النص المؤقت الحالي وتعرض:
+
+- بطاقة عدد الملفات الكلي.
+- Ready / Processing / Awaiting selection / Failed.
+- عدد المحادثات.
+- آخر الملفات مع الحالة والإجراء التالي.
+- آخر المحادثات.
+- زر `رفع ملف`.
+- زر `محادثة جديدة` معطّل مع تفسير إذا لم توجد وثيقة قابلة للمحادثة.
+- بطاقة Deployment mode: Cloud أو Local، والقدرات المتاحة بصياغة مفهومة.
+
+### قائمة الملفات `/documents`
+
+- Table على Desktop وCards على Mobile.
+- الاسم والعنوان والنوع والحجم والحالة وتاريخ الرفع.
+- selected processing profile للوثيقة الجاهزة.
+- مؤشرات Processing وAwaiting selection وExpired وFailed.
+- بحث وفرز وتصفية بالحالة والنوع.
+- Actions: تفاصيل، تنزيل مصرح، إعادة معالجة، مقارنة عند توفرها، حذف.
+- لا تعرض Qdrant collection أو IDs تقنية للمستخدم العادي.
+
+### صفحة رفع ملف `/documents/upload`
+
+- Dropzone وFile picker، ملف واحد فقط.
+- الأنواع والحجم المسموحان.
+- Radio cards للقدرات المتاحة:
+  - Cloud.
+  - Hybrid Local.
+  - Compare both.
+- في Online Cloud-only يظهر Cloud ثابتاً ولا تظهر الخيارات الأخرى.
+- وصف الخصوصية والاعتماد على Cloud لكل خيار بدقة.
+- لا تعرض تقدير تكلفة.
+- Progress لحالات Upload وScan وQueue.
+- الأخطاء بجانب الحقل مع Retry آمن.
+
+### تفاصيل الوثيقة `/documents/{document}`
+
+- بيانات الملف وSHA-256 والحالة.
+- Timeline: Upload → Scan → Processing → Selection/Indexing → Ready.
+- selected profile ومعلومات Run الملخصة.
+- عدد الصفحات/chunks ومدة المعالجة والتحذيرات.
+- زر المحادثة مع هذه الوثيقة إذا كانت ready.
+- Download/Delete/Reprocess وفق Policy.
+- لا تعرض raw vectors.
+
+### شاشة المقارنة `/documents/{document}/comparison`
+
+تعرض Cloud مقابل Hybrid Local في عمودين أو Tabs على الهاتف:
+
+- Profile والنماذج.
+- أزمنة المراحل والإجمالي.
+- الصفحات والـchunks وأبعاد/عدد vectors.
+- Chunk samples وحدود التقسيم.
+- Errors/Warnings.
+- حقل `سؤال اختبار`.
+- زر تشغيل الاختبار.
+- أفضل المقاطع والمصادر لكل مسار.
+- `reranker_score` بعنوان `درجة صلة المصدر`.
+- زر `اعتماد هذا المسار` لكل طرف مع Confirmation واضح.
+- Countdown/تاريخ انتهاء artifacts.
+- لا يوجد Cost field.
+
+سؤال الاختبار موصى به وليس إلزامياً تقنياً؛ يجوز الاعتماد بدونه بعد Confirmation يوضح أن المقارنة النوعية لم تُجر.
+
+### قائمة المحادثات `/conversations`
+
+- New conversation.
+- العنوان وآخر رسالة ووقت التحديث وعدد الملفات المحددة.
+- Empty state يوجه أولاً لرفع وثيقة.
+
+### المحادثة `/conversations/{conversation}`
+
+- Sidebar أو قائمة للمحادثات.
+- أعلى المحادثة زر واضح `اختيار الملفات`.
+- Modal multi-select يعرض فقط وثائق المستخدم الجاهزة والمفهرسة والمدعومة في Runtime الحالي.
+- Search داخل الوثائق وSelect all visible.
+- Chips بأسماء الملفات المختارة مع إزالة مصرح بها.
+- لا يوجد اختيار Cloud/Local هنا.
+- يمنع إرسال سؤال بلا وثيقة مع رسالة واضحة.
+- الرسائل تدعم Pending/Processing/Failed/Retry.
+- جواب المساعد يعرض اسم نموذج التوليد بشكل ثانوي.
+- قسم Sources قابل للفتح يعرض الوثيقة والصفحة/القسم وpreview ودرجة صلة المصدر.
+- قسم Performance يعرض الزمن الإجمالي وتفصيل المراحل.
+- لا تستخدم عبارة `دقة الإجابة` للـreranker.
+
+### حالات الواجهة الإلزامية
+
+- Loading skeletons.
+- Empty states.
+- Permission denied.
+- Provider unavailable.
+- Expired comparison.
+- Processing failure مع correlation/reference مناسب.
+- Offline/network retry دون تكرار Job.
+- RTL كامل، keyboard navigation، contrast مناسب، responsive.
+
+## 174.13 Filament
+
+تضاف الموارد:
+
+- Users.
+- Documents.
+- DocumentProcessingRuns.
+- DocumentProcessingComparisons.
+- Conversations.
+- Messages.
+
+في `DocumentResource` توجد صفحة/Action read-only باسم `Qdrant Chunks`:
+
+- تتصل Laravel بـFastAPI internal admin endpoint فقط.
+- لا تتصل Laravel مباشرة بـQdrant.
+- تستخدم pagination.
+- ترسل `user_id` و`document_id` و`selected_processing_run_id`.
+- تعرض النص الكامل للـchunk، الصفحة/القسم، `chunk_index`، Profile، Run ID، Point ID وmetadata.
+- لا تعرض raw vectors.
+- لا تسمح بتعديل أو حذف Chunk منفرد من Filament.
+- تسجل عملية المشاهدة في Admin audit log.
+
+Widgets:
+
+- Documents by aggregate status.
+- Runs by Profile/status.
+- Comparisons awaiting decision/expired.
+- Failed/Infected documents.
+- Processing duration percentiles.
+- Qdrant indexed chunk counts.
+
+## 174.14 الأمان والخصوصية
+
+- Laravel مصدر الحقيقة للـOwnership.
+- Browser لا يرسل IDs يعتمد عليها دون إعادة تحميلها وتفويضها.
+- FastAPI لا يقبل Request من Browser مباشرة.
+- Internal API key، request signing أو mTLS لاحقاً؛ لا Secrets في logs.
+- Qdrant غير مكشوف للإنترنت.
+- كل Retrieval/Delete/Admin browse يطبق user/document/run filters.
+- Temporary artifacts في مسار خاص، بأذونات محدودة، وCleanup دوري.
+- Chunk samples في Laravel تعتبر بيانات وثيقة خاصة وتخضع للـPolicy نفسها.
+- Logs لا تحتوي محتوى الوثيقة الكامل أو prompts/sources إلا في وضع Debug محلي صريح.
+- Errors العائدة للمستخدم منقحة؛ التفاصيل التقنية في logs مع Correlation ID.
+
+## 174.15 الاختبارات ومعايير القبول
+
+### Database
+
+- Migrations up/down على MySQL.
+- Foreign keys والفهارس والأطوال صحيحة.
+- لا يمكن ربط Run بوثيقة أخرى.
+- لا يمكن اختيار Run غير indexed أو تابع لمستخدم آخر.
+- Unique pivot للمحادثة.
+
+### Capabilities
+
+- Cloud mode يعرض ويقبل Cloud فقط.
+- Tampered local/compare request في Cloud mode يعود `422`.
+- Cloud image لا يحتوي local models أو Torch/Transformers/Ollama.
+- Local mode يعلن الخيارات وفق صحة Providers الفعلية.
+- Config غير المتوافق يفشل عند startup.
+
+### Compare
+
+- ينشأ Runان فقط للوثيقة نفسها.
+- التقرير لا يحتوي vector values ولا cost.
+- سؤال الاختبار يعيد مصادر صحيحة لكل مسار.
+- اختيار الفائز idempotent.
+- لا يُحذف الخاسر قبل نجاح الفائز.
+- Cleanup يعلّم expired ويحذف artifacts بعد TTL.
+
+### Qdrant
+
+- Collections منفصلة.
+- payload indexes موجودة.
+- count بعد Promotion يساوي expected vector_count.
+- Reprocess لا يكرر Points.
+- كل query مفلتر بـuser/document/run.
+
+### Conversations
+
+- ملف واحد وعدة ملفات.
+- ملفات Profiles متجانسة ومختلطة.
+- تغيير الملفات يؤثر على الأسئلة الجديدة فقط ويحفظ Snapshot القديم.
+- User A لا يستطيع اختيار أو البحث في Document User B حتى بطلب يدوي.
+- المصادر تعود للوثائق المختارة فقط.
+- timing totals منطقية، ودرجة reranker تعرض كصلة مصدر.
+
+### Filament
+
+- المشرف فقط يرى Chunks.
+- pagination والفلاتر إلزامية.
+- لا vectors ولا direct edit/delete.
+- كل Browse audited.
+
+### UI
+
+- Cloud-only لا يظهر خيارات غير متاحة.
+- Upload ملف واحد.
+- Comparison responsive وبحالات loading/error/expired.
+- اختيار عدة وثائق من أعلى المحادثة.
+- Sources وtimings ظاهرة ويمكن الوصول إليها بلوحة المفاتيح.
+
+## 174.16 خريطة المهام المنقحة
+
+هذه الخريطة تستبدل تفاصيل المراحل B–Q القديمة عند التعارض، مع إبقاء A1–A5 منجزة كما هي. كل Task تنفذ في Chat وفرع وPR مستقلين ما لم يسجل ملف التقدم دمجاً صريحاً.
+
+### المرحلة B — Documents Foundation
+
+- `B1` documents migration وفق 174.7.1 فقط.
+- `B2` Document model والعلاقات الأساسية.
+- `B3` FileType وDocumentStatus enums/casts.
+- `B4` DocumentPolicy واختبارات ownership.
+- `B5` Documents index/details Blade skeleton.
+- `B6` Upload validation لملف واحد PDF/DOCX/TXT.
+- `B7` Private storage/download authorization.
+- `B8` SHA-256 وسياسة duplicate على مستوى Application.
+- `B9` document_processing_runs migration.
+- `B10` ProcessingRun model/enums/relations.
+- `B11` selected_processing_run_id migration وDomain invariants.
+- `B12` document_processing_comparisons migration/model.
+
+### المرحلة C — Security Pipeline
+
+- `C1` ClamAV infrastructure.
+- `C2` DocumentSecurityService.
+- `C3` Temporary upload flow.
+- `C4` clean path.
+- `C5` infected/fail-closed path.
+- `C6` aggregate status transitions.
+- `C7` security tests.
+
+### المرحلة D — FastAPI Foundation and Capabilities
+
+- `D1` FastAPI project.
+- `D2` typed config.
+- `D3` structured logging/correlation IDs.
+- `D4` internal API security.
+- `D5` health.
+- `D6` versioned DTO schemas.
+- `D7` structured exceptions.
+- `D8` deployment capabilities endpoint.
+- `D9` startup configuration validation.
+- `D10` base/cloud/local dependency split.
+
+### المرحلة E — Qdrant
+
+- `E1` Local Qdrant + persistent volume.
+- `E2` cloud collection.
+- `E3` hybrid-local collection.
+- `E4` dense/sparse configs.
+- `E5` payload indexes.
+- `E6` Point builder with run metadata.
+- `E7` idempotent upsert/count/delete.
+- `E8` cross-user leakage tests.
+
+### المرحلة F — Parsing and Normalization
+
+- `F1` Loader interface.
+- `F2` LlamaParse provider.
+- `F3` PDF loader.
+- `F4` DOCX loader.
+- `F5` TXT loader.
+- `F6` normalized document/page/section schema.
+- `F7` shared parse result reuse for Compare.
+- `F8` loader tests.
+
+### المرحلة G — Profile Processing
+
+- `G1` ProcessingProfile interface/registry.
+- `G2` Cloud chunking.
+- `G3` Cloud Jina embeddings.
+- `G4` Cloud sparse representation.
+- `G5` Hybrid Local chunking.
+- `G6` Local BGE-M3 embeddings.
+- `G7` Local BM25.
+- `G8` batching/retries/rate limits.
+- `G9` metrics/report builder بلا vectors/cost.
+- `G10` profile parity and isolation tests.
+
+### المرحلة H — Temporary Artifacts and Promotion
+
+- `H1` private artifact store/opaque references.
+- `H2` 24-hour TTL configuration.
+- `H3` temporary retrieval index.
+- `H4` winner promotion.
+- `H5` count verification.
+- `H6` loser cleanup.
+- `H7` scheduled expiration cleanup.
+- `H8` idempotency/failure recovery tests.
+
+### المرحلة I — Laravel Processing Orchestration
+
+- `I1` AiServiceClient.
+- `I2` processing DTOs.
+- `I3` ProcessDocumentJob.
+- `I4` single-profile flow.
+- `I5` compare flow وإنشاء Runين.
+- `I6` report persistence.
+- `I7` test-question endpoint flow.
+- `I8` winner selection transaction.
+- `I9` aggregate status projector.
+- `I10` queue retries/timeouts.
+
+### المرحلة J — Blade Documents Experience
+
+- `J1` authenticated responsive app shell/sidebar.
+- `J2` workspace dashboard.
+- `J3` documents list/cards/filters.
+- `J4` one-file upload page and capability-aware options.
+- `J5` document details/timeline.
+- `J6` comparison screen.
+- `J7` trial-question interaction.
+- `J8` select-winner confirmation/states.
+- `J9` accessibility/responsive/error states.
+
+### المرحلة K — Conversations Database
+
+- `K1` conversations migration/model.
+- `K2` conversation_document unique pivot.
+- `K3` messages migration with snapshots/metrics.
+- `K4` message_sources with run/profile.
+- `K5` policies.
+- `K6` create/list conversations.
+- `K7` multi-document selection.
+- `K8` ready/indexed/runtime-capable filtering.
+
+### المرحلة L — Retrieval and Reranking
+
+- `L1` trusted document_targets contract.
+- `L2` Cloud query embeddings/retrieval.
+- `L3` Hybrid Local query embeddings/retrieval.
+- `L4` mandatory user/document/run filters.
+- `L5` per-profile Dense + BM25 + RRF.
+- `L6` Cloud Jina reranker.
+- `L7` Local BGE reranker.
+- `L8` cross-profile rank fusion.
+- `L9` metadata/source preservation.
+- `L10` retrieval quality/security tests.
+
+### المرحلة M — Generation
+
+- `M1` ContextService.
+- `M2` prompt/insufficient-context behavior.
+- `M3` LLMProvider interface/factory.
+- `M4` HF Router `Qwen/Qwen3.5-9B`.
+- `M5` Ollama `qwen3.5:4b`.
+- `M6` no-fallback/provider validation.
+- `M7` answer/sources/timings response.
+- `M8` provider contract tests.
+
+### المرحلة N — Chat Experience
+
+- `N1` chat layout/list.
+- `N2` top document multi-selector.
+- `N3` selected chips and authorization.
+- `N4` AskConversationJob.
+- `N5` save snapshots/answer/metrics.
+- `N6` sources drawer with relevance score.
+- `N7` timings display.
+- `N8` pending/failure/retry.
+- `N9` mixed-profile end-to-end chat tests.
+
+### المرحلة O — Filament
+
+- `O1` Resources الأساسية.
+- `O2` ProcessingRuns/Comparisons resources.
+- `O3` dashboard widgets.
+- `O4` failed/infected/expired filters.
+- `O5` safe retry actions.
+- `O6` FastAPI admin chunks endpoint/client.
+- `O7` read-only paginated Qdrant Chunks view.
+- `O8` admin audit logging.
+- `O9` authorization/no-vectors tests.
+
+### المرحلة P — Security and Operations
+
+- `P1` ownership/IDOR.
+- `P2` Qdrant leakage across users/documents/runs.
+- `P3` MIME/size/malware.
+- `P4` FastAPI authentication.
+- `P5` private download and chunk-sample authorization.
+- `P6` artifact TTL/permissions.
+- `P7` secret/log redaction.
+- `P8` deletion/reprocessing consistency.
+
+### المرحلة Q — Final Validation and Deployment
+
+- `Q1` PDF/DOCX/TXT E2E.
+- `Q2` Cloud profile E2E.
+- `Q3` Hybrid Local profile E2E.
+- `Q4` Compare/select E2E.
+- `Q5` multi-document/mixed-profile chat E2E.
+- `Q6` queue/service restart and Qdrant persistence.
+- `Q7` RAG quality/source correctness.
+- `Q8` performance report.
+- `Q9` Cloud-only lightweight image verification.
+- `Q10` Local Ollama profile verification.
+- `Q11` backup/restore.
+- `Q12` final documentation.
+
+## 174.17 Definition of Done الجديدة
+
+### Document ready
+
+- الملف مملوك للمستخدم واجتاز Validation وClamAV.
+- يوجد selected processing run واحد.
+- Run حالته `indexed`.
+- Qdrant count مطابق وpayload كامل.
+- لا توجد artifacts خاسرة غير منتهية بلا سبب.
+- الوثيقة تظهر كخيار محادثة فقط إذا كان Runtime يستطيع الاستعلام من Profile المختار.
+
+### Compare decided
+
+- التقرير للطرفين محفوظ بلا vectors أو cost.
+- سؤال الاختبار، إن استخدم، ومصادره محفوظة.
+- الفائز رُفع وتحقق count.
+- Transaction حدّث selected run والحالات.
+- الخاسر حُذف من التخزين المؤقت بعد النجاح.
+
+### Question completed
+
+- Conversation والمستندات مخولة.
+- Snapshot محفوظ.
+- Qdrant filters تشمل user/document/run.
+- Profiles المختلطة عولجت دون مقارنة raw scores.
+- Answer وsources وtimings والنموذج محفوظون.
+- كل Source يعرض درجة صلة المصدر لا ادعاء دقة الإجابة.
+
+## 174.18 قرارات غير قابلة للتفاوض
+
+1. Online لا يحمل أي Local embedding/reranker/LLM model.
+2. Cloud deployment يقبل Cloud processing فقط في UI وbackend.
+3. Local deployment يمكنه Cloud أو Hybrid Local أو Compare.
+4. Compare لا يرسل raw vectors إلى Laravel ولا يعرض Cloud cost.
+5. لا يدخل Qdrant إلا selected winner.
+6. لا Retrieval بلا `user_id + document_id + processing_run_id`.
+7. Laravel هو مصدر الحقيقة للملكية والاختيار.
+8. FastAPI بلا قاعدة أعمال علائقية مستقلة في v1.
+9. المحادثة تختار وثيقة أو عدة وثائق، لا Processing profile.
+10. `reranker_score` درجة صلة مصدر وليست دقة إجابة.
+11. Filament يشاهد Chunks عبر FastAPI read-only ولا يتصل مباشرة بـQdrant.
+12. Local generation model هو `qwen3.5:4b` عبر Ollama.
+13. Cloud generation model هو `Qwen/Qwen3.5-9B` عبر Hugging Face Router.
+14. B1 يبقى ضيقاً وينشئ جدول documents فقط وفق 174.7.1.

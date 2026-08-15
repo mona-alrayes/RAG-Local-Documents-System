@@ -17,13 +17,15 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Initialized
+Verified Main Commit: f0f5c35071ce29057bee0266961c66370f627ca3
+Last Merged PR: #9 — [A5] Queue Setup
 Last Completed Task: A5 — إعداد Queue
 Current Task: B1 — إنشاء documents migration
 Current Task Status: TODO
 Expected Task Branch: task/B1-documents-migration
 Next Task After Completion: B2 — Document model
 Open Blockers: لا يوجد
-Required Context: هذا الملف + الخطة الرئيسية عند الحاجة فقط
+Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
 
 ## قاعدة الانتقال بين المحادثات
@@ -110,180 +112,202 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 
 ---
 
-# 5. المرحلة B — Documents Domain
+# 5. المرحلة B — Documents Foundation
 
 | المهمة | الحالة |
 |---|---|
-| B1 إنشاء documents migration | TODO |
-| B2 Document model | TODO |
-| B3 DocumentStatus enum | TODO |
-| B4 DocumentPolicy | TODO |
-| B5 صفحة Documents | TODO |
-| B6 Upload validation | TODO |
-| B7 Private storage | TODO |
-| B8 SHA-256 | TODO |
+| B1 documents migration وفق Master Plan 174.7.1 | TODO |
+| B2 Document model والعلاقات الأساسية | TODO |
+| B3 FileType وDocumentStatus enums/casts | TODO |
+| B4 DocumentPolicy واختبارات ownership | TODO |
+| B5 Documents index/details Blade skeleton | TODO |
+| B6 Upload validation لملف واحد | TODO |
+| B7 Private storage/download authorization | TODO |
+| B8 SHA-256 وسياسة duplicate في Application | TODO |
+| B9 document_processing_runs migration | TODO |
+| B10 ProcessingRun model/enums/relations | TODO |
+| B11 selected_processing_run_id migration/invariants | TODO |
+| B12 document_processing_comparisons migration/model | TODO |
 
-**معيار انتهاء المرحلة:** المستخدم يستطيع رفع ملف صالح ويظهر في قائمة ملفاته بدون معالجة AI بعد.
+**معيار انتهاء المرحلة:** Domain الوثائق وRuns والمقارنات ممثلة بوضوح، دون تنفيذ AI.
 
 ---
 
-# 6. المرحلة C — ClamAV
+# 6. المرحلة C — Security Pipeline
 
 | المهمة | الحالة |
 |---|---|
-| C1 إضافة ClamAV infrastructure | TODO |
+| C1 ClamAV infrastructure | TODO |
 | C2 DocumentSecurityService | TODO |
 | C3 Temporary upload flow | TODO |
-| C4 Scan clean files | TODO |
-| C5 Reject infected files | TODO |
-| C6 Status transitions | TODO |
-| C7 Tests | TODO |
+| C4 Clean path | TODO |
+| C5 Infected/fail-closed path | TODO |
+| C6 Aggregate status transitions | TODO |
+| C7 Security tests | TODO |
 
-**معيار انتهاء المرحلة:** لا يمكن لملف لم يجتز ClamAV الوصول إلى Queue الخاصة بمعالجة AI.
+**معيار انتهاء المرحلة:** لا يصل ملف غير نظيف إلى Queue أو FastAPI.
 
 ---
 
-# 7. المرحلة D — FastAPI Foundation
+# 7. المرحلة D — FastAPI Foundation and Capabilities
 
 | المهمة | الحالة |
 |---|---|
-| D1 إنشاء مشروع FastAPI | TODO |
-| D2 Config | TODO |
-| D3 Logging | TODO |
+| D1 FastAPI project | TODO |
+| D2 Typed config | TODO |
+| D3 Structured logging/correlation IDs | TODO |
 | D4 Internal API security | TODO |
 | D5 Health endpoint | TODO |
-| D6 Schemas | TODO |
+| D6 Versioned DTO schemas | TODO |
 | D7 Structured exceptions | TODO |
+| D8 Deployment capabilities endpoint | TODO |
+| D9 Startup configuration validation | TODO |
+| D10 Base/cloud/local dependency split | TODO |
 
-**معيار انتهاء المرحلة:** Laravel يستطيع الاتصال بـFastAPI داخلياً والحصول على Health response.
+**معيار انتهاء المرحلة:** Laravel يرى صحة FastAPI وقدرات البيئة، وCloud image لا يحمل Local AI dependencies.
 
 ---
 
-# 8. المرحلة E — Qdrant Local
+# 8. المرحلة E — Qdrant
 
 | المهمة | الحالة |
 |---|---|
-| E1 تشغيل Qdrant محلياً | TODO |
-| E2 إضافة Docker volume | TODO |
-| E3 إنشاء `rag_documents` | TODO |
-| E4 Dense vector config | TODO |
-| E5 Sparse vector config | TODO |
-| E6 Payload indexes | TODO |
-| E7 اختبار الاتصال | TODO |
+| E1 Local Qdrant + persistent volume | TODO |
+| E2 `rag_documents_cloud` collection | TODO |
+| E3 `rag_documents_hybrid_local` collection | TODO |
+| E4 Dense/sparse configs | TODO |
+| E5 Payload indexes | TODO |
+| E6 Point builder مع run metadata | TODO |
+| E7 Idempotent upsert/count/delete | TODO |
+| E8 Cross-user leakage tests | TODO |
 
-**معيار انتهاء المرحلة:** FastAPI يستطيع إدخال واسترجاع وحذف Points من Qdrant المحلي.
+**معيار انتهاء المرحلة:** Collections منفصلة ودائمة وآمنة وقابلة للإدخال والاسترجاع والحذف.
 
 ---
 
-# 9. المرحلة F — Document Loaders
+# 9. المرحلة F — Parsing and Normalization
 
 | المهمة | الحالة |
 |---|---|
-| F1 Base loader interface | TODO |
-| F2 PDF Loader | TODO |
-| F3 DOCX Loader | TODO |
-| F4 TXT Loader | TODO |
-| F5 Normalized document schema | TODO |
-| F6 Loader tests | TODO |
+| F1 Loader interface | TODO |
+| F2 LlamaParse provider | TODO |
+| F3 PDF loader | TODO |
+| F4 DOCX loader | TODO |
+| F5 TXT loader | TODO |
+| F6 Normalized page/section schema | TODO |
+| F7 Reuse parsed result in Compare | TODO |
+| F8 Loader tests | TODO |
 
-**معيار انتهاء المرحلة:** PDF/DOCX/TXT تتحول إلى Documents موحدة قابلة للـChunking.
+**معيار انتهاء المرحلة:** الملفات الثلاثة تتحول إلى تمثيل موحد ويمكن مشاركة Parsing في Compare.
 
 ---
 
-# 10. المرحلة G — Chunking + Embeddings
+# 10. المرحلة G — Profile Processing
 
 | المهمة | الحالة |
 |---|---|
-| G1 ChunkingService | TODO |
-| G2 EmbeddingService | TODO |
-| G3 Passage/query separation | TODO |
-| G4 Batch processing | TODO |
-| G5 Retry/rate limit handling | TODO |
-| G6 Metadata propagation | TODO |
+| G1 ProcessingProfile registry | TODO |
+| G2 Cloud chunking | TODO |
+| G3 Cloud Jina embeddings | TODO |
+| G4 Cloud sparse representation | TODO |
+| G5 Hybrid Local chunking | TODO |
+| G6 Local BGE-M3 embeddings | TODO |
+| G7 Local BM25 | TODO |
+| G8 Batch/retry/rate-limit | TODO |
+| G9 Metrics/report بلا vectors/cost | TODO |
+| G10 Profile isolation tests | TODO |
 
-**معيار انتهاء المرحلة:** كل Document ينتج chunks لها vectors صحيحة وmetadata كاملة.
+**معيار انتهاء المرحلة:** كل Profile ينتج Chunks وVectors وتقريراً صحيحاً دون خلط Providers.
 
 ---
 
-# 11. المرحلة H — Qdrant Ingestion
+# 11. المرحلة H — Temporary Artifacts and Promotion
 
 | المهمة | الحالة |
 |---|---|
-| H1 Point builder | TODO |
-| H2 UUID generation | TODO |
-| H3 Dense vectors | TODO |
-| H4 BM25 sparse representation | TODO |
-| H5 Upload batches | TODO |
-| H6 Count verification | TODO |
-| H7 Delete by user/document | TODO |
-| H8 Reprocessing without duplicates | TODO |
+| H1 Private artifact store/opaque refs | TODO |
+| H2 Configurable 24h TTL | TODO |
+| H3 Temporary retrieval index | TODO |
+| H4 Winner promotion | TODO |
+| H5 Count verification | TODO |
+| H6 Loser cleanup | TODO |
+| H7 Scheduled expiration cleanup | TODO |
+| H8 Idempotency/failure recovery tests | TODO |
 
-**معيار انتهاء المرحلة:** يمكن معالجة وثيقة كاملة ورؤية جميع chunks الخاصة بها داخل Qdrant.
+**معيار انتهاء المرحلة:** لا تدخل Qdrant الدائمة إلا نتيجة فائزة متحقق منها.
 
 ---
 
-# 12. المرحلة I — Laravel ↔ FastAPI Document Processing
+# 12. المرحلة I — Laravel Processing Orchestration
 
 | المهمة | الحالة |
 |---|---|
 | I1 AiServiceClient | TODO |
-| I2 `POST /documents/process` | TODO |
+| I2 Processing DTOs | TODO |
 | I3 ProcessDocumentJob | TODO |
-| I4 Status handling | TODO |
-| I5 total_chunks | TODO |
-| I6 total_pages | TODO |
-| I7 failure_reason | TODO |
-| I8 UI status refresh | TODO |
+| I4 Single-profile flow | TODO |
+| I5 Compare flow وإنشاء Runين | TODO |
+| I6 Report persistence | TODO |
+| I7 Trial-question flow | TODO |
+| I8 Winner selection transaction | TODO |
+| I9 Aggregate status projector | TODO |
+| I10 Queue retries/timeouts | TODO |
 
-**معيار انتهاء المرحلة:** المستخدم يرفع PDF/DOCX/TXT، يمر بـClamAV ثم Queue ثم FastAPI ويصبح Ready.
-
----
-
-# 13. المرحلة J — Conversations
-
-| المهمة | الحالة |
-|---|---|
-| J1 Conversations migration | TODO |
-| J2 conversation_document | TODO |
-| J3 messages | TODO |
-| J4 message_sources | TODO |
-| J5 ConversationPolicy | TODO |
-| J6 Create conversation | TODO |
-| J7 List conversations | TODO |
-| J8 Select documents | TODO |
-| J9 Only ready documents | TODO |
-
-**معيار انتهاء المرحلة:** المستخدم يستطيع إنشاء محادثة واختيار عدة وثائق يملكها.
+**معيار انتهاء المرحلة:** Single أو Compare يكتملان بحالة متسقة بين Laravel وFastAPI وQdrant.
 
 ---
 
-# 14. المرحلة K — Retrieval
+# 13. المرحلة J — Blade Documents Experience
 
 | المهمة | الحالة |
 |---|---|
-| K1 Query embedding | TODO |
-| K2 Security filter (`user_id`, `document_ids`) | TODO |
-| K3 Dense retrieval | TODO |
-| K4 BM25 retrieval | TODO |
-| K5 RRF | TODO |
-| K6 Top candidates | TODO |
-| K7 Development debug helper | TODO |
+| J1 Responsive authenticated app shell/sidebar | TODO |
+| J2 Workspace dashboard | TODO |
+| J3 Documents list/cards/filters | TODO |
+| J4 One-file upload + capability-aware options | TODO |
+| J5 Document details/timeline | TODO |
+| J6 Comparison screen | TODO |
+| J7 Trial-question interaction | TODO |
+| J8 Select-winner confirmation/states | TODO |
+| J9 Accessibility/responsive/error states | TODO |
 
-**معيار انتهاء المرحلة:** السؤال يسترجع المقاطع ذات الصلة فقط من وثائق المستخدم المختارة.
+**معيار انتهاء المرحلة:** المستخدم يرفع ويتابع ويقارن ويعتمد النتيجة من واجهة RTL واضحة.
 
 ---
 
-# 15. المرحلة L — Reranking
+# 14. المرحلة K — Conversations Database
 
 | المهمة | الحالة |
 |---|---|
-| L1 Jina Reranker client | TODO |
-| L2 Convert Qdrant points to reranker nodes | TODO |
-| L3 Rerank | TODO |
-| L4 Top 5 | TODO |
-| L5 Preserve metadata | TODO |
+| K1 Conversations migration/model | TODO |
+| K2 conversation_document unique pivot | TODO |
+| K3 Messages + snapshots/metrics | TODO |
+| K4 message_sources + run/profile | TODO |
+| K5 Policies | TODO |
+| K6 Create/list conversations | TODO |
+| K7 Multi-document selection | TODO |
+| K8 Ready/indexed/runtime-capable filtering | TODO |
 
-**معيار انتهاء المرحلة:** أفضل chunks بعد reranking جاهزة لبناء السياق.
+**معيار انتهاء المرحلة:** المحادثة تختار ملفاً أو عدة ملفات يملكها المستخدم ومفهرسة فعلياً.
+
+---
+
+# 15. المرحلة L — Retrieval and Reranking
+
+| المهمة | الحالة |
+|---|---|
+| L1 Trusted document_targets contract | TODO |
+| L2 Cloud query embeddings/retrieval | TODO |
+| L3 Hybrid Local query embeddings/retrieval | TODO |
+| L4 Mandatory user/document/run filters | TODO |
+| L5 Per-profile Dense + BM25 + RRF | TODO |
+| L6 Cloud Jina reranker | TODO |
+| L7 Local BGE reranker | TODO |
+| L8 Cross-profile rank fusion | TODO |
+| L9 Metadata/source preservation | TODO |
+| L10 Retrieval quality/security tests | TODO |
+
+**معيار انتهاء المرحلة:** الاسترجاع يقتصر على الملفات المختارة ويدعم Profiles مختلطة دون مقارنة raw scores.
 
 ---
 
@@ -292,33 +316,33 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 | المهمة | الحالة |
 |---|---|
 | M1 ContextService | TODO |
-| M2 Prompt file | TODO |
-| M3 GenerationService | TODO |
-| M4 LLM Provider abstraction | TODO |
-| M5 Cloud provider | TODO |
-| M6 Local provider | TODO |
-| M7 Sources array | TODO |
-| M8 Insufficient-information behavior | TODO |
+| M2 Prompt/insufficient-context | TODO |
+| M3 LLMProvider interface/factory | TODO |
+| M4 HF `Qwen/Qwen3.5-9B` | TODO |
+| M5 Ollama `qwen3.5:4b` | TODO |
+| M6 No-fallback/provider validation | TODO |
+| M7 Answer/sources/timings response | TODO |
+| M8 Provider contract tests | TODO |
 
-**معيار انتهاء المرحلة:** FastAPI يعيد Answer + Sources بعقد ثابت ومنظم.
+**معيار انتهاء المرحلة:** التوليد يعمل بالعقد نفسه في Cloud وLocal دون تحميل Local LLM في Online.
 
 ---
 
-# 17. المرحلة N — Laravel Chat Flow
+# 17. المرحلة N — Chat Experience
 
 | المهمة | الحالة |
 |---|---|
-| N1 إرسال سؤال | TODO |
-| N2 Save user message | TODO |
-| N3 Assistant placeholder | TODO |
+| N1 Chat layout/list | TODO |
+| N2 Top document multi-selector | TODO |
+| N3 Selected chips/authorization | TODO |
 | N4 AskConversationJob | TODO |
-| N5 FastAPI request | TODO |
-| N6 Save answer | TODO |
-| N7 Save sources | TODO |
-| N8 Livewire refresh | TODO |
-| N9 Error display | TODO |
+| N5 Save snapshots/answer/metrics | TODO |
+| N6 Sources drawer/relevance score | TODO |
+| N7 Timings display | TODO |
+| N8 Pending/failure/retry | TODO |
+| N9 Mixed-profile E2E chat tests | TODO |
 
-**معيار انتهاء المرحلة:** المستخدم يجري محادثة كاملة مع عدة وثائق ويشاهد المصادر.
+**معيار انتهاء المرحلة:** المستخدم يحادث وثيقة أو عدة وثائق ويشاهد المصادر والأزمنة ودرجة صلة كل مصدر.
 
 ---
 
@@ -326,49 +350,55 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 
 | المهمة | الحالة |
 |---|---|
-| O1 UserResource | TODO |
-| O2 DocumentResource | TODO |
-| O3 ConversationResource | TODO |
-| O4 Dashboard widgets | TODO |
-| O5 Failed documents filters | TODO |
-| O6 Infected uploads monitoring | TODO |
-| O7 Retry action | TODO |
+| O1 Core Resources | TODO |
+| O2 ProcessingRuns/Comparisons Resources | TODO |
+| O3 Dashboard widgets | TODO |
+| O4 Failed/infected/expired filters | TODO |
+| O5 Safe retry actions | TODO |
+| O6 FastAPI admin chunks endpoint/client | TODO |
+| O7 Read-only paginated Qdrant Chunks | TODO |
+| O8 Admin audit logging | TODO |
+| O9 Authorization/no-vectors tests | TODO |
 
-**معيار انتهاء المرحلة:** المشرف يستطيع مراقبة حالة النظام من لوحة Filament.
-
----
-
-# 19. المرحلة P — الاختبارات الأمنية
-
-| المهمة | الحالة |
-|---|---|
-| P1 Ownership tests | TODO |
-| P2 IDOR attempts | TODO |
-| P3 Qdrant leakage tests | TODO |
-| P4 ClamAV failures | TODO |
-| P5 MIME spoofing | TODO |
-| P6 Invalid extensions | TODO |
-| P7 File size limits | TODO |
-| P8 FastAPI API key | TODO |
-| P9 Private download authorization | TODO |
-
-**معيار انتهاء المرحلة:** لا يستطيع مستخدم الوصول أو البحث أو التنزيل من وثائق مستخدم آخر.
+**معيار انتهاء المرحلة:** المشرف يراقب النظام ويشاهد Chunks بأمان دون وصول Laravel مباشر إلى Qdrant.
 
 ---
 
-# 20. المرحلة Q — الاختبارات النهائية
+# 19. المرحلة P — Security and Operations
 
 | المهمة | الحالة |
 |---|---|
-| Q1 PDF scenarios | TODO |
-| Q2 DOCX scenarios | TODO |
-| Q3 TXT scenarios | TODO |
-| Q4 RAG questions | TODO |
-| Q5 Queue failures | TODO |
-| Q6 Service restarts | TODO |
-| Q7 Qdrant persistence | TODO |
+| P1 Ownership/IDOR | TODO |
+| P2 Qdrant leakage by user/document/run | TODO |
+| P3 MIME/size/malware | TODO |
+| P4 FastAPI authentication | TODO |
+| P5 Private download/chunk authorization | TODO |
+| P6 Artifact TTL/permissions | TODO |
+| P7 Secret/log redaction | TODO |
+| P8 Deletion/reprocessing consistency | TODO |
 
-**معيار انتهاء المرحلة:** النظام يعمل End-to-End بعد إعادة تشغيل الخدمات ولا تضيع البيانات.
+**معيار انتهاء المرحلة:** لا تسرب بين المستخدمين أو الوثائق أو Runs، ولا تبقى artifacts أو Points يتيمة.
+
+---
+
+# 20. المرحلة Q — Final Validation
+
+| المهمة | الحالة |
+|---|---|
+| Q1 PDF/DOCX/TXT E2E | TODO |
+| Q2 Cloud profile E2E | TODO |
+| Q3 Hybrid Local profile E2E | TODO |
+| Q4 Compare/select E2E | TODO |
+| Q5 Multi-document/mixed-profile chat E2E | TODO |
+| Q6 Queue/restart/Qdrant persistence | TODO |
+| Q7 RAG quality/source correctness | TODO |
+| Q8 Performance report | TODO |
+| Q9 Cloud-only lightweight image verification | TODO |
+| Q10 Local Ollama profile verification | TODO |
+| Q11 Backup/restore | TODO |
+| Q12 Final documentation | TODO |
+
+**معيار انتهاء المرحلة:** المساران والمقارنة والمحادثة متعددة الملفات يعملون End-to-End بأمان وبعد Restart.
 
 ---
 
@@ -393,11 +423,16 @@ Required Context: هذا الملف + الخطة الرئيسية عند الح�
 | DPL-15 اختبار PDF | TODO |
 | DPL-16 اختبار DOCX | TODO |
 | DPL-17 اختبار TXT | TODO |
-| DPL-18 Cloud LLM Test | TODO |
-| DPL-19 Local LLM Test | TODO |
-| DPL-20 Security Test | TODO |
-| DPL-21 Backup Test | TODO |
-| DPL-22 Restart Test | TODO |
+| DPL-18 Cloud-only capability/UI/API test | TODO |
+| DPL-19 التحقق أن Online image بلا Torch/Transformers/Ollama/models | TODO |
+| DPL-20 HF `Qwen/Qwen3.5-9B` test | TODO |
+| DPL-21 Security test | TODO |
+| DPL-22 Backup/restore test | TODO |
+| DPL-23 Restart/persistence test | TODO |
+| DPL-24 Local demo profile منفصل مع Ollama `qwen3.5:4b` | TODO |
+| DPL-25 Compare flow على الجهاز المحلي | TODO |
+
+**قاعدة النشر:** النسخة Online تستخدم `RAG_DEPLOYMENT_MODE=cloud` ولا تشغّل أو تنزّل أي Local embedding/reranker/LLM. الـLocal demo مسار تشغيل منفصل على جهاز صاحبة المشروع.
 
 ---
 
@@ -775,6 +810,18 @@ A2 — إعداد Authentication
 | 2026-08-12 | بدء المشروع من الصفر وإلغاء P0 | لا يوجد Codebase سابق يحتاج إلى Baseline Audit |
 | 2026-08-12 | Task واحدة لكل Chat | تقليل استهلاك نافذة السياق وتحسين التنظيم والتتبع |
 | 2026-08-12 | اعتماد `CURRENT HANDOFF` في أعلى ملف التقدم | تمكين أي محادثة جديدة من معرفة نقطة الاستكمال فوراً |
+| 2026-08-15 | اعتماد Profiles: `cloud` و`hybrid_local` و`compare` في البيئة المحلية | تمكين مقارنة مسارين للوثيقة نفسها ثم حفظ الفائز فقط |
+| 2026-08-15 | جعل Online deployment Cloud-only | إبقاء النسخة المنشورة خفيفة بلا تنزيل Embedding/Reranker/LLM محلي |
+| 2026-08-15 | اعتماد `Qwen/Qwen3.5-9B` عبر Hugging Face Router للـCloud | هو اسم النموذج المثبت في المرجع التقني Cloud |
+| 2026-08-15 | اعتماد Ollama `qwen3.5:4b` للتوليد المحلي | النموذج موجود محلياً لدى صاحبة المشروع ولا يدخل نسخة Online |
+| 2026-08-15 | فصل Document عن Processing Runs | الوثيقة تمثل الملكية والملف والحالة التجميعية، بينما Run يمثل النماذج والنتائج والأخطاء والأزمنة |
+| 2026-08-15 | عدم إضافة قاعدة بيانات علائقية مستقلة لـFastAPI في v1 | Laravel/MySQL مصدر الحقيقة، وFastAPI يستخدم temporary artifacts وQdrant فقط |
+| 2026-08-15 | حفظ selected winner فقط في Persistent Qdrant | منع مضاعفة الفهرس، مع إبقاء تقارير Audit للمقارنة في MySQL |
+| 2026-08-15 | Collection منفصلة لكل Embedding profile | منع خلط فضاءات Jina وBGE-M3 حتى إن تساوت الأبعاد |
+| 2026-08-15 | اختيار وثيقة أو عدة وثائق لكل محادثة | البحث يقيد بـuser/document/selected-run metadata ولا يبحث في كامل Qdrant |
+| 2026-08-15 | دمج نتائج Profiles المختلطة رتبياً | raw reranker scores من نماذج مختلفة غير قابلة للمقارنة المباشرة |
+| 2026-08-15 | عرض Sources وtimings ودرجة صلة المصدر | `reranker_score` لا يمثل دقة الإجابة ولا يسمى Confidence |
+| 2026-08-15 | عرض Chunks في Filament عبر FastAPI read-only | الحفاظ على Separation of Concerns ومنع وصول Laravel المباشر إلى Qdrant |
 
 ---
 
@@ -793,11 +840,61 @@ Status: TODO
 
 ## الهدف
 
-إنشاء migration لجدول `documents` وفق متطلبات Documents Domain في الخطة الرئيسية.
+إنشاء migration لجدول `documents` وفق القسم `174.7.1` من الخطة الرئيسية، دون إدخال حقول Processing Runs أو منطق مهام لاحقة.
 
 ## ملاحظة البدء
 
-تُراجع متطلبات B1 من الخطة الرئيسية في محادثة مستقلة قبل التنفيذ.
+متطلبات B1 المعتمدة:
+
+```text
+id
+user_id                 FK users + restrictOnDelete
+original_name           varchar(255)
+stored_name             varchar(255)
+title                    varchar(255) nullable
+file_path                varchar(1024)
+file_type                varchar(16)
+mime_type                varchar(255)
+file_size                unsigned big integer
+sha256                   char(64)
+status                   varchar(32), default pending
+created_at / updated_at
+```
+
+الفهارس:
+
+```text
+(user_id, status)
+(user_id, sha256)        non-unique
+(user_id, created_at)
+```
+
+خارج نطاق B1:
+
+```text
+selected_processing_run_id
+document_processing_runs
+document_processing_comparisons
+failure_reason
+total_pages
+total_chunks
+qdrant_collection
+processed_at
+models / timings / reports
+Enums / Model / Policy / Upload UI
+```
+
+لا تعتبر B1 منجزة قبل:
+
+- مراجعة اسم ملف migration وTimestamp.
+- مراجعة أنواع الأعمدة وForeign Key وسياسة الحذف والفهارس.
+- نجاح `php artisan migrate:fresh` في بيئة الاختبار المخصصة.
+- نجاح `php artisan migrate:rollback --step=1` ثم إعادة migration.
+- نجاح اختبارات Laravel الحالية.
+- نجاح `git diff --check`.
+- مراجعة `git diff` و`git status` والتأكد أن التغيير يخص B1 فقط.
+- Review Result = `APPROVED`.
+- تحديث هذا الملف في Commit توثيق منفصل بعد اعتماد كود المهمة.
 
 ---
 
