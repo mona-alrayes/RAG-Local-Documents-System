@@ -2,7 +2,7 @@
 
 > **المرجع:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** توثيق التنفيذ الفعلي خطوة بخطوة دون تعديل الخطة المعمارية الأصلية.  
-> **آخر تحديث:** 2026-08-15
+> **آخر تحديث:** 2026-08-16
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -16,14 +16,14 @@
 Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
-Repository Status: Initialized
-Verified Main Commit: f805e846b094661437eb45c92b35ef458006994b
-Last Merged PR: #13 — [B4] Add document ownership policy
-Last Completed Task: B5 — Documents index/details Blade skeleton
-Current Task: B6 — Upload validation لملف واحد
+Repository Status: Active Development
+Verified Main Commit: 3f7d762c61ff14f6ad258f7779bd0e735a2324a4
+Last Merged PR: #14 — [B5] Add documents index and details Blade skeleton
+Last Completed Task: B6 — Upload validation لملف واحد
+Current Task: B7 — Private storage/download authorization
 Current Task Status: TODO
-Expected Task Branch: task/B6-upload-validation
-Next Task After Completion: B7 — Private storage/download authorization
+Expected Task Branch: task/B7-private-storage-download
+Next Task After Completion: B8 — SHA-256 وسياسة duplicate في Application
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -121,7 +121,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | B3 FileType وDocumentStatus enums/casts | DONE |
 | B4 DocumentPolicy واختبارات ownership | DONE |
 | B5 Documents index/details Blade skeleton | DONE |
-| B6 Upload validation لملف واحد | TODO |
+| B6 Upload validation لملف واحد | DONE |
 | B7 Private storage/download authorization | TODO |
 | B8 SHA-256 وسياسة duplicate في Application | TODO |
 | B9 document_processing_runs migration | TODO |
@@ -437,6 +437,87 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-16 — B6 Upload validation لملف واحد
+
+Status: DONE
+
+Task:
+B6
+
+Branch:
+`task/B6-upload-validation`
+
+Pull Request:
+Pending
+
+Reviewed Commit:
+`b98174e5ad1872763063b198d920024fb3ad4ed6`
+
+### تم التنفيذ
+
+- إضافة Route من نوع `POST /documents` داخل مجموعة `auth` و`verified`.
+- إضافة `UploadDocumentRequest` مع Authorization عبر `DocumentPolicy::create`.
+- إضافة `SecureDocumentUpload` كقاعدة تحقق أمنية متخصصة.
+- السماح برفع ملف واحد فقط من نوع PDF أو DOCX أو TXT.
+- مطابقة الامتداد مع MIME المكتشف من المحتوى.
+- تطبيق فحص بنيوي أولي لكل نوع:
+  - التحقق من توقيع PDF وعلامة النهاية.
+  - التحقق من بنية DOCX الأساسية كحزمة OOXML.
+  - التحقق من أن TXT نص UTF-8 صالح وليس ملفًا ثنائيًا أو PDF/ZIP متنكرًا.
+- رفض أسماء الملفات الخطرة، والمسارات، والامتدادات المركبة، والأسماء المخفية، ومحارف HTML والتحكم.
+- دعم أسماء الملفات العربية وUnicode ضمن سياسة أحرف مسموحة.
+- اعتماد حد رفع افتراضي قابل للضبط بقيمة 10 MB.
+- حماية DOCX من الحزم الشاذة عبر حد 1000 entry و50 MB للحجم غير المضغوط.
+- رفض المسارات الداخلية الخطرة داخل حزم DOCX.
+- إعلان `ext-zip` كمتطلب منصة في Composer.
+- إبقاء الاسم الأصلي كبيانات غير موثوقة وعدم استخدامه للتخزين.
+- إعادة `204 No Content` عند نجاح التحقق دون تخزين الملف أو إنشاء سجل `Document`.
+
+### الملفات المنشأة أو المعدلة
+
+- `laravel-app/.env.example`
+- `laravel-app/app/Http/Controllers/DocumentController.php`
+- `laravel-app/app/Http/Requests/UploadDocumentRequest.php`
+- `laravel-app/app/Rules/SecureDocumentUpload.php`
+- `laravel-app/composer.json`
+- `laravel-app/composer.lock`
+- `laravel-app/config/documents.php`
+- `laravel-app/routes/web.php`
+- `laravel-app/tests/Feature/Documents/DocumentUploadValidationTest.php`
+
+### التحقق والاختبارات
+
+- PASS — قبول PDF وDOCX وTXT السليمة دون Persistence.
+- PASS — رفض عدم تطابق الامتداد والمحتوى وDOCX غير السليم.
+- PASS — رفض أسماء الملفات الخطرة.
+- PASS — رفض الملف المتجاوز للحد المضبوط.
+- PASS — اختبارات B6: 4 اختبارات و34 assertions.
+- PASS — مجموعة Laravel الكاملة: 31 اختبارًا و121 assertions.
+- PASS — ملفات المهمة اجتازت Laravel Pint.
+- PASS — `composer validate --no-check-publish`.
+- PASS — `git diff --check`.
+- PASS — لم يُنشأ أي سجل `Document` ولم يُخزن أي ملف.
+
+### القرارات
+
+- اعتماد 10 MB كحد رفع افتراضي قابل للضبط عبر `DOCUMENT_UPLOAD_MAX_SIZE_KB`.
+- عدم الثقة باسم الملف أو امتداده أو MIME منفردًا.
+- استخدام الاسم الأصلي كـdisplay metadata فقط.
+- تأجيل توليد اسم التخزين العشوائي والتخزين الخاص والتنزيل المفوض إلى B7.
+- تأجيل quarantine وClamAV والفحص fail-closed إلى المرحلة C.
+- اعتماد 1000 entry و50 MB غير مضغوط كحدود أولية لحزم DOCX.
+
+Review Result:
+APPROVED
+
+Open Issues:
+- يوجد تنسيق Pint قديم في `bootstrap/providers.php` خارج نطاق B6؛ غير حاجب ولم يُعدّل ضمن المهمة.
+
+Next Task:
+B7 — Private storage/download authorization
+
+---
 
 ## 2026-08-15 — B5 Documents index/details Blade skeleton
 
@@ -1076,29 +1157,32 @@ A2 — إعداد Authentication
 | 2026-08-15 | دمج نتائج Profiles المختلطة رتبياً | raw reranker scores من نماذج مختلفة غير قابلة للمقارنة المباشرة |
 | 2026-08-15 | عرض Sources وtimings ودرجة صلة المصدر | `reranker_score` لا يمثل دقة الإجابة ولا يسمى Confidence |
 | 2026-08-15 | عرض Chunks في Filament عبر FastAPI read-only | الحفاظ على Separation of Concerns ومنع وصول Laravel المباشر إلى Qdrant |
-
+| 2026-08-16 | اعتماد حد رفع افتراضي 10 MB قابل للضبط | منع استنزاف الموارد مع إبقاء السياسة قابلة للتغيير حسب بيئة التشغيل |
+| 2026-08-16 | عدم الثقة باسم الملف أو امتداده أو MIME منفردًا | تطبيق دفاع متعدد الطبقات ضد التنكر والمسارات والأسماء الخطرة |
+| 2026-08-16 | اعتماد 1000 entry و50 MB غير مضغوط كحدود DOCX أولية | تقليل خطر ZIP bombs واستنزاف الذاكرة والمعالج |
+| 2026-08-16 | إبقاء التخزين وإعادة التسمية لـB7 وClamAV للمرحلة C | الحفاظ على فصل المسؤوليات ومنع الأمان الشكلي |
 ---
 
 # 24. العوائق والملاحظات
 
-لا توجد عوائق مسجلة حتى الآن.
-
+- لا توجد عوائق حالية.
+- توجد ملاحظة تنسيق Pint قديمة في `laravel-app/bootstrap/providers.php` خارج نطاق B6؛ لا تؤثر في الاختبارات أو تشغيل المهمة.
 ---
 
 # 25. المهمة الحالية
 
 ```text
-B6 — Upload validation لملف واحد
+B7 — Private storage/download authorization
 Status: TODO
 ```
 
 ## الهدف
 
-إضافة Validation لرفع ملف واحد من نوع PDF أو DOCX أو TXT، مع التحقق من امتداد الملف وMIME الفعلي والحجم المسموح، دون تنفيذ التخزين الدائم أو ClamAV أو Queue أو أي معالجة للوثيقة.
+إضافة التخزين الخاص للوثيقة بعد نجاح التحقق، مع توليد اسم تخزين عشوائي من الخادم وعدم استخدام الاسم الأصلي في المسار، وإنشاء سجل Document بالبيانات الموثوقة، وتوفير تنزيل مفوض يمنع الوصول إلى وثائق المستخدمين الآخرين.
 
 ## ملاحظة البدء
 
-تُراجع متطلبات رفع الوثائق في القسمين `174.4` و`174.16` من الخطة الرئيسية، ثم تُفحص أنماط Form Requests والاختبارات والواجهة الحالية قبل التنفيذ. يجب وضع حد الحجم في Configuration بدل Hardcoding، وعدم اعتبار امتداد الملف وحده دليلًا كافيًا على نوعه، مع إبقاء التخزين والفحص الأمني والمعالجة خارج نطاق B6.
+تُراجع متطلبات التخزين والتحميل والـAuthorization في القسم 174 من الخطة الرئيسية قبل التنفيذ. يجب تخزين الملفات خارج Web root، واستخدام اسم عشوائي وامتداد موثوق، ومنع overwrite، وإبقاء quarantine وClamAV وQueue والمعالجة خارج نطاق B7.
 
 ---
 
