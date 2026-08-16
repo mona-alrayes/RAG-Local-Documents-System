@@ -23,9 +23,8 @@ return [
         ],
 
         'docx' => [
-            'max_entries' => 2000,
-            'max_uncompressed_bytes' => 100 * 1024 * 1024,
-            'max_compression_ratio' => 20,
+            'max_entries' => 1000,
+            'max_uncompressed_bytes' => 50 * 1024 * 1024,
         ],
     ],
 ];
