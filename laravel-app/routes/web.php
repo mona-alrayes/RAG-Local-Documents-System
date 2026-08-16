@@ -17,4 +17,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/documents/{document}', [DocumentController::class, 'show'])
         ->name('documents.show');
+
+    Route::post('/documents', [DocumentController::class, 'store'])
+        ->name('documents.store');
 });
