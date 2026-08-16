@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UploadDocumentRequest;
 use App\Models\Document;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
@@ -26,5 +28,10 @@ class DocumentController extends Controller
         Gate::authorize('view', $document);
 
         return view('documents.show', compact('document'));
+    }
+
+    public function store(UploadDocumentRequest $request): Response
+    {
+        return response()->noContent();
     }
 }
