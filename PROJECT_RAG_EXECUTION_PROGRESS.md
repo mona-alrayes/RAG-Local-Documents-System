@@ -2,7 +2,7 @@
 
 > **المرجع:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** توثيق التنفيذ الفعلي خطوة بخطوة دون تعديل الخطة المعمارية الأصلية.  
-> **آخر تحديث:** 2026-08-16
+> **آخر تحديث:** 2026-08-19
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -17,13 +17,13 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: 3f7d762c61ff14f6ad258f7779bd0e735a2324a4
-Last Merged PR: #14 — [B5] Add documents index and details Blade skeleton
-Last Completed Task: B6 — Upload validation لملف واحد
-Current Task: B7 — Private storage/download authorization
+Verified Main Commit: b02a94dbe8f35eb4e04cafb2c3bcaa56e7d6fdfc
+Last Merged PR: #15 — B6 Upload validation لملف واحد
+Last Completed Task: B7 — Private storage/download authorization
+Current Task: B8 — SHA-256 وسياسة duplicate في Application
 Current Task Status: TODO
-Expected Task Branch: task/B7-private-storage-download
-Next Task After Completion: B8 — SHA-256 وسياسة duplicate في Application
+Expected Task Branch: task/B8-sha256-duplicate-policy
+Next Task After Completion: B9 — document_processing_runs migration
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -122,7 +122,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | B4 DocumentPolicy واختبارات ownership | DONE |
 | B5 Documents index/details Blade skeleton | DONE |
 | B6 Upload validation لملف واحد | DONE |
-| B7 Private storage/download authorization | TODO |
+| B7 Private storage/download authorization | DONE |
 | B8 SHA-256 وسياسة duplicate في Application | TODO |
 | B9 document_processing_runs migration | TODO |
 | B10 ProcessingRun model/enums/relations | TODO |
@@ -438,6 +438,88 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 
 # 22. سجل الإنجاز
 
+## 2026-08-19 — B7 Private storage/download authorization
+
+Status: DONE
+
+Task:
+B7
+
+Branch:
+`task/B7-private-storage-download`
+
+Pull Request:
+Pending
+
+Reviewed Commit:
+Pending
+
+Merge Commit:
+Pending
+
+### تم التنفيذ
+
+- إعادة استخدام `UploadDocumentRequest` و`SecureDocumentUpload` من B6 دون تكرار منطق التحقق.
+- إضافة private filesystem disk مخصص للوثائق داخل `storage/app/private/documents`.
+- إضافة `DocumentStorageService` لفصل مسؤولية التخزين وإنشاء سجل الوثيقة عن الـController.
+- توليد اسم تخزين Server-side باستخدام ULID دون استخدام أي جزء من الاسم الأصلي.
+- استخدام الامتداد الذي اجتاز Validation في B6.
+- تخزين الملفات داخل مسار خاص بالمستخدم باستخدام معرف المستخدم واسم التخزين العشوائي.
+- إنشاء سجل `Document` من خلال علاقة المستخدم مع metadata الموثوقة.
+- استخدام MIME والحجم المكتشفين Server-side.
+- منع overwrite عبر التحقق من عدم وجود المسار المولد قبل التخزين.
+- حذف الملف المخزن إذا فشل إنشاء سجل `Document`.
+- إضافة `DocumentPolicy::download` للتحكم بتنزيل الوثائق حسب الملكية.
+- إضافة Route خاص بتنزيل الوثيقة عبر Controller.
+- تنزيل الملف كـattachment بالاسم الأصلي للمستخدم.
+- إضافة `X-Content-Type-Options: nosniff` إلى استجابة التنزيل.
+- التأكد من عدم تخزين الوثائق على public disk وعدم السماح لمستخدم آخر بتنزيلها.
+- جعل `sha256` nullable مؤقتًا حتى تنفيذ B8، لأن حساب SHA-256 وسياسة duplicate خارج نطاق B7.
+- تحديث اختبار B6 ليتوافق مع انتقال `POST /documents` من validation-only إلى persistence بعد نجاح Validation.
+- استخدام fake private storage في الاختبارات لمنع إنشاء ملفات اختبار حقيقية.
+
+### الملفات المنشأة أو المعدلة
+
+- `PROJECT_RAG_EXECUTION_PROGRESS.md`
+- `laravel-app/app/Http/Controllers/DocumentController.php`
+- `laravel-app/app/Policies/DocumentPolicy.php`
+- `laravel-app/app/Services/Documents/DocumentStorageService.php`
+- `laravel-app/config/filesystems.php`
+- `laravel-app/routes/web.php`
+- `laravel-app/database/migrations/2026_08_16_230641_make_sha256_nullable_on_documents_table.php`
+- `laravel-app/tests/Feature/Documents/DocumentPrivateStorageDownloadTest.php`
+- `laravel-app/tests/Feature/Documents/DocumentUploadValidationTest.php`
+
+### التحقق والاختبارات
+
+- PASS — اختبارات B6: 4 اختبارات و33 assertions.
+- PASS — اختبارات B7: 2 اختبار و22 assertions.
+- PASS — مجموعة Laravel الكاملة: 33 اختبارًا و142 assertions.
+- PASS — Laravel Pint.
+- PASS — `git diff --check`.
+
+### القرارات
+
+- اعتماد disk مستقل باسم `documents` للوثائق الخاصة.
+- عدم استخدام الاسم الأصلي في filesystem path نهائيًا.
+- اعتماد ULID كاسم تخزين Server-generated.
+- إبقاء الاسم الأصلي كـdisplay/download metadata فقط.
+- فصل التخزين وإنشاء سجل الوثيقة داخل `DocumentStorageService`.
+- تطبيق authorization على download عبر `DocumentPolicy`.
+- جعل `sha256` nullable مؤقتًا حتى B8 دون تنفيذ hash أو duplicate policy داخل B7.
+- إبقاء ClamAV وQueue وAI خارج نطاق B7.
+
+Review Result:
+APPROVED — التنفيذ والاختبارات المحلية ناجحة، بانتظار Commit وPull Request.
+
+Open Issues:
+- `sha256` nullable مؤقتًا؛ تتم معالجة SHA-256 وسياسة duplicate في B8.
+
+Next Task:
+B8 — SHA-256 وسياسة duplicate في Application
+
+---
+
 ## 2026-08-16 — B6 Upload validation لملف واحد
 
 Status: DONE
@@ -449,10 +531,13 @@ Branch:
 `task/B6-upload-validation`
 
 Pull Request:
-Pending
+#15
 
 Reviewed Commit:
 `b98174e5ad1872763063b198d920024fb3ad4ed6`
+
+Merge Commit:
+`b02a94dbe8f35eb4e04cafb2c3bcaa56e7d6fdfc`
 
 ### تم التنفيذ
 
@@ -1172,17 +1257,18 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B7 — Private storage/download authorization
+B8 — SHA-256 وسياسة duplicate في Application
 Status: TODO
 ```
 
 ## الهدف
 
-إضافة التخزين الخاص للوثيقة بعد نجاح التحقق، مع توليد اسم تخزين عشوائي من الخادم وعدم استخدام الاسم الأصلي في المسار، وإنشاء سجل Document بالبيانات الموثوقة، وتوفير تنزيل مفوض يمنع الوصول إلى وثائق المستخدمين الآخرين.
+إضافة حساب `SHA-256` للوثائق بعد التخزين، واعتماد سياسة واضحة لاكتشاف الملفات المكررة على مستوى المستخدم داخل Laravel، دون إدخال Queue أو ClamAV أو أي منطق AI.
+
 
 ## ملاحظة البدء
 
-تُراجع متطلبات التخزين والتحميل والـAuthorization في القسم 174 من الخطة الرئيسية قبل التنفيذ. يجب تخزين الملفات خارج Web root، واستخدام اسم عشوائي وامتداد موثوق، ومنع overwrite، وإبقاء quarantine وClamAV وQueue والمعالجة خارج نطاق B7.
+تُراجع حالة `DocumentStorageService` وعمود `sha256` بعد B7، ثم تُحدد سياسة duplicate المعتمدة وفق الخطة الرئيسية قبل التنفيذ. يجب أن يُحسب الـSHA-256 من محتوى الملف المخزن Server-side، وألا يعتمد على أي قيمة مقدمة من المستخدم. يبقى نطاق B8 محصورًا في الـhash وسياسة التكرار داخل Application فقط.
 
 ---
 
