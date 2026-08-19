@@ -17,14 +17,14 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: 82102c1154222e305b73ec89963dfa7cefa56021
-Last Merged PR: #17 — docs(B7): record merge and update execution progress
-Latest Task PR: #18 — feat(B8): add SHA-256 duplicate protection
-Last Completed Task: B8 — SHA-256 وسياسة duplicate في Application
-Current Task: B9 — document_processing_runs migration
+Verified Main Commit: eee235b893a6ec51e0676a4845617bf69e03726a
+Last Merged PR: #18 — feat(B8): add SHA-256 duplicate protection
+Latest Task PR: Pending — B9 PR not opened yet
+Last Completed Task: B9 — document_processing_runs migration
+Current Task: B10 — ProcessingRun model/enums/relations
 Current Task Status: TODO
-Expected Task Branch: task/B9-document-processing-runs-migration
-Next Task After Completion: B10 — ProcessingRun model/enums/relations
+Expected Task Branch: task/B10-processing-run-model
+Next Task After Completion: B11 — selected_processing_run_id migration/invariants
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -125,7 +125,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | B6 Upload validation لملف واحد | DONE |
 | B7 Private storage/download authorization | DONE |
 | B8 SHA-256 وسياسة duplicate في Application | DONE |
-| B9 document_processing_runs migration | TODO |
+| B9 document_processing_runs migration | DONE |
 | B10 ProcessingRun model/enums/relations | TODO |
 | B11 selected_processing_run_id migration/invariants | TODO |
 | B12 document_processing_comparisons migration/model | TODO |
@@ -454,6 +454,72 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 ---
 
 # 22. سجل الإنجاز
+## 2026-08-20 — B9 document_processing_runs migration
+
+Status: DONE
+
+Task:
+B9
+
+Branch:
+`task/B9-document-processing-runs-migration`
+
+Pull Request:
+Pending
+
+### تم التنفيذ
+
+- إنشاء جدول `document_processing_runs` وفق القسم `174.7.2` من Master Plan.
+- إضافة `document_id` كـForeign Key إلى `documents.id`.
+- اعتماد `restrictOnDelete` حسب سياسة حذف الوثائق المعتمدة.
+- إضافة حقول Profile وحالة الـRun وConfiguration snapshot.
+- إضافة عدادات الصفحات والـchunks والـvectors وأبعاد الـvectors.
+- إضافة أزمنة مراحل المعالجة والتحذيرات ومعلومات الفشل.
+- إضافة تقرير المقارنة والـtemporary artifact metadata وTTL.
+- إضافة معلومات Qdrant وحالات indexed/selected/discarded/expired.
+- إضافة الفهارس المطلوبة:
+  - `(document_id, status)`
+  - `(document_id, profile, created_at)`
+  - `(status, temporary_expires_at)`
+- إبقاء ProcessingRun Model والـEnums والـcasts والعلاقات خارج نطاق B9.
+- إبقاء `selected_processing_run_id` خارج B9 للمهمة B11.
+- عدم إضافة Queue أو FastAPI أو Qdrant logic أو Processing services.
+
+### الملفات المنشأة أو المعدلة
+
+- `PROJECT_RAG_EXECUTION_PROGRESS.md`
+- `laravel-app/database/migrations/2026_08_19_223046_create_document_processing_runs_table.php`
+
+### التحقق
+
+- PASS — migration `up()`.
+- PASS — migration `down()` عبر rollback.
+- PASS — إعادة تنفيذ migration بعد rollback.
+- PASS — `php artisan migrate:status`.
+- PASS — فحص Schema الفعلي عبر `php artisan db:table document_processing_runs`.
+- PASS — Foreign Key مع `ON DELETE RESTRICT`.
+- PASS — الفهارس الثلاثة المطلوبة موجودة.
+- PASS — `git diff --check`.
+- لم يتم إنشاء Test suite إضافية لأن التحقق المباشر من MySQL كافٍ لنطاق B9.
+
+### القرارات
+
+- يحتفظ جدول `document_processing_runs` ببيانات كل محاولة/مسار معالجة بصورة مستقلة عن `documents`.
+- محتوى الـchunks الكامل لا يخزن في MySQL؛ التخزين الدائم للـselected chunks سيكون في Qdrant.
+- Laravel يعرض Chunks الإدارية لاحقاً عبر FastAPI وليس باتصال مباشر مع Qdrant.
+- `total_chunks` و`vector_count` يبدأان من `0`.
+- تفاصيل Domain الخاصة بالـProfile والـStatus والـcasts والعلاقات تؤجل إلى B10.
+
+Review Result:
+APPROVED — Schema مطابقة للقسم 174.7.2 والتحقق المباشر على MySQL ناجح.
+
+Open Issues:
+- لا توجد عوائق تخص B9.
+
+Next Task:
+B10 — ProcessingRun model/enums/relations
+
+---
 
 ## 2026-08-19 — B8 SHA-256 وسياسة duplicate في Application
 
@@ -1352,18 +1418,17 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B9 — document_processing_runs migration
+B10 — ProcessingRun model/enums/relations
 Status: TODO
 ```
 
 ## الهدف
 
-إنشاء migration لجدول document_processing_runs وفق الخطة الرئيسية لتمثيل محاولات ومسارات معالجة الوثيقة بصورة مستقلة عن سجل documents، دون تنفيذ Processing logic أو AI integration في هذه المهمة.
-
+إنشاء ProcessingRun Model مع الـEnums والـcasts والعلاقات اللازمة لتمثيل سجلات document_processing_runs داخل Laravel بصورة واضحة وقابلة للصيانة، وربط كل Run بالوثيقة التابعة لها وفق المعمارية المعتمدة في القسم 174، دون إدخال منطق المعالجة الفعلي أو اختيار الـselected run في هذه المهمة.
 
 ## ملاحظة البدء
 
-تُراجع بنية documents الحالية والقسم 174 من الخطة الرئيسية قبل التنفيذ، ويُحصر نطاق B9 في بنية قاعدة البيانات الخاصة بـdocument_processing_runs. يبقى إنشاء Model والـEnums والعلاقات التفصيلية للمهمة B10، ولا يتم إدخال Queue أو FastAPI أو Qdrant أو AI ضمن B9.
+تُراجع بنية جدول document_processing_runs المنجزة في B9 والقسم 174.7.2 قبل التنفيذ. يقتصر نطاق B10 على إنشاء Model والـEnums والـcasts والعلاقات الخاصة بـProcessingRun وDocument بما يتوافق مع حالات الـRun والـProfiles المعتمدة. يبقى selected_processing_run_id وقيود اختيار الـRun الرسمية للمهمة B11، ولا يتم إدخال Queue أو FastAPI أو Qdrant أو Processing Services ضمن B10.
 
 ---
 

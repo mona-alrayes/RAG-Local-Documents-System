@@ -1,0 +1,58 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('document_processing_runs', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('document_id')
+                ->constrained()
+                ->restrictOnDelete();
+
+            $table->string('profile', 32);
+            $table->string('status', 32);
+
+            $table->json('profile_snapshot');
+
+            $table->unsignedInteger('total_pages')->nullable();
+            $table->unsignedBigInteger('total_chunks')->default(0);
+            $table->unsignedBigInteger('vector_count')->default(0);
+            $table->unsignedInteger('vector_dimension')->nullable();
+
+            $table->json('stage_timings_ms');
+            $table->json('warnings')->nullable();
+
+            $table->string('error_code')->nullable();
+            $table->text('failure_reason')->nullable();
+
+            $table->json('comparison_report')->nullable();
+
+            $table->string('temporary_artifact_ref')->nullable();
+            $table->timestamp('temporary_expires_at')->nullable();
+
+            $table->string('qdrant_collection')->nullable();
+
+            $table->timestamp('indexed_at')->nullable();
+            $table->timestamp('selected_at')->nullable();
+            $table->timestamp('discarded_at')->nullable();
+            $table->timestamp('expired_at')->nullable();
+
+            $table->timestamps();
+
+            $table->index(['document_id', 'status']);
+            $table->index(['document_id', 'profile', 'created_at']);
+            $table->index(['status', 'temporary_expires_at']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('document_processing_runs');
+    }
+};
