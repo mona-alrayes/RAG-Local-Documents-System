@@ -17,8 +17,8 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: b02a94dbe8f35eb4e04cafb2c3bcaa56e7d6fdfc
-Last Merged PR: #15 — B6 Upload validation لملف واحد
+Verified Main Commit: f4adb45774133b6b081a6682a03d4b85581c1cc7
+Last Merged PR: #16 — [B7] Add private document storage and authorized downloads
 Last Completed Task: B7 — Private storage/download authorization
 Current Task: B8 — SHA-256 وسياسة duplicate في Application
 Current Task Status: TODO
@@ -449,13 +449,13 @@ Branch:
 `task/B7-private-storage-download`
 
 Pull Request:
-Pending
+#16
 
 Reviewed Commit:
-Pending
+`bb82d433cad7d5b2f099391ae3ccb97794d06085`
 
 Merge Commit:
-Pending
+`f4adb45774133b6b081a6682a03d4b85581c1cc7`
 
 ### تم التنفيذ
 
