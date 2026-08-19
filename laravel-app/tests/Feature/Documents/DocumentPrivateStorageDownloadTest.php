@@ -107,6 +107,7 @@ class DocumentPrivateStorageDownloadTest extends TestCase
             'file_type' => 'txt',
             'mime_type' => 'text/plain',
             'file_size' => strlen('private document'),
+            'sha256' => hash('sha256', 'private document'),
         ]);
 
         $this->actingAs($otherUser)
