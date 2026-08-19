@@ -3,6 +3,7 @@
 namespace App\Services\Documents;
 
 use App\Enums\FileType;
+use App\Exceptions\DuplicateDocumentException;
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -46,6 +47,30 @@ class DocumentStorageService
         }
 
         try {
+            $stream = $disk->readStream($storedPath);
+
+            if (! is_resource($stream)) {
+                throw new RuntimeException(
+                    'Unable to read stored document.',
+                );
+            }
+
+            try {
+                $hashContext = hash_init('sha256');
+                hash_update_stream($hashContext, $stream);
+                $sha256 = hash_final($hashContext);
+            } finally {
+                fclose($stream);
+            }
+
+            $duplicate = $user->documents()
+                ->where('sha256', $sha256)
+                ->first();
+
+            if ($duplicate instanceof Document) {
+                throw new DuplicateDocumentException($duplicate);
+            }
+
             return $user->documents()->create([
                 'original_name' => $file->getClientOriginalName(),
                 'stored_name' => $storedName,
@@ -53,6 +78,7 @@ class DocumentStorageService
                 'file_type' => $fileType,
                 'mime_type' => $mimeType,
                 'file_size' => $fileSize,
+                'sha256' => $sha256,
             ]);
         } catch (Throwable $exception) {
             $disk->delete($storedPath);

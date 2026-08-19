@@ -14,7 +14,7 @@
 > **إستراتيجية المعالجة:** Cloud أو Hybrid Local أو Compare في البيئة المحلية، وCloud فقط في النشر Online
 > **إستراتيجية LLM:** `Qwen/Qwen3.5-9B` عبر Hugging Face Router في Cloud، و`qwen3.5:4b` عبر Ollama محلياً
 > **خطة النشر المرجعية:** Oracle Cloud Always Free + Docker Compose
-> **آخر تحديث للخطة:** 2026-08-15
+> **آخر تحديث للخطة:** 2026-08-19
 
 > [!IMPORTANT]
 > القسم **174 — التعديل المعماري المعتمد** هو المرجع الأحدث والملزم لكل ما يخص مسارات المعالجة، قواعد البيانات، Qdrant، المحادثة، صفحات Blade، Filament والنشر. عند وجود تعارض مع قسم أقدم، تكون الأولوية للقسم 174. أبقينا الأقسام السابقة لحفظ سياق القرارات وعدم فقدان أي معلومة تاريخية.
@@ -6294,6 +6294,11 @@ Top bar:
 - لا تعرض تقدير تكلفة.
 - Progress لحالات Upload وScan وQueue.
 - الأخطاء بجانب الحقل مع Retry آمن.
+- عند محاولة رفع محتوى مكرر لنفس المستخدم، لا تُنشأ وثيقة جديدة ولا تبدأ معالجة جديدة.
+- تعرض الواجهة رسالة واضحة بأن الملف مرفوع مسبقاً، وتتضمن `original_name` للوثيقة الأصلية حتى يعرف المستخدم أي ملف موجود مسبقاً.
+- تستخدم الواجهة `duplicate_document.id` لإتاحة إجراء واضح للانتقال مباشرة إلى صفحة الوثيقة الأصلية بدل إعادة رفعها.
+- لا تعرض الواجهة `sha256` أو `stored_name` أو `file_path` ضمن رسالة التكرار.
+- اختلاف اسم الملف المرفوع لا يغيّر حالة duplicate إذا كان محتواه مطابقاً للوثيقة الأصلية.
 
 ### تفاصيل الوثيقة `/documents/{document}`
 
@@ -6455,6 +6460,8 @@ Widgets:
 
 - Cloud-only لا يظهر خيارات غير متاحة.
 - Upload ملف واحد.
+- عند duplicate upload لنفس المستخدم تظهر رسالة قابلة للتصرف تذكر `original_name` للوثيقة الأصلية وتتيح الانتقال إليها عبر `duplicate_document.id`، دون كشف `sha256` أو `stored_name` أو `file_path`.
+- حالة duplicate متوافقة مع RTL وAccessibility والشاشات الصغيرة، ولا تعرض كرسالة خطأ عامة فقط.
 - Comparison responsive وبحالات loading/error/expired.
 - اختيار عدة وثائق من أعلى المحادثة.
 - Sources وtimings ظاهرة ويمكن الوصول إليها بلوحة المفاتيح.
@@ -6565,12 +6572,12 @@ Widgets:
 - `J1` authenticated responsive app shell/sidebar.
 - `J2` workspace dashboard.
 - `J3` documents list/cards/filters.
-- `J4` one-file upload page and capability-aware options.
+- `J4` one-file upload page, capability-aware options, and duplicate-document UX linking to the original document.
 - `J5` document details/timeline.
 - `J6` comparison screen.
 - `J7` trial-question interaction.
 - `J8` select-winner confirmation/states.
-- `J9` accessibility/responsive/error states.
+- `J9` accessibility/responsive/error states, including actionable duplicate-upload states.
 
 ### المرحلة K — Conversations Database
 

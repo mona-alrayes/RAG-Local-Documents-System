@@ -17,13 +17,14 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: f4adb45774133b6b081a6682a03d4b85581c1cc7
-Last Merged PR: #16 — [B7] Add private document storage and authorized downloads
-Last Completed Task: B7 — Private storage/download authorization
-Current Task: B8 — SHA-256 وسياسة duplicate في Application
+Verified Main Commit: 82102c1154222e305b73ec89963dfa7cefa56021
+Last Merged PR: #17 — docs(B7): record merge and update execution progress
+Latest Task PR: #18 — feat(B8): add SHA-256 duplicate protection
+Last Completed Task: B8 — SHA-256 وسياسة duplicate في Application
+Current Task: B9 — document_processing_runs migration
 Current Task Status: TODO
-Expected Task Branch: task/B8-sha256-duplicate-policy
-Next Task After Completion: B9 — document_processing_runs migration
+Expected Task Branch: task/B9-document-processing-runs-migration
+Next Task After Completion: B10 — ProcessingRun model/enums/relations
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -123,7 +124,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | B5 Documents index/details Blade skeleton | DONE |
 | B6 Upload validation لملف واحد | DONE |
 | B7 Private storage/download authorization | DONE |
-| B8 SHA-256 وسياسة duplicate في Application | TODO |
+| B8 SHA-256 وسياسة duplicate في Application | DONE |
 | B9 document_processing_runs migration | TODO |
 | B10 ProcessingRun model/enums/relations | TODO |
 | B11 selected_processing_run_id migration/invariants | TODO |
@@ -270,6 +271,22 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | J7 Trial-question interaction | TODO |
 | J8 Select-winner confirmation/states | TODO |
 | J9 Accessibility/responsive/error states | TODO |
+
+### متطلبات UX مرتبطة برفع الملفات
+
+ضمن `J4`:
+
+- عند محاولة رفع ملف مكرر لنفس المستخدم، لا تُنشأ وثيقة جديدة.
+- تعرض الواجهة رسالة واضحة بأن الملف مرفوع مسبقًا.
+- يجب أن تتضمن الرسالة `original_name` للوثيقة الأصلية، حتى يعرف المستخدم أي ملف موجود مسبقًا.
+- تستخدم الواجهة `duplicate_document.id` لإتاحة الانتقال مباشرة إلى صفحة الوثيقة الأصلية.
+- لا تعرض الواجهة `sha256` أو `stored_name` أو `file_path` للمستخدم.
+- اختلاف اسم الملف المرفوع لا يغيّر حالة duplicate إذا كان المحتوى مطابقًا للوثيقة الأصلية.
+
+ضمن `J9`:
+
+- تعامل حالة duplicate upload كـUX error state واضح وقابل للتصرف، وليس كرسالة خطأ عامة.
+- يجب أن تبقى رسالة duplicate مفهومة على الشاشات الصغيرة ومتوافقة مع RTL وAccessibility.
 
 **معيار انتهاء المرحلة:** المستخدم يرفع ويتابع ويقارن ويعتمد النتيجة من واجهة RTL واضحة.
 
@@ -437,6 +454,84 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-19 — B8 SHA-256 وسياسة duplicate في Application
+
+Status: DONE
+
+Task:
+B8
+
+Branch:
+`task/B8-sha256-duplicate-policy`
+
+Pull Request:
+#18
+
+Implementation Commit:
+`86df0b5b95ce78f64f86c2e56e06fc41a8441e7c`
+
+### تم التنفيذ
+
+- حساب SHA-256 من محتوى الملف المخزن فعليًا على Server-side بعد التخزين الخاص.
+- استخدام stream من filesystem لحساب الـhash دون الاعتماد على اسم الملف أو metadata مقدمة من المستخدم.
+- حفظ SHA-256 داخل `documents.sha256` عند إنشاء الوثيقة.
+- تطبيق سياسة duplicate على مستوى Application ضمن نطاق المستخدم الحالي فقط عبر `user_id + sha256`.
+- اعتبار الملف Duplicate حتى عند اختلاف الاسم إذا كان المحتوى مطابقًا.
+- السماح لمستخدم مختلف برفع نفس المحتوى دون كشف وجود وثائق مستخدمين آخرين.
+- إضافة `DuplicateDocumentException` لفصل منطق التخزين عن طبقة HTTP.
+- حذف النسخة الجديدة المخزنة فور اكتشاف duplicate مع الإبقاء على الوثيقة الأصلية.
+- إعادة HTTP 422 عند رفع duplicate مع `id` و`original_name` للوثيقة الأصلية فقط.
+- عدم كشف `stored_name` أو `file_path` أو SHA-256 في استجابة duplicate.
+- إعادة عمود `sha256` إلى `NOT NULL` بعد انتهاء الفترة المؤقتة التي احتاجتها B7.
+- الإبقاء على index الحالي `(user_id, sha256)` دون إضافة UNIQUE constraint لأن منع التكرار سياسة Application-level حسب الخطة.
+- تحديث fixture واحد من اختبار B7 ليتوافق مع عودة `sha256` إلى `NOT NULL`.
+- إبقاء Queue وClamAV وFastAPI وAI/RAG خارج نطاق B8.
+
+### الملفات المنشأة أو المعدلة
+
+- `PROJECT_RAG_EXECUTION_PROGRESS.md`
+- `laravel-app/app/Exceptions/DuplicateDocumentException.php`
+- `laravel-app/app/Http/Controllers/DocumentController.php`
+- `laravel-app/app/Services/Documents/DocumentStorageService.php`
+- `laravel-app/database/migrations/2026_08_19_182038_make_sha256_required_on_documents_table.php`
+- `laravel-app/tests/Feature/Documents/DocumentPrivateStorageDownloadTest.php`
+- `laravel-app/tests/Feature/Documents/DocumentSha256DuplicateTest.php`
+
+### التحقق والاختبارات
+
+- PASS — اختبارات B8: اختباران و14 assertions.
+- PASS — اختبارات B6 وB7 المرتبطة بعد تحديث الـfixture.
+- PASS — مجموعة Laravel الكاملة: 35 اختبارًا.
+- PASS — migration `up()` لتثبيت `sha256 NOT NULL`.
+- PASS — migration `down()` لإعادة `sha256` nullable.
+- PASS — إعادة تنفيذ migration بعد rollback.
+- PASS — Laravel Pint على ملفات المهمة.
+- PASS — `git diff --check`.
+- PASS — `git diff --cached --check`.
+- PASS — التحقق أن duplicate لا ينشئ سجل `Document` إضافيًا ولا يترك ملفًا إضافيًا.
+
+### القرارات
+
+- SHA-256 يحسب حصريًا من المحتوى المخزن Server-side.
+- نطاق duplicate هو المستخدم نفسه فقط: `user_id + sha256`.
+- الاسم الأصلي لا يدخل في قرار duplicate.
+- منع duplicate يبقى Application-level دون `UNIQUE(user_id, sha256)` في B8.
+- النسخة الجديدة تحذف عند اكتشاف duplicate، بينما تبقى الوثيقة الأصلية دون تعديل.
+- استجابة duplicate تعرض فقط معلومات آمنة تساعد المستخدم على الوصول إلى الوثيقة الأصلية.
+- إبقاء معالجة race condition المتزامنة خارج نطاق B8 وعدم إضافة locking أو Redis complexity دون حاجة حالية.
+
+Review Result:
+APPROVED — التنفيذ والاختبارات والتحقق المحلي ناجحة، وPR #18 جاهز للدمج بعد تحديث سجل التنفيذ.
+
+Open Issues:
+- لا توجد عوائق تخص B8.
+- تبقى ملاحظة تنسيق Pint القديمة في `laravel-app/bootstrap/providers.php` خارج نطاق المهمة.
+
+Next Task:
+B9 — document_processing_runs migration
+
+---
 
 ## 2026-08-19 — B7 Private storage/download authorization
 
@@ -1257,18 +1352,18 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B8 — SHA-256 وسياسة duplicate في Application
+B9 — document_processing_runs migration
 Status: TODO
 ```
 
 ## الهدف
 
-إضافة حساب `SHA-256` للوثائق بعد التخزين، واعتماد سياسة واضحة لاكتشاف الملفات المكررة على مستوى المستخدم داخل Laravel، دون إدخال Queue أو ClamAV أو أي منطق AI.
+إنشاء migration لجدول document_processing_runs وفق الخطة الرئيسية لتمثيل محاولات ومسارات معالجة الوثيقة بصورة مستقلة عن سجل documents، دون تنفيذ Processing logic أو AI integration في هذه المهمة.
 
 
 ## ملاحظة البدء
 
-تُراجع حالة `DocumentStorageService` وعمود `sha256` بعد B7، ثم تُحدد سياسة duplicate المعتمدة وفق الخطة الرئيسية قبل التنفيذ. يجب أن يُحسب الـSHA-256 من محتوى الملف المخزن Server-side، وألا يعتمد على أي قيمة مقدمة من المستخدم. يبقى نطاق B8 محصورًا في الـhash وسياسة التكرار داخل Application فقط.
+تُراجع بنية documents الحالية والقسم 174 من الخطة الرئيسية قبل التنفيذ، ويُحصر نطاق B9 في بنية قاعدة البيانات الخاصة بـdocument_processing_runs. يبقى إنشاء Model والـEnums والعلاقات التفصيلية للمهمة B10، ولا يتم إدخال Queue أو FastAPI أو Qdrant أو AI ضمن B9.
 
 ---
 
