@@ -17,9 +17,9 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: eee235b893a6ec51e0676a4845617bf69e03726a
-Last Merged PR: #18 — feat(B8): add SHA-256 duplicate protection
-Latest Task PR: Pending — B9 PR not opened yet
+Verified Main Commit: 5fec8ddb5794fe985bc84ed4acb9f1892f518036
+Last Merged PR: #19 — feat(B9): add document processing runs schema
+Latest Task PR: #19 — feat(B9): add document processing runs schema
 Last Completed Task: B9 — document_processing_runs migration
 Current Task: B10 — ProcessingRun model/enums/relations
 Current Task Status: TODO
@@ -465,7 +465,7 @@ Branch:
 `task/B9-document-processing-runs-migration`
 
 Pull Request:
-Pending
+#19 — feat(B9): add document processing runs schema
 
 ### تم التنفيذ
 
