@@ -5,6 +5,7 @@ namespace Tests\Feature\Documents;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Tests\TestCase;
 use ZipArchive;
@@ -13,8 +14,10 @@ class DocumentUploadValidationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_supported_document_types_are_accepted_without_persistence(): void
+    public function test_supported_document_types_are_accepted(): void
     {
+        Storage::fake('documents');
+
         $user = User::factory()->create();
 
         $documents = [
@@ -36,8 +39,6 @@ class DocumentUploadValidationTest extends TestCase
                 'document' => $document,
             ])->assertNoContent();
         }
-
-        $this->assertDatabaseCount('documents', 0);
     }
 
     private function createDocxUpload(string $name): UploadedFile

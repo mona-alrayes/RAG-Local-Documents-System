@@ -61,4 +61,14 @@ class DocumentPolicy
     {
         return $user->id === $document->user_id;
     }
+
+    /**
+     * Determine whether the user can download the document.
+     *
+     * السماح للمالك بتنزيل الوثيقة.
+     */
+    public function download(User $user, Document $document): bool
+    {
+        return $user->id === $document->user_id;
+    }
 }

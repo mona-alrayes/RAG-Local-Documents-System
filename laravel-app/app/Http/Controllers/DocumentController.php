@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UploadDocumentRequest;
 use App\Models\Document;
+use App\Services\Documents\DocumentStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
@@ -30,8 +33,33 @@ class DocumentController extends Controller
         return view('documents.show', compact('document'));
     }
 
-    public function store(UploadDocumentRequest $request): Response
+    public function store(UploadDocumentRequest $request, DocumentStorageService $storage): Response
     {
+        $storage->store(
+            $request->user(),
+            $request->file('document'),
+        );
+
         return response()->noContent();
+    }
+
+    public function download(Document $document): StreamedResponse
+    {
+        Gate::authorize('download', $document);
+
+        $disk = Storage::disk('documents');
+
+        abort_unless(
+            $disk->exists($document->file_path),
+            404,
+        );
+
+        return $disk->download(
+            $document->file_path,
+            $document->original_name,
+            [
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+        );
     }
 }
