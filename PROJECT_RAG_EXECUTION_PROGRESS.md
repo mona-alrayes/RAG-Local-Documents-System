@@ -2,7 +2,7 @@
 
 > **المرجع:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** توثيق التنفيذ الفعلي خطوة بخطوة دون تعديل الخطة المعمارية الأصلية.  
-> **آخر تحديث:** 2026-08-19
+> **آخر تحديث:** 2026-08-20
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -17,14 +17,14 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: 5fec8ddb5794fe985bc84ed4acb9f1892f518036
-Last Merged PR: #19 — feat(B9): add document processing runs schema
-Latest Task PR: #19 — feat(B9): add document processing runs schema
-Last Completed Task: B9 — document_processing_runs migration
-Current Task: B10 — ProcessingRun model/enums/relations
+Verified Main Commit: 0d062a59022f25a41d7897b5ce2f9579e0097781
+Last Merged PR: #21 — feat(B10): add processing run domain model
+Latest Task PR: #21 — feat(B10): add processing run domain model
+Last Completed Task: B10 — ProcessingRun model/enums/relations
+Current Task: B11 — selected_processing_run_id migration/invariants
 Current Task Status: TODO
-Expected Task Branch: task/B10-processing-run-model
-Next Task After Completion: B11 — selected_processing_run_id migration/invariants
+Expected Task Branch: task/B11-selected-processing-run
+Next Task After Completion: B12 — document_processing_comparisons migration/model
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
 ```
@@ -126,7 +126,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | B7 Private storage/download authorization | DONE |
 | B8 SHA-256 وسياسة duplicate في Application | DONE |
 | B9 document_processing_runs migration | DONE |
-| B10 ProcessingRun model/enums/relations | TODO |
+| B10 ProcessingRun model/enums/relations | DONE |
 | B11 selected_processing_run_id migration/invariants | TODO |
 | B12 document_processing_comparisons migration/model | TODO |
 
@@ -454,6 +454,90 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-20 — B10 ProcessingRun model/enums/relations
+
+Status: DONE
+
+Task:
+B10
+
+Branch:
+`task/B10-processing-run-model`
+
+Pull Request:
+#21 — feat(B10): add processing run domain model
+
+### تم التنفيذ
+
+* إنشاء `ProcessingProfile` Enum بالقيمتين المعتمدتين:
+
+  * `cloud`
+  * `hybrid_local`
+* إنشاء `ProcessingRunStatus` Enum بحالات دورة حياة الـRun التسع المعتمدة.
+* إنشاء `ProcessingRun` Model وربطه صراحة بجدول `document_processing_runs`.
+* إضافة `Fillable` للحقول التشغيلية الخاصة بالـRun، مع إبقاء `document_id` خارج الـmass assignment.
+* إضافة Enum casts لحقلي `profile` و`status`.
+* إضافة Array casts للحقول:
+
+  * `profile_snapshot`
+  * `stage_timings_ms`
+  * `warnings`
+  * `comparison_report`
+* إضافة Datetime casts للحقول:
+
+  * `temporary_expires_at`
+  * `indexed_at`
+  * `selected_at`
+  * `discarded_at`
+  * `expired_at`
+* إضافة علاقة `ProcessingRun -> document` من نوع `BelongsTo`.
+* إضافة علاقة `Document -> processingRuns` من نوع `HasMany`.
+* عدم إضافة `selected_processing_run_id` أو منطق اختيار Run.
+* عدم إضافة Services أو Queue أو FastAPI أو Qdrant أو AI logic.
+* عدم إنشاء Migration جديدة أو Test Suite إضافية.
+
+### الملفات المنشأة أو المعدلة
+
+* `PROJECT_RAG_EXECUTION_PROGRESS.md`
+* `laravel-app/app/Enums/ProcessingProfile.php`
+* `laravel-app/app/Enums/ProcessingRunStatus.php`
+* `laravel-app/app/Models/ProcessingRun.php`
+* `laravel-app/app/Models/Document.php`
+
+### التحقق
+
+* PASS — تشغيل Pint على ملفات B10 الأربعة.
+* PASS — `php artisan model:show ProcessingRun`.
+* PASS — التحقق من اسم جدول `document_processing_runs`.
+* PASS — التحقق من Enum وJSON وDatetime casts.
+* PASS — التحقق من علاقة `ProcessingRun::document()` كـ`BelongsTo`.
+* PASS — `php artisan model:show Document`.
+* PASS — التحقق من علاقة `Document::processingRuns()` كـ`HasMany`.
+* PASS — `git diff --check`.
+* PASS — `git diff --cached --check`.
+* لم تتم إضافة اختبارات جديدة لأن فحص Laravel المباشر غطّى سلوك الـModel والـcasts والعلاقات ضمن نطاق B10.
+
+### القرارات
+
+* استخدم الاسم `ProcessingRun` مع تعريف `$table` صراحة لأن الاسم الافتراضي الذي يستنتجه Eloquent لا يطابق `document_processing_runs`.
+* تحفظ قيم `profile` و`status` كـstrings في MySQL وتعرض داخل Laravel كـEnums.
+* تحول حقول JSON إلى Arrays وحقول التوقيت التشغيلية إلى Datetime objects.
+* يبقى `document_id` خارج `Fillable` ليُربط عبر علاقة الوثيقة.
+* يبقى `selected_processing_run_id` ومنطق اختيار الـRun للمهمة B11 وما بعدها.
+
+Review Result:
+APPROVED — PR #21 مطابق للقسم 174.7.2 ولنطاق B10، ولا توجد ملاحظات مانعة.
+
+Open Issues:
+
+* لا توجد عوائق تخص B10.
+
+Next Task:
+B11 — selected_processing_run_id migration/invariants
+
+---
+
 ## 2026-08-20 — B9 document_processing_runs migration
 
 Status: DONE
@@ -1418,18 +1502,21 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B10 — ProcessingRun model/enums/relations
+B11 — selected_processing_run_id migration/invariants
 Status: TODO
 ```
 
 ## الهدف
 
-إنشاء ProcessingRun Model مع الـEnums والـcasts والعلاقات اللازمة لتمثيل سجلات document_processing_runs داخل Laravel بصورة واضحة وقابلة للصيانة، وربط كل Run بالوثيقة التابعة لها وفق المعمارية المعتمدة في القسم 174، دون إدخال منطق المعالجة الفعلي أو اختيار الـselected run في هذه المهمة.
+ربط الوثيقة بالـProcessing Run الرسمي المعتمد عبر إضافة `selected_processing_run_id` كحقل nullable داخل جدول `documents`، مع Foreign Key إلى `document_processing_runs.id` وسياسة `restrictOnDelete` وفهرس مناسب، بما يتوافق مع القسم `174.7.3` من Master Plan.
+
+يجب أن يبقى التصميم متوافقاً مع الـinvariants المعتمدة: الـselected Run يجب أن يعود إلى الوثيقة نفسها وأن تكون حالته `indexed`. لا يجوز اعتبار وجود Foreign Key وحده كافياً لإثبات أن الـRun تابع للوثيقة نفسها.
 
 ## ملاحظة البدء
 
-تُراجع بنية جدول document_processing_runs المنجزة في B9 والقسم 174.7.2 قبل التنفيذ. يقتصر نطاق B10 على إنشاء Model والـEnums والـcasts والعلاقات الخاصة بـProcessingRun وDocument بما يتوافق مع حالات الـRun والـProfiles المعتمدة. يبقى selected_processing_run_id وقيود اختيار الـRun الرسمية للمهمة B11، ولا يتم إدخال Queue أو FastAPI أو Qdrant أو Processing Services ضمن B10.
+تُراجع Migration جدول `document_processing_runs` المنجزة في B9، و`ProcessingRun` Model والعلاقات المنجزة في B10، والقسم `174.7.3` قبل التنفيذ.
 
+يقتصر نطاق B11 على Migration الربط والعلاقات أو القيود اللازمة لتمثيل `selected_processing_run_id` بوضوح. لا يتم ضمنها تنفيذ اختيار الفائز الفعلي، أو Transaction الاختيار النهائي، أو استدعاء FastAPI، أو تأكيد Qdrant، أو إنشاء comparison model؛ تبقى هذه المسؤوليات للمهام اللاحقة.
 ---
 
 # 26. قالب إغلاق أي Task
