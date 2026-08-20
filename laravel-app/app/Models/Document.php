@@ -7,6 +7,7 @@ use App\Enums\FileType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Represents a document owned by a user.
@@ -48,5 +49,15 @@ class Document extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the processing runs created for this document.
+     *
+     * محاولات المعالجة التابعة للوثيقة.
+     */
+    public function processingRuns(): HasMany
+    {
+        return $this->hasMany(ProcessingRun::class);
     }
 }
