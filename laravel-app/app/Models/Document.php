@@ -60,4 +60,17 @@ class Document extends Model
     {
         return $this->hasMany(ProcessingRun::class);
     }
+
+    /**
+     * Get the processing run officially selected for this document.
+     *
+     * محاولة المعالجة الرسمية المعتمدة للوثيقة.
+     */
+    public function selectedProcessingRun(): BelongsTo
+    {
+        return $this->belongsTo(
+            ProcessingRun::class,
+            'selected_processing_run_id',
+        );
+    }
 }
