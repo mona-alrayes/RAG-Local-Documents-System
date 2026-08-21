@@ -17,18 +17,18 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: f23d8f6ef9a641826888cc08dd99dcc8fb72e8bb
-Schema Audit: 2026-08-21 — migrations + live MySQL 8.4.11 verified
+Verified Main Commit: 43059ec99fcc2668ca1bf751a07ab8fa724c743f
+Schema Audit: 2026-08-21 — B11 migration up/down/up + live MySQL 8.4.11 verified
 Live Tables: 12
-Last Merged PR: #21 — feat(B10): add processing run domain model
-Latest Task PR: #21 — feat(B10): add processing run domain model
-Last Completed Task: B10 — ProcessingRun model/enums/relations
-Current Task: B11 — selected_processing_run_id migration/invariants
+Last Merged PR: #22 — docs: update architecture and execution plans
+Latest Task PR: #23 — feat(B11): link documents to selected processing runs
+Last Completed Task: B11 — selected_processing_run_id migration/invariants
+Current Task: B12 — document_processing_comparisons migration/model
 Current Task Status: TODO
-Expected Task Branch: task/B11-selected-processing-run
-Next Task After Completion: B12 — document_processing_comparisons migration/model
+Expected Task Branch: task/B12-processing-comparisons
+Next Task After Completion: C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
 Open Blockers: لا يوجد
-Required Context: هذا الملف + القسم 174 من الخطة الرئيسية؛ B11 يعتمد 174.7.3، ومهام AI تعتمد أيضاً الـNotebookين المرجعيين، ومهام القدرات والفحص والموارد وتوجيه Providers والسياق البسيط والعرض التدريجي D8–D11/C1–C7/G11/I11/M1/M3/M6/M9/M10/N8/N9/Q8/Q10/Q12 تعتمد 174.20 إلزامياً، ومهام DPL-1–DPL-25 تعتمد الأقسام 101–172 بعد تحديثها مع 174.20 كمرجع أعلى
+Required Context: هذا الملف + القسم 174 من الخطة الرئيسية؛ B12 يعتمد 174.7.4، ومهام AI تعتمد أيضاً الـNotebookين المرجعيين، ومهام القدرات والفحص والموارد وتوجيه Providers والسياق البسيط والعرض التدريجي D8–D11/C1–C7/G11/I11/M1/M3/M6/M9/M10/N8/N9/Q8/Q10/Q12 تعتمد 174.20 إلزامياً، ومهام DPL-1–DPL-25 تعتمد الأقسام 101–172 بعد تحديثها مع 174.20 كمرجع أعلى
 ```
 
 ## قاعدة الانتقال بين المحادثات
@@ -129,14 +129,14 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | B8 SHA-256 وسياسة duplicate في Application | DONE |
 | B9 document_processing_runs migration | DONE |
 | B10 ProcessingRun model/enums/relations | DONE |
-| B11 selected_processing_run_id migration/invariants | TODO |
+| B11 selected_processing_run_id migration/invariants | DONE |
 | B12 document_processing_comparisons migration/model | TODO |
 
 **معيار انتهاء المرحلة:** Domain الوثائق وRuns والمقارنات ممثلة بوضوح، دون تنفيذ AI.
 
-## لقطة الـSchema التنفيذية المطابقة لـB10
+## لقطة الـSchema التنفيذية المطابقة لـB11
 
-تمت مطابقة ملفات migrations والـModels والـEnums مع MySQL الفعلي على الـcommit الموثق أعلاه. جميع Migrations التسع الحالية في حالة `Ran`، والقاعدة تحتوي 12 جدولاً:
+تمت مطابقة ملفات Migrations والـModels والـEnums مع MySQL 8.4.11 الفعلي بعد تنفيذ B11. جميع Migrations العشر الحالية في حالة `Ran`، والقاعدة تحتوي 12 جدولاً:
 
 ```text
 users
@@ -168,21 +168,33 @@ file_size                  BIGINT UNSIGNED
 sha256                     CHAR(64) NOT NULL
 status                     VARCHAR(32) DEFAULT pending
 created_at / updated_at    NULL
+selected_processing_run_id BIGINT UNSIGNED NULL
+                            FK document_processing_runs.id
+                            ON DELETE RESTRICT
 ```
 
-الفهارس: `(user_id, status)` و`(user_id, sha256)` و`(user_id, created_at)`. لا يوجد Unique constraint على `(user_id, sha256)`؛ منع duplicate منفذ في `DocumentStorageService` داخل نطاق المستخدم.
+الفهارس: `(user_id, status)` و`(user_id, sha256)` و`(user_id, created_at)` و`(selected_processing_run_id)`.
+
+لا يوجد Unique constraint على `(user_id, sha256)`؛ منع duplicate منفذ في `DocumentStorageService` داخل نطاق المستخدم.
 
 ### `document_processing_runs` — الحالة الفعلية الحالية
 
-يحتوي 23 عموداً مطابقاً لـMigration B9: FK `document_id` مع `ON DELETE RESTRICT`، و`profile/status/profile_snapshot`، والعدادات، وJSON timings/warnings/report، وحقول الخطأ، وtemporary artifact/TTL، وQdrant metadata، وتواريخ indexed/selected/discarded/expired، وtimestamps. يبدأ `total_chunks` و`vector_count` من `0`، بينما `total_pages` و`vector_dimension` nullable.
+يحتوي 23 عموداً مطابقاً لـMigration B9: FK `document_id` مع `ON DELETE RESTRICT`، و`profile/status/profile_snapshot`، والعدادات، وJSON timings/warnings/report، وحقول الخطأ، وtemporary artifact/TTL، وQdrant metadata، وتواريخ indexed/selected/discarded/expired، وtimestamps.
+
+يبدأ `total_chunks` و`vector_count` من `0`، بينما `total_pages` و`vector_dimension` nullable.
 
 ### حدود الحالة الحالية
 
-- `documents` لا يحتوي `failure_reason` أو `total_pages` أو `total_chunks` أو `qdrant_collection` أو `processed_at`; هذه بيانات Run.
-- `documents.selected_processing_run_id` غير موجود بعد؛ هو نطاق B11 وحالته `TODO`.
+- `documents` لا يحتوي `failure_reason` أو `total_pages` أو `total_chunks` أو `qdrant_collection` أو `processed_at`؛ هذه بيانات Processing Run.
+- `documents.selected_processing_run_id` موجود كحقل nullable مع Index وForeign Key إلى `document_processing_runs.id` وسياسة `ON DELETE RESTRICT`.
+- يضمن الـForeign Key وجود الـRun المشار إليها ويمنع حذفها أثناء اعتمادها.
+- لا يضمن الـForeign Key أن `document_processing_runs.document_id` يساوي `documents.id`.
+- لا يفرض الـForeign Key أن حالة الـRun هي `indexed`.
+- يبقى فرض تطابق الوثيقة وحالة `indexed` مسؤولية Domain Service وTransaction الاختيار في مهام orchestration اللاحقة بعد تأكيد نجاح Qdrant.
+- لم يضف B11 Trigger أو Composite Foreign Key أو Service أو منطق اختيار فعلي.
 - جدول `document_processing_comparisons` غير موجود بعد؛ هو نطاق B12 وحالته `TODO`.
-- `Document::processingRuns()` و`ProcessingRun::document()` منفذتان؛ علاقة selected run لم تنفذ بعد.
-- Routes الوثائق المنفذة حالياً هي index/show/store/download فقط؛ صفحة upload المنفصلة والمقارنة وإعادة المعالجة والحذف ما زالت مهاماً لاحقة.
+- العلاقات `Document::processingRuns()` و`ProcessingRun::document()` و`Document::selectedProcessingRun()` منفذة.
+- Routes الوثائق المنفذة حالياً هي index/show/store/download فقط؛ صفحة المقارنة وإعادة المعالجة والحذف ما زالت مهاماً لاحقة.
 - Upload الحالي ينفذ Validation والتخزين الخاص وSHA-256 وسياسة duplicate، لكنه لا ينفذ ClamAV أو Queue أو FastAPI أو Qdrant بعد.
 
 ---
@@ -514,6 +526,70 @@ created_at / updated_at    NULL
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-21 — B11 selected_processing_run_id migration/invariants
+
+Status: DONE
+
+Task:
+B11
+
+Branch:
+`task/B11-selected-processing-run`
+
+Pull Request:
+#23 — feat(B11): link documents to selected processing runs
+
+### تم التنفيذ
+
+- إنشاء Migration مستقلة تضيف `documents.selected_processing_run_id` كحقل `BIGINT UNSIGNED NULL`.
+- إضافة Index صريح للحقل الجديد.
+- إضافة Foreign Key صريح إلى `document_processing_runs.id` مع `restrictOnDelete`.
+- تنفيذ rollback مرتب يحذف الـForeign Key ثم الـIndex ثم العمود.
+- إضافة علاقة `Document::selectedProcessingRun()` من نوع `BelongsTo` مع تحديد `selected_processing_run_id` صراحة.
+- إبقاء `selected_processing_run_id` خارج `Fillable`.
+- عدم إضافة cast غير ضروري للحقل.
+- عدم إضافة Domain Service أو Transaction اختيار أو Queue أو FastAPI أو Qdrant أو AI/RAG logic.
+
+### الملفات المنشأة أو المعدلة
+
+- `PROJECT_RAG_EXECUTION_PROGRESS.md`
+- `laravel-app/database/migrations/2026_08_21_165713_add_selected_processing_run_id_to_documents_table.php`
+- `laravel-app/app/Models/Document.php`
+
+### التحقق
+
+- PASS — تشغيل Pint على ملفي PHP المستهدفين.
+- PASS — تنفيذ Migration على MySQL 8.4.11.
+- PASS — أكد `php artisan db:table documents` وجود العمود nullable والـIndex والـForeign Key وسياسة `ON DELETE RESTRICT`.
+- PASS — أكد `php artisan model:show Document` اكتشاف علاقة `selectedProcessingRun` كـ`BelongsTo`.
+- PASS — تنفيذ rollback لآخر Migration بنجاح.
+- PASS — إعادة تنفيذ Migration بعد rollback بنجاح.
+- PASS — `git diff --cached --check`.
+- لم تتم إضافة Test Suite جديدة لأن التحقق المباشر عبر Laravel وMySQL غطّى السلوك المطلوب ضمن نطاق B11.
+
+### حدود الـinvariants
+
+- تضمن قاعدة البيانات أن `selected_processing_run_id` يشير إلى Processing Run موجودة.
+- تمنع سياسة `restrictOnDelete` حذف Run ما دامت وثيقة تشير إليها كـselected Run.
+- الـForeign Key المفرد لا يضمن أن الـRun تعود إلى الوثيقة نفسها.
+- لا يستطيع هذا الـForeign Key فرض أن حالة الـRun هي `indexed`.
+- يؤجل التحقق من تطابق `document_processing_runs.document_id` مع الوثيقة وحالة `indexed` إلى Domain Service في مهام orchestration اللاحقة.
+- يتم لاحقاً تغيير `selected_processing_run_id` وحالات الـRuns داخل Transaction واحدة بعد تأكيد نجاح Qdrant.
+- لم تتم إضافة Trigger أو Composite Foreign Key أو منطق اختيار فعلي ضمن B11.
+
+Review Result:
+IMPLEMENTED AND LOCALLY VERIFIED — PR #23 مفتوح للمراجعة والدمج.
+
+Open Issues:
+
+- لا توجد عوائق تنفيذية تخص B11.
+- فرض الـinvariants العابرة للجدولين مؤجل عمداً إلى مهام orchestration اللاحقة.
+
+Next Task:
+B12 — document_processing_comparisons migration/model
+
+---
 
 ## 2026-08-21 — مراجعة اتساق الخطة والتقدم مع Laravel
 
@@ -1607,21 +1683,41 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B11 — selected_processing_run_id migration/invariants
+B12 — document_processing_comparisons migration/model
 Status: TODO
 ```
 
 ## الهدف
 
-ربط الوثيقة بالـProcessing Run الرسمي المعتمد عبر إضافة `selected_processing_run_id` كحقل nullable داخل جدول `documents`، مع Foreign Key إلى `document_processing_runs.id` وسياسة `restrictOnDelete` وفهرس مناسب، بما يتوافق مع القسم `174.7.3` من Master Plan.
+تمثيل جلسة المقارنة بين Processing Run من Profile `cloud` وProcessing Run من Profile `hybrid_local` عبر إنشاء جدول `document_processing_comparisons` والـModel والعلاقات والـcasts اللازمة، وفق القسم `174.7.4` من Master Plan.
 
-يجب أن يبقى التصميم متوافقاً مع الـinvariants المعتمدة: الـselected Run يجب أن يعود إلى الوثيقة نفسها وأن تكون حالته `indexed`. لا يجوز اعتبار وجود Foreign Key وحده كافياً لإثبات أن الـRun تابع للوثيقة نفسها.
+يتضمن الجدول مراجع الوثيقة والمستخدم والـRunين المشاركين في المقارنة، و`selected_run_id` الاختياري، وحالة المقارنة، وسؤال التجربة، وتاريخ القرار، وتاريخ انتهاء الـTTL، وحقول التدقيق الزمنية.
+
+تبقى Services مسؤولة في المهام اللاحقة عن ضمان أن جميع الـRuns تعود إلى Document وUser نفسيهما.
 
 ## ملاحظة البدء
 
-تُراجع Migration جدول `document_processing_runs` المنجزة في B9، و`ProcessingRun` Model والعلاقات المنجزة في B10، والقسم `174.7.3` قبل التنفيذ.
+تُراجع قبل التنفيذ:
 
-يقتصر نطاق B11 على Migration الربط والعلاقات أو القيود اللازمة لتمثيل `selected_processing_run_id` بوضوح. لا يتم ضمنها تنفيذ اختيار الفائز الفعلي، أو Transaction الاختيار النهائي، أو استدعاء FastAPI، أو تأكيد Qdrant، أو إنشاء comparison model؛ تبقى هذه المسؤوليات للمهام اللاحقة.
+- Migration جدول `document_processing_runs` المنجزة في B9.
+- `ProcessingRun` Model والـEnums والعلاقات المنجزة في B10.
+- Migration وعلاقة `selected_processing_run_id` المنجزة في B11.
+- القسم `174.7.4` من `PROJECT_RAG_MASTER_PLAN.md`.
+- حالة MySQL الفعلية وأسماء Foreign Keys وسياسات الحذف والفهارس المطلوبة.
+
+يقتصر نطاق B12 على إنشاء Schema وDomain Model للمقارنة، بما في ذلك العلاقات والـcasts أو Enum الضروري فقط.
+
+لا تنفذ B12:
+
+- اختيار الـRun الفائزة فعلياً.
+- Transaction الاعتماد النهائي.
+- تغيير حالات الـRuns فعلياً.
+- استدعاء FastAPI.
+- تأكيد Qdrant أو نقل الـvectors.
+- Queue أو Jobs أو Processing Services.
+- AI أو RAG logic.
+- أي منطق orchestration مؤجل.
+
 ---
 
 # 26. قالب إغلاق أي Task
