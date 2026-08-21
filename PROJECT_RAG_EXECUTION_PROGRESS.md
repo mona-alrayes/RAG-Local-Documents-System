@@ -17,15 +17,15 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: 43059ec99fcc2668ca1bf751a07ab8fa724c743f
-Schema Audit: 2026-08-21 — B11 migration up/down/up + live MySQL 8.4.11 verified
-Live Tables: 12
-Last Merged PR: #22 — docs: update architecture and execution plans
-Latest Task PR: #23 — feat(B11): link documents to selected processing runs
-Last Completed Task: B11 — selected_processing_run_id migration/invariants
-Current Task: B12 — document_processing_comparisons migration/model
+Verified Main Commit: c0f746e36d94c16bd1bb6e9f7af6e53a2df1d037
+Schema Audit: 2026-08-21 — B12 migration up/down/up + live MySQL 8.4.11 verified
+Live Tables: 13
+Last Merged PR: #23 — feat(B11): link documents to selected processing runs
+Latest Task PR: #24 — feat(B12): add processing comparisons model and schema
+Last Completed Task: B12 — document_processing_comparisons migration/model
+Current Task: C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
 Current Task Status: TODO
-Expected Task Branch: task/B12-processing-comparisons
+Next Task After Completion: C2 — DocumentSecurityService
 Next Task After Completion: C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية؛ B12 يعتمد 174.7.4، ومهام AI تعتمد أيضاً الـNotebookين المرجعيين، ومهام القدرات والفحص والموارد وتوجيه Providers والسياق البسيط والعرض التدريجي D8–D11/C1–C7/G11/I11/M1/M3/M6/M9/M10/N8/N9/Q8/Q10/Q12 تعتمد 174.20 إلزامياً، ومهام DPL-1–DPL-25 تعتمد الأقسام 101–172 بعد تحديثها مع 174.20 كمرجع أعلى
@@ -130,13 +130,13 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | B9 document_processing_runs migration | DONE |
 | B10 ProcessingRun model/enums/relations | DONE |
 | B11 selected_processing_run_id migration/invariants | DONE |
-| B12 document_processing_comparisons migration/model | TODO |
+| B12 document_processing_comparisons migration/model | DONE |
 
 **معيار انتهاء المرحلة:** Domain الوثائق وRuns والمقارنات ممثلة بوضوح، دون تنفيذ AI.
 
-## لقطة الـSchema التنفيذية المطابقة لـB11
+## لقطة الـSchema التنفيذية المطابقة لـB12
 
-تمت مطابقة ملفات Migrations والـModels والـEnums مع MySQL 8.4.11 الفعلي بعد تنفيذ B11. جميع Migrations العشر الحالية في حالة `Ran`، والقاعدة تحتوي 12 جدولاً:
+تمت مطابقة ملفات Migrations والـModels والـEnums مع MySQL 8.4.11 الفعلي بعد تنفيذ B11. جميع Migrations العشر الحالية في حالة `Ran`، والقاعدة تحتوي 13 جدولاً:
 
 ```text
 users
@@ -151,6 +151,7 @@ migrations
 passkeys
 documents
 document_processing_runs
+document_processing_comparisons
 ```
 
 ### `documents` — الحالة الفعلية الحالية
@@ -192,7 +193,10 @@ selected_processing_run_id BIGINT UNSIGNED NULL
 - لا يفرض الـForeign Key أن حالة الـRun هي `indexed`.
 - يبقى فرض تطابق الوثيقة وحالة `indexed` مسؤولية Domain Service وTransaction الاختيار في مهام orchestration اللاحقة بعد تأكيد نجاح Qdrant.
 - لم يضف B11 Trigger أو Composite Foreign Key أو Service أو منطق اختيار فعلي.
-- جدول `document_processing_comparisons` غير موجود بعد؛ هو نطاق B12 وحالته `TODO`.
+- جدول `document_processing_comparisons` منفذ وفق 174.7.4، ويربط الوثيقة والمستخدم وCloud/Hybrid Runs والـselected Run الاختياري.
+- جميع Foreign Keys في جدول المقارنات تستخدم `ON DELETE RESTRICT`.
+- حالات المقارنة ممثلة عبر `DocumentProcessingComparisonStatus`: `processing`, `ready`, `decided`, `expired`, `failed`.
+- فرض أن جميع الـRuns تعود إلى الوثيقة والمستخدم نفسيهما مؤجل إلى Domain/Orchestration logic اللاحق.
 - العلاقات `Document::processingRuns()` و`ProcessingRun::document()` و`Document::selectedProcessingRun()` منفذة.
 - Routes الوثائق المنفذة حالياً هي index/show/store/download فقط؛ صفحة المقارنة وإعادة المعالجة والحذف ما زالت مهاماً لاحقة.
 - Upload الحالي ينفذ Validation والتخزين الخاص وSHA-256 وسياسة duplicate، لكنه لا ينفذ ClamAV أو Queue أو FastAPI أو Qdrant بعد.
@@ -526,6 +530,78 @@ selected_processing_run_id BIGINT UNSIGNED NULL
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-21 — B12 document_processing_comparisons migration/model
+
+Status: DONE
+
+Task:
+B12
+
+Branch:
+`task/B12-processing-comparisons`
+
+Pull Request:
+#24 — feat(B12): add processing comparisons model and schema
+
+### تم التنفيذ
+
+- إنشاء جدول `document_processing_comparisons` وفق القسم `174.7.4`.
+- إضافة العلاقات مع `documents`, `users` و`document_processing_runs`.
+- إضافة `cloud_run_id` و`hybrid_local_run_id` كـRuns إلزامية للمقارنة.
+- إضافة `selected_run_id` كـnullable لاختيار الفائز لاحقاً.
+- اعتماد `restrictOnDelete` لجميع Foreign Keys.
+- إضافة `status`, `trial_question`, `decided_at`, `expires_at` وtimestamps.
+- إنشاء `DocumentProcessingComparisonStatus` بالقيم:
+  - `processing`
+  - `ready`
+  - `decided`
+  - `expired`
+  - `failed`
+- إنشاء `DocumentProcessingComparison` Model.
+- إضافة casts للحالة والتواريخ.
+- إضافة علاقات `document`, `user`, `cloudRun`, `hybridLocalRun`, `selectedRun`.
+- إبقاء جميع Relationship IDs خارج Mass Assignment.
+- عدم تنفيذ Compare orchestration أو winner selection أو AI/Qdrant logic ضمن B12.
+
+### الملفات المنشأة أو المعدلة
+
+- `laravel-app/app/Enums/DocumentProcessingComparisonStatus.php`
+- `laravel-app/app/Models/DocumentProcessingComparison.php`
+- `laravel-app/database/migrations/2026_08_21_185233_create_document_processing_comparisons_table.php`
+- `PROJECT_RAG_EXECUTION_PROGRESS.md`
+
+### التحقق
+
+- PASS — Migration على MySQL.
+- PASS — `php artisan db:table document_processing_comparisons`.
+- PASS — جميع Foreign Keys الخمسة و`ON DELETE RESTRICT`.
+- PASS — rollback ثم إعادة Migration.
+- PASS — `php artisan migrate:status`.
+- PASS — `php artisan model:show DocumentProcessingComparison`.
+- PASS — Enum cast وDatetime casts والعلاقات الخمس.
+- PASS — Laravel Pint.
+- PASS — `git diff --cached --check`.
+- لم تتم إضافة Test Suite جديدة لأن التحقق المباشر غطّى نطاق B12.
+
+### حدود الـDomain
+
+- Foreign Keys تضمن وجود السجلات المشار إليها فقط.
+- لا تضمن قاعدة البيانات وحدها أن Cloud/Hybrid/Selected Runs تعود إلى نفس `document_id` و`user_id`.
+- هذه الـinvariants وTransaction اختيار الفائز تبقى مسؤولية Domain/Orchestration في المهام اللاحقة.
+
+Review Result:
+IMPLEMENTED AND LOCALLY VERIFIED — PR #24.
+
+Open Issues:
+
+- لا توجد عوائق تخص B12.
+- Compare orchestration واختيار الفائز مؤجلان للمرحلة المخصصة لهما.
+
+Next Task:
+C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
+
+---
 
 ## 2026-08-21 — B11 selected_processing_run_id migration/invariants
 
@@ -1683,40 +1759,30 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-B12 — document_processing_comparisons migration/model
+C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
 Status: TODO
 ```
 
 ## الهدف
 
-تمثيل جلسة المقارنة بين Processing Run من Profile `cloud` وProcessing Run من Profile `hybrid_local` عبر إنشاء جدول `document_processing_comparisons` والـModel والعلاقات والـcasts اللازمة، وفق القسم `174.7.4` من Master Plan.
+تأسيس طبقة الفحص الأمني للوثائق باستخدام ClamAV كعمليات قصيرة العمر عند الطلب، مع الاحتفاظ بتواقيع الفحص بشكل دائم، ومنع التداخل بين عمليات الفحص الأمني وعمليات Local AI الثقيلة على الأجهزة المحلية.
 
-يتضمن الجدول مراجع الوثيقة والمستخدم والـRunين المشاركين في المقارنة، و`selected_run_id` الاختياري، وحالة المقارنة، وسؤال التجربة، وتاريخ القرار، وتاريخ انتهاء الـTTL، وحقول التدقيق الزمنية.
-
-تبقى Services مسؤولة في المهام اللاحقة عن ضمان أن جميع الـRuns تعود إلى Document وUser نفسيهما.
+تشمل المهمة إعداد عقد التنفيذ الأساسي لـSecurity Scan Worker، بحيث تعمل عمليات `clamscan` و`freshclam` بطريقة متسلسلة وآمنة، مع استخدام Redis lock مشترك للموارد الثقيلة في Local Demo، دون تنفيذ كامل منطق `DocumentSecurityService` أو انتقالات حالات الوثيقة أو أي تكامل مع FastAPI/Qdrant/RAG ضمن هذه المهمة.
 
 ## ملاحظة البدء
 
-تُراجع قبل التنفيذ:
+قبل تنفيذ C1 يجب مراجعة القسم `174.20` من `PROJECT_RAG_MASTER_PLAN.md` باعتباره المرجع الأعلى لسياسة الموارد المحلية والفحص الأمني، مع مراجعة إعداد Redis والـQueue المنفذ في A4/A5 ومسار رفع وتخزين الوثائق المنفذ في B6–B8.
 
-- Migration جدول `document_processing_runs` المنجزة في B9.
-- `ProcessingRun` Model والـEnums والعلاقات المنجزة في B10.
-- Migration وعلاقة `selected_processing_run_id` المنجزة في B11.
-- القسم `174.7.4` من `PROJECT_RAG_MASTER_PLAN.md`.
-- حالة MySQL الفعلية وأسماء Foreign Keys وسياسات الحذف والفهارس المطلوبة.
+يجب الحفاظ على القرارات المعمارية التالية أثناء التنفيذ:
 
-يقتصر نطاق B12 على إنشاء Schema وDomain Model للمقارنة، بما في ذلك العلاقات والـcasts أو Enum الضروري فقط.
-
-لا تنفذ B12:
-
-- اختيار الـRun الفائزة فعلياً.
-- Transaction الاعتماد النهائي.
-- تغيير حالات الـRuns فعلياً.
-- استدعاء FastAPI.
-- تأكيد Qdrant أو نقل الـvectors.
-- Queue أو Jobs أو Processing Services.
-- AI أو RAG logic.
-- أي منطق orchestration مؤجل.
+- عدم تشغيل `clamd` كخدمة دائمة.
+- تشغيل `clamscan` و`freshclam` كعمليات قصيرة العمر تنتهي بعد إنجاز المهمة.
+- الاحتفاظ بتواقيع ClamAV في Storage/Persistent Volume دائم.
+- تشغيل Queue الفحص الأمني بتزامن `1`.
+- مشاركة Local Security وLocal AI في Redis global lock واحد للموارد الثقيلة.
+- عدم استخدام Docker socket من داخل التطبيق.
+- عدم السماح بوصول الوثيقة إلى AI Pipeline قبل نجاح الفحص الأمني في المراحل اللاحقة.
+- عدم توسيع نطاق C1 إلى C2 أو C3 أو إضافة FastAPI/Qdrant/RAG logic.
 
 ---
 
