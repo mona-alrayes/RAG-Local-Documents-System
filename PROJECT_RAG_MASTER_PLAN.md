@@ -10,14 +10,30 @@
 > **الواجهة الأمامية:** Blade + Livewire + Flux + Tailwind CSS + JavaScript  
 > **لوحة الإدارة:** Filament  
 > **المعالجة الخلفية:** Laravel Queue + Redis  
-> **المراجع التقنية لمساري RAG:** الملفان `cloud_first_rag_colab_fixed_interactive.ipynb` و`hybrid_cloud_parse_local_rag_simple_colab(1).ipynb`
+> **المراجع التقنية لمساري RAG:** الملفان `cloud_first_rag_colab_fixed_interactive.ipynb` و`hybrid_cloud_parse_local_rag_simple_colab(5).ipynb`
 > **إستراتيجية المعالجة:** Cloud أو Hybrid Local أو Compare في البيئة المحلية، وCloud فقط في النشر Online
 > **إستراتيجية LLM:** `Qwen/Qwen3.5-9B` عبر Hugging Face Router في Cloud، و`qwen3.5:4b` عبر Ollama محلياً
-> **خطة النشر المرجعية:** Oracle Cloud Always Free + Docker Compose
-> **آخر تحديث للخطة:** 2026-08-19
+> **خطة النشر المرجعية:** Oracle Cloud Always Free + Docker Compose لمسار `cloud` فقط؛ الـLocal/Compare Demo يعمل منفصلاً على أجهزة المشروع
+> **آخر تحديث للخطة:** 2026-08-21
+> **مرجع المطابقة التنفيذية:** `main@f23d8f6ef9a641826888cc08dd99dcc8fb72e8bb` + Laravel migrations + MySQL schema الفعلي بتاريخ 2026-08-21
 
 > [!IMPORTANT]
-> القسم **174 — التعديل المعماري المعتمد** هو المرجع الأحدث والملزم لكل ما يخص مسارات المعالجة، قواعد البيانات، Qdrant، المحادثة، صفحات Blade، Filament والنشر. عند وجود تعارض مع قسم أقدم، تكون الأولوية للقسم 174. أبقينا الأقسام السابقة لحفظ سياق القرارات وعدم فقدان أي معلومة تاريخية.
+> القسم **174 — التعديل المعماري المعتمد** هو المرجع الأحدث والملزم لكل ما يخص مسارات المعالجة، قواعد البيانات، Qdrant، المحادثة، صفحات Blade، Filament والنشر. داخل القسم 174 تكون الأولوية للقسم **174.20 — قرار التبسيط النهائي** عند أي تعارض مع 174.19 أو ما قبله. أبقينا الأقسام السابقة لحفظ سياق القرارات وعدم فقدان أي معلومة تاريخية.
+
+## Baseline التنفيذ النشط
+
+أي Task جديدة يجب أن تبدأ من هذا الـBaseline ثم ترجع إلى قسمها التفصيلي:
+
+```text
+Oracle Online        = cloud profile فقط، بلا Local AI dependencies أو weights
+Mac/ASUS Local Demo  = cloud | hybrid_local | compare
+Provider routing     = trusted processing profile + capabilities، بلا global LLM_PROVIDER switch
+Security scan        = on-demand clamscan، fail-closed، بلا clamd أو Docker socket
+Local heavy work     = global Redis lock + single_active model + release after every stage
+Conversation context = آخر تبادلين مكتملين فقط، بلا ذاكرة مستخرجة
+Answer delivery      = polling + جاري التفكير + completed-answer visual reveal، بلا Streaming backend
+Deployment tasks     = DPL-1–23 Oracle Cloud-only، وDPL-24–25 Local Demo فقط
+```
 
 ---
 
@@ -272,11 +288,13 @@ Laravel Validation
   ↓
 Temporary Private Storage
   ↓
-ClamAV Scan
+security-scan queue (concurrency=1)
+  ↓
+short-lived clamscan Process
   ↓
 Clean?
-  ├── Yes → متابعة
-  └── No  → حذف + رفض
+  ├── Yes → تثبيت Clean ثم خروج Process ثم متابعة
+  └── No/Failure/Timeout → Fail-closed وعدم تشغيل AI
 ```
 
 ## 4.3 استخدام Qdrant Local
@@ -327,7 +345,7 @@ RESET_COLLECTION = True
 │ Messages                                                     │
 │ Sources                                                      │
 │ Private Storage                                              │
-│ ClamAV                                                       │
+│ Security Scan Queue / Worker                                 │
 │ Laravel Queue                                                │
 │ Filament                                                     │
 └────────────────────────────┬─────────────────────────────────┘
@@ -346,9 +364,11 @@ RESET_COLLECTION = True
                 │                  │
                 ▼                  ▼
        ┌────────────────┐   ┌────────────────────┐
-       │ Qdrant Local   │   │ External AI APIs   │
-       │ Dense + BM25   │   │ Llama/Jina/HF     │
+       │ Qdrant         │   │ External AI APIs   │
+       │ self-hosted    │   │ Llama/Jina/HF     │
        └────────────────┘   └────────────────────┘
+                                  │
+                                  └── Local Demo only: Host BGE/Ollama
 ```
 
 ---
@@ -370,7 +390,7 @@ Laravel مسؤول عن:
 - MIME validation.
 - File size validation.
 - SHA-256.
-- ClamAV.
+- تنسيق Security Scan Worker ونتيجة `clamscan` Fail-closed.
 - Private Storage.
 - Documents.
 - Conversations.
@@ -439,6 +459,9 @@ laravel-app/
 ├── app/
 │   ├── Enums/
 │   │   ├── DocumentStatus.php
+│   │   ├── FileType.php
+│   │   ├── ProcessingProfile.php
+│   │   ├── ProcessingRunStatus.php
 │   │   ├── MessageRole.php
 │   │   └── MessageStatus.php
 │   │
@@ -464,6 +487,7 @@ laravel-app/
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Document.php
+│   │   ├── ProcessingRun.php
 │   │   ├── Conversation.php
 │   │   ├── Message.php
 │   │   └── MessageSource.php
@@ -478,7 +502,8 @@ laravel-app/
 │   │   │   └── DTO/
 │   │   │
 │   │   ├── Documents/
-│   │   │   ├── DocumentUploadService.php
+│   │   │   ├── DocumentStorageService.php
+│   │   │   ├── DocumentUploadService.php        # مخطط للـquarantine/scan orchestration
 │   │   │   ├── DocumentSecurityService.php
 │   │   │   └── DocumentProcessingService.php
 │   │   │
@@ -503,6 +528,8 @@ laravel-app/
 الفكرة الأساسية:
 
 > Controllers وLivewire Components يجب أن تكون خفيفة، ولا تحتوي منطق أعمال كبير.
+
+الأسماء الموجودة فعلياً حتى B10 تشمل `DocumentStorageService` و`Document` و`ProcessingRun` والـEnums الأربعة أعلاه. بقية العناصر في الشجرة هدف معماري للمهام اللاحقة وليست ادعاءً بأنها منفذة الآن.
 
 ---
 
@@ -571,44 +598,73 @@ ai-service/
 
 ## 9.1 users
 
-جدول Laravel القياسي مع:
-
-- الاسم.
-- البريد.
-- كلمة المرور.
-- email verification.
-- timestamps.
-
----
-
-# 10. جدول documents
-
-يقترح أن يحتوي:
+الحالة المنفذة حالياً هي جدول Laravel/Fortify الفعلي التالي:
 
 ```text
 id
-user_id
-original_name
-stored_name
-title
-file_path
-file_type
-mime_type
-file_size
-sha256
-
-status
-failure_reason
-
-total_pages
-total_chunks
-
-qdrant_collection
-processed_at
-
-created_at
-updated_at
+name
+email                         UNIQUE
+email_verified_at             NULL
+password
+two_factor_secret             NULL
+two_factor_recovery_codes     NULL
+two_factor_confirmed_at       NULL
+remember_token                NULL
+created_at                    NULL
+updated_at                    NULL
 ```
+
+أعمدة المصادقة الثنائية موجودة بسبب Migrations الحزمة، لكن 2FA وPasskeys غير مفعّلتين كميزة مستخدم ضمن نطاق A2 الحالي.
+
+## 9.2 جداول Laravel الداعمة المنفذة
+
+توجد في MySQL فعلياً، إضافة إلى `users` والجداول Domain المذكورة لاحقاً:
+
+```text
+password_reset_tokens
+sessions
+cache
+cache_locks
+jobs
+job_batches
+failed_jobs
+migrations
+passkeys
+```
+
+`passkeys.user_id` يستخدم `cascadeOnDelete` كما أنشأته الحزمة، بينما `documents.user_id` يستخدم `restrictOnDelete` عمداً بسبب الموارد الخارجية والملف الخاص.
+
+---
+
+# 10. جدول `documents` المنفذ حالياً
+
+جدول `documents` يمثل هوية الوثيقة وملكيتها وبيانات الملف والحالة التجميعية فقط. الـSchema الفعلي بعد B8 هو:
+
+| العمود | النوع الفعلي | Null / Default |
+|---|---|---|
+| `id` | BIGINT UNSIGNED | PK, auto increment |
+| `user_id` | BIGINT UNSIGNED | NOT NULL، FK إلى `users.id` مع `ON DELETE RESTRICT` |
+| `original_name` | VARCHAR(255) | NOT NULL |
+| `stored_name` | VARCHAR(255) | NOT NULL |
+| `title` | VARCHAR(255) | NULL |
+| `file_path` | VARCHAR(1024) | NOT NULL |
+| `file_type` | VARCHAR(16) | NOT NULL |
+| `mime_type` | VARCHAR(255) | NOT NULL |
+| `file_size` | BIGINT UNSIGNED | NOT NULL |
+| `sha256` | CHAR(64) | NOT NULL بعد B8 |
+| `status` | VARCHAR(32) | NOT NULL، default `pending` |
+| `created_at` | TIMESTAMP | NULL |
+| `updated_at` | TIMESTAMP | NULL |
+
+الفهارس الفعلية:
+
+```text
+documents_user_id_status_index (user_id, status)
+documents_user_id_sha256_index (user_id, sha256)
+documents_user_id_created_at_index (user_id, created_at)
+```
+
+لا توجد حالياً في `documents` الأعمدة `failure_reason` أو `total_pages` أو `total_chunks` أو `qdrant_collection` أو `processed_at`. خصائص التنفيذ موجودة في `document_processing_runs`. كذلك لا يوجد بعد `selected_processing_run_id` لأن B11 ما زالت TODO، ولا يوجد جدول `document_processing_comparisons` لأن B12 ما زالت TODO.
 
 ## 10.1 file_type
 
@@ -622,16 +678,19 @@ txt
 
 ## 10.2 status
 
-المقترح:
+القيم المعتمدة والمنفذة في `DocumentStatus`:
 
 ```text
 pending
 scanning
+infected
 queued
 processing
+awaiting_selection
+indexing
 ready
 failed
-infected
+selection_expired
 ```
 
 ### معنى الحالات
@@ -652,7 +711,7 @@ ClamAV اعتبر الملف مصاباً أو مشبوهاً.
 
 - رفض الملف.
 - عدم إرساله إلى FastAPI.
-- حذف النسخة المؤقتة.
+- إبقاؤه في Quarantine أو حذفه وفق سياسة الاحتفاظ الآمنة المعتمدة، من دون نقله إلى Private Storage الدائم.
 - تسجيل سبب الرفض.
 
 #### queued
@@ -663,6 +722,14 @@ ClamAV اعتبر الملف مصاباً أو مشبوهاً.
 
 FastAPI بدأ معالجة الوثيقة.
 
+#### awaiting_selection
+
+اكتملت Runs المقارنة وأصبح القرار بانتظار اختيار المستخدم، ولا تكون الوثيقة Ready بعد.
+
+#### indexing
+
+تم اختيار Run ويجري تثبيت نتيجته والتحقق منها في Qdrant.
+
 #### ready
 
 انتهت المعالجة بنجاح وأصبح الملف قابلاً للاستخدام في المحادثات.
@@ -670,6 +737,10 @@ FastAPI بدأ معالجة الوثيقة.
 #### failed
 
 حدث خطأ أثناء Parsing أو Embedding أو التخزين أو الاتصال بالخدمات.
+
+#### selection_expired
+
+انتهت مهلة المقارنة قبل اعتماد Run؛ لا تُفهرس أي نتيجة تلقائياً.
 
 ---
 
@@ -781,13 +852,19 @@ Conversation
 
 Document
  ├── belongsTo User
+ ├── hasMany ProcessingRuns
  ├── belongsToMany Conversations
  └── hasMany MessageSources
+
+ProcessingRun
+ └── belongsTo Document
 
 Message
  ├── belongsTo Conversation
  └── hasMany MessageSources
 ```
+
+الحالة التنفيذية حتى B10: علاقات `User ↔ Document` و`Document ↔ ProcessingRun` منفذة. علاقات Conversations وMessages مخطط لها ولم تنفذ بعد. بعد B11 ستضاف علاقة الـselected run بصورة صريحة مع بقاء شرط أن الـRun المختار يعود إلى الوثيقة نفسها Domain invariant لا يضمنه الـForeign Key وحده.
 
 ---
 
@@ -814,6 +891,8 @@ Message
 7. SHA-256.
 8. ClamAV.
 
+الحالة الحالية حتى B10 تنفذ البنود 1–7؛ بند ClamAV يبدأ في المرحلة C. لذلك `POST /documents` الحالي يخزن مباشرة على الـdisk الخاص بحالة `pending` ولا يدعي أن الفحص الأمني منفذ بعد.
+
 ---
 
 # 17. التخزين الآمن للملفات
@@ -837,10 +916,10 @@ storage/app/private/documents/{user_id}/
 مثال:
 
 ```text
-5b1a93a8-77e1-4c06-b066-7c82b24d624c.pdf
+01J5Z8YQ6D7M2K4N9P3R5T7V8W.pdf
 ```
 
-ولا يتم استخدام الاسم الأصلي كاسم فعلي في التخزين.
+الاسم المنفذ حالياً هو ULID يولده الخادم مع الامتداد الذي اجتاز Validation، ولا يستخدم الاسم الأصلي كاسم فعلي في التخزين.
 
 ---
 
@@ -857,7 +936,9 @@ Laravel request validation
   ↓
 Temporary private file
   ↓
-ClamAV
+security-scan queue
+  ↓
+short-lived clamscan
   ↓
 ┌───────────────────────┐
 │ Is file clean?        │
@@ -868,14 +949,17 @@ ClamAV
       Yes      No
        │        │
        ▼        ▼
-Permanent     Delete
-Private       Temp File
+Permanent     Keep quarantined or remove
+Private       according to retention policy
 Storage         │
        │        ▼
        │     infected
        │
        ▼
-Create / Update Document
+Process exits / RAM released
+       │
+       ▼
+Update Document
        │
        ▼
 Dispatch Queue
@@ -885,22 +969,28 @@ Dispatch Queue
 
 > FastAPI يجب ألا يستقبل أي ملف لم يجتز ClamAV.
 
+لا يوجد `clamd` دائم. يملك Security Scan Worker ClamAV CLI وQuarantine/signature volumes، ولا يملك Docker socket. كل نتيجة غير Clean، بما فيها missing/stale signatures أو Timeout، تمنع المعالجة.
+
 ---
 
-# 19. DocumentUploadService
+# 19. خدمات رفع وتخزين الوثيقة
 
-المسؤوليات:
+## الحالة المنفذة حتى B10 — `DocumentStorageService`
 
-- استقبال UploadedFile.
-- حساب SHA-256.
-- تخزين مؤقت.
-- استدعاء `DocumentSecurityService`.
-- رفض الملف إذا كان مصاباً.
-- نقل الملف إلى Private Storage الدائم.
-- إنشاء Document record.
-- Dispatch `ProcessDocumentJob`.
+- يستقبل `UploadedFile` بعد نجاح `UploadDocumentRequest` و`SecureDocumentUpload`.
+- يخزن الملف على disk خاص باسم `documents` تحت `{user_id}/{ULID}.{extension}`.
+- يحسب SHA-256 من النسخة المخزنة نفسها.
+- يمنع duplicate داخل نطاق المستخدم على مستوى التطبيق بواسطة `(user_id, sha256)`، من دون Unique constraint.
+- ينشئ `Document` بحالة `pending` ويحذف الملف الجديد إذا فشل إنشاء السجل أو ثبت أنه duplicate.
 
-يجب ألا يقوم هذا Service بـParsing أو Embedding.
+## الهدف المخطط للمرحلة C — `DocumentUploadService`
+
+- ينقل orchestration الرفع إلى Private Quarantine.
+- ينشئ/يحدّث Document بحالة ما قبل الفحص.
+- يطلق Security Scan Job فقط.
+- بعد نجاح Job الأمنية ينقل الملف إلى Private Storage الدائم ويطلق `ProcessDocumentJob`.
+
+لا يطلق Upload request معالجة AI مباشرة، ولا تقوم أي من خدمتي الرفع/التخزين بـParsing أو Embedding.
 
 ---
 
@@ -921,6 +1011,8 @@ clean
 infected
 scan_failed
 ```
+
+ينفّذ داخل Security Scan Worker ويشغّل `clamscan` بوسائط Array عبر Process API، لا Shell command مبنياً من اسم الملف.
 
 من المهم التفريق بين:
 
@@ -957,6 +1049,8 @@ Ensure status = queued
   ↓
 Update status → processing
   ↓
+Create/Update ProcessingRun
+  ↓
 DocumentProcessingService
   ↓
 AiServiceClient
@@ -965,18 +1059,28 @@ POST FastAPI /documents/process
   ↓
 Receive result
   ↓
-Update:
+Update ProcessingRun:
   total_pages
   total_chunks
-  processed_at
-  status = ready
+  vector_count / vector_dimension
+  stage_timings_ms / warnings
+  comparison_report / temporary artifact metadata
 ```
 
-في حال Exception:
+ثم يطبق Laravel إحدى النهايتين:
 
 ```text
-status = failed
-failure_reason = ...
+single profile → promotion ناجح → Run = indexed → selected run transaction → Document = ready
+compare        → Runان = ready_for_comparison → Document = awaiting_selection
+```
+
+في حال Exception تحفظ معلومات الفشل على الـRun، ثم يسقط Document إلى الحالة التجميعية المناسبة:
+
+```text
+ProcessingRun.status = failed
+ProcessingRun.error_code = ...
+ProcessingRun.failure_reason = ...
+Document.status = failed  # فقط عندما لا توجد نتيجة صالحة أخرى وفق projector
 ```
 
 ---
@@ -1019,6 +1123,8 @@ POST /api/v1/documents/process
 ```text
 document_id
 user_id
+processing_run_id
+processing_profile
 file_type
 file
 ```
@@ -1028,15 +1134,22 @@ file
 ```json
 {
   "document_id": 152,
-  "status": "processed",
+  "processing_run_id": 901,
+  "profile": "cloud",
+  "status": "ready_for_comparison",
   "total_pages": 33,
-  "total_chunks": 184
+  "total_chunks": 184,
+  "vector_count": 184,
+  "vector_dimension": 1024,
+  "temporary_artifact_ref": "opaque-token"
 }
 ```
 
 بالنسبة إلى TXT أو DOCX:
 
 `total_pages` يمكن أن يكون `null` إذا لم توجد دلالة موثوقة للصفحات.
+
+كل هذه القيم تخص `document_processing_runs` ولا تضاف إلى `documents`. العقد النهائي التفصيلي وعمليات Promotion/Compare في 174.4–174.11.
 
 ---
 
@@ -1461,19 +1574,19 @@ QDRANT_URL=http://qdrant:6333
 
 # 38. Qdrant Collection
 
-مبدئياً نستخدم Collection واحدة:
+نستخدم Collection منفصلة لكل فضاء Embedding:
 
 ```text
-rag_documents
+rag_documents_cloud
+rag_documents_hybrid_local
 ```
 
-بدلاً من Collection لكل User أو لكل Document.
+لا ننشئ Collection لكل User أو لكل Document.
 
 الأسباب:
 
-- إدارة أسهل.
-- scalability أفضل.
-- filtering موحد.
+- منع مقارنة vectors من فضاء Jina مع vectors من فضاء BGE-M3 حتى لو كان البعد 1024 في كليهما.
+- إبقاء الإدارة والفلاتر موحدة داخل كل Profile.
 - لا تتكاثر الـcollections بدون حاجة.
 
 ---
@@ -1535,6 +1648,8 @@ Point
 └── payload
     ├── user_id
     ├── document_id
+    ├── processing_run_id
+    ├── processing_profile
     ├── file_type
     ├── source
     ├── page
@@ -1559,6 +1674,10 @@ user_id = authenticated user
 AND
 
 document_id IN selected document ids
+
+AND
+
+processing_run_id IN selected run ids
 ```
 
 مثال:
@@ -1567,6 +1686,8 @@ document_id IN selected document ids
 user_id = 7
 AND
 document_id IN [12, 17, 33]
+AND
+processing_run_id IN [41, 52, 78]
 ```
 
 هذه القاعدة يجب تطبيقها على:
@@ -1575,6 +1696,8 @@ document_id IN [12, 17, 33]
 - Sparse prefetch.
 - deletion.
 - أي query آخر.
+
+يستخدم كل target أيضاً `processing_profile` لاختيار Collection والـquery embedding/reranker الصحيحين؛ لا تقارن raw scores بين Profiles مباشرة.
 
 ---
 
@@ -1726,7 +1849,7 @@ app/rag/prompts.py
 
 ---
 
-# 49. LLM Generation — تصميم مزدوج Cloud / Local
+# 49. LLM Generation — Provider موحّد وبيئتان منفصلتان
 
 الـNotebook الأصلي يستخدم:
 
@@ -1736,17 +1859,17 @@ Qwen/Qwen3.5-9B
 
 عبر Hugging Face Router.
 
-في التطبيق النهائي **لا يتم ربط FastAPI مباشرة بمزوّد واحد**. بدلاً من ذلك نعرّف طبقة Provider مستقلة تسمح بتشغيل أحد مسارين:
+في التطبيق النهائي **لا يتم ربط منطق RAG مباشرة بمزوّد واحد**. نعرّف Provider Registry، ويختار Laravel/FastAPI المزود من Processing profile موثوقة بعد التحقق من Capabilities:
 
 ```text
-LLM_PROVIDER=cloud
+cloud profile       → CloudLLMProvider
+hybrid_local profile → LocalLLMProvider
+compare             → الطرفان بالتتابع
 ```
 
-أو:
-
-```text
-LLM_PROVIDER=local
-```
+- Oracle Online يستخدم `cloud` فقط.
+- Mac/ASUS Local Demo يسجل Cloud وLocal providers حسب جاهزيتهما ويستخدم كليهما عند اختبار `compare`.
+- لا يتحول Oracle إلى Local بإجراء Config بسيط، لأن Images والـDependencies والـTopology مختلفة عمداً.
 
 ## 49.1 المسار الأول: Cloud LLM
 
@@ -1772,7 +1895,7 @@ Qwen/Qwen3.5-9B
 
 لكن يجب الانتباه أن رصيد Hugging Face المجاني للمستخدم المجاني محدود، لذلك لا يجب اعتبار Cloud LLM مجانياً بشكل دائم عند زيادة الاستخدام.
 
-## 49.2 المسار الثاني: Self-hosted Local LLM
+## 49.2 المسار الثاني: Self-hosted Local LLM على أجهزة المشروع
 
 المسار الثاني يشغل النموذج تحت إدارتنا:
 
@@ -1783,67 +1906,29 @@ LocalLLMProvider
    ↓
 OpenAI-compatible Local Endpoint
    ↓
-llama.cpp / Ollama / compatible runtime
+Host-native Ollama
    ↓
-Quantized Qwen model
+qwen3.5:4b
 ```
-
-في النشر المجاني على CPU، النموذج المقترح كبداية:
-
-```text
-Qwen/Qwen3-4B-GGUF
-Q4_K_M
-```
-
-حجم ملف Q4_K_M الرسمي يقارب:
-
-```text
-2.5 GB
-```
-
-ويتم تشغيله مثلاً بواسطة `llama.cpp` كـOpenAI-compatible server.
 
 هذا المسار مناسب لـ:
 
-- Demo.
-- الاختبارات.
-- إثبات إمكانية العمل بدون LLM API خارجي.
+- Local Demo على Mac/ASUS.
+- اختبار `hybrid_local` و`compare`.
+- إثبات Self-hosted generation.
 - تقليل تكلفة كل Request.
-- الحفاظ على خصوصية السياق المرسل للـLLM داخل بنيتنا.
+- إبقاء سياق Generation على الجهاز بعد Parsing الخارجي.
 
-لكنه أبطأ بكثير على Oracle Always Free لأن الخطة المجانية تعتمد على CPU محدود.
+لا يعمل هذا المسار على Oracle، ولا يوصف بأنه Offline بالكامل لأن LlamaParse Cloud ما زال مستخدماً.
 
-## 49.3 لا نستخدم Qwen3.5-9B محلياً على Free VM
+## 49.3 لا Local AI على Oracle
 
-رغم إمكانية تشغيل نماذج Quantized أكبر نظرياً، لا تعتمد الخطة المجانية على تشغيل:
-
-```text
-Qwen3.5-9B
-```
-
-محلياً على نفس VM التي تشغّل:
+القرار النهائي:
 
 ```text
-Laravel
-FastAPI
-MySQL
-Redis
-Qdrant
-ClamAV
-Queue Worker
-Nginx
+Oracle Cloud-only → Qwen3.5-9B عبر Hugging Face Router
+Mac/ASUS Local Demo → Ollama qwen3.5:4b
 ```
-
-لأن ذلك سيؤدي إلى ضغط كبير على الذاكرة والـCPU.
-
-لذلك:
-
-```text
-Cloud mode  → Qwen3.5-9B
-Local mode  → Small quantized model مثل Qwen3-4B Q4_K_M
-```
-
-مع إمكانية تغيير النموذج لاحقاً من الإعدادات.
 
 ## 49.4 Provider Interface
 
@@ -1878,21 +1963,20 @@ Laravel
 مثلاً:
 
 ```text
-LLMProviderFactory
+LLMProviderRegistry
    ↓
-read LLM_PROVIDER
+validated processing_profile + capabilities
    ↓
-cloud ? CloudLLMProvider
-local ? LocalLLMProvider
+cloud → CloudLLMProvider
+hybrid_local → LocalLLMProvider
+compare → both sequentially
 ```
 
-وبذلك يتم تغيير المسار من `.env` فقط.
+لا يقبل الـRegistry قيمة Provider مباشرة من Browser. يحدد `RAG_DEPLOYMENT_MODE` Profiles المسموحة، ويختار الـRun الموثوق Provider المناسب. هذا ضروري لأن Compare يحتاج Providerين في الطلب نفسه ولا يمكن تمثيله بمفتاح `LLM_PROVIDER` عالمي.
 
 ## 49.6 إعدادات Cloud LLM
 
 ```text
-LLM_PROVIDER=cloud
-
 CLOUD_LLM_BASE_URL=https://router.huggingface.co/v1
 CLOUD_LLM_MODEL=Qwen/Qwen3.5-9B
 HF_TOKEN=...
@@ -1901,12 +1985,12 @@ HF_TOKEN=...
 ## 49.7 إعدادات Local LLM
 
 ```text
-LLM_PROVIDER=local
-
-LOCAL_LLM_BASE_URL=http://local-llm:8080/v1
-LOCAL_LLM_MODEL=qwen-local
+LOCAL_LLM_BASE_URL=http://127.0.0.1:11434/v1
+LOCAL_LLM_MODEL=qwen3.5:4b
 LOCAL_LLM_API_KEY=none
 ```
+
+تستخدم هذه القيمة لأن FastAPI وOllama يعملان على Host OS. لا تستخدم متغيرات Local LLM في Oracle.
 
 ## 49.8 توحيد OpenAI-compatible API
 
@@ -1919,7 +2003,7 @@ Cloud:
 https://router.huggingface.co/v1/chat/completions
 
 Local:
-http://local-llm:8080/v1/chat/completions
+http://127.0.0.1:11434/v1/chat/completions
 ```
 
 الفرق يصبح فقط:
@@ -2100,7 +2184,10 @@ infected
 الوثائق المتاحة للمحادثة يجب أن تكون فقط:
 
 ```text
-ready
+documents.status = ready
+selected_processing_run_id موجود
+selected run status = indexed
+Runtime/Collection الخاصة بالـprocessing_profile متاحة
 ```
 
 ---
@@ -2110,8 +2197,9 @@ ready
 عند إضافة Document إلى Conversation:
 
 1. Verify owner.
-2. Verify status = ready.
-3. attach pivot.
+2. Verify aggregate status = ready.
+3. Verify selected Run belongs to the document and is indexed and runtime-capable.
+4. attach pivot.
 
 عند الإزالة:
 
@@ -2162,14 +2250,18 @@ Authorize
   ↓
 Delete Qdrant points
   ↓
+Delete temporary artifacts
+  ↓
 Delete physical private file
   ↓
-Delete pivot references
+Delete/Detach pivot and source references
+  ↓
+Delete comparisons and processing runs in an explicit service order
   ↓
 Delete database record
 ```
 
-يفضل تنفيذ حذف Qdrant عبر Job مع معالجة حالات الفشل.
+ينفذ ذلك عبر `DocumentDeletionService`/Jobs مع معالجة حالات الفشل. تمنع مفاتيح `RESTRICT` حذف `documents` أو الـRuns قبل تنظيف الموارد والعلاقات صراحة.
 
 ---
 
@@ -2177,14 +2269,15 @@ Delete database record
 
 عند إعادة معالجة وثيقة:
 
-1. حذف vectors القديمة الخاصة بالوثيقة.
-2. status → queued.
-3. إرسال ProcessDocumentJob جديد.
-4. استخراج chunks جديدة.
-5. إدخال points جديدة.
-6. status → ready.
+1. إبقاء الـselected run القديم وPoints الخاصة به قابلة للاستخدام أثناء إنشاء Run جديدة.
+2. تحويل الحالة التجميعية إلى الحالة المناسبة من دون كسر المحادثات القائمة.
+3. إرسال `ProcessDocumentJob` وإنشاء Run جديدة.
+4. استخراج chunks جديدة وحفظها كـtemporary artifact.
+5. بعد نجاح المعالجة والاختيار، Promotion idempotent للـRun الجديدة والتحقق من count.
+6. داخل Transaction تحديث `selected_processing_run_id` وحالات الـRuns والوثيقة.
+7. تنظيف Points/artifacts القديمة بعد نجاح التحويل فقط.
 
-يجب ألا تتراكم duplicates لنفس الوثيقة.
+يجب ألا تتراكم duplicates لنفس الوثيقة، ولا يجوز حذف النسخة العاملة قبل ثبوت نجاح البديل.
 
 ---
 
@@ -2482,12 +2575,15 @@ nginx
 
 internal app network:
 laravel
+queue-worker
+security-scan-worker
 mysql
 redis
 fastapi
 qdrant
-clamav
 ```
+
+وجود `fastapi` داخل الشبكة يخص Oracle Cloud Compose. في Local Demo تعمل FastAPI على Host ويصل إليها Docker عبر `host.docker.internal:8000`.
 
 لا حاجة لتعريض:
 
@@ -2495,7 +2591,6 @@ clamav
 3306
 6379
 6333
-3310
 ```
 
 للإنترنت في production.
@@ -2507,15 +2602,22 @@ clamav
 مثال:
 
 ```text
+RAG_DEPLOYMENT_MODE=cloud|local
 AI_SERVICE_BASE_URL=http://fastapi:8000
 AI_SERVICE_API_KEY=...
 AI_SERVICE_TIMEOUT=600
 
 QUEUE_CONNECTION=redis
 
-CLAMAV_HOST=clamav
-CLAMAV_PORT=3310
+CLAMAV_SCAN_MODE=on_demand_cli
+CLAMAV_SCAN_QUEUE=security-scan
+CLAMAV_SCAN_CONCURRENCY=1
+CLAMAV_SCAN_TIMEOUT=300
+CLAMAV_SIGNATURE_DIR=/var/lib/clamav
+CLAMAV_FAIL_CLOSED=true
 ```
+
+في Local Demo تصبح `AI_SERVICE_BASE_URL=http://host.docker.internal:8000`، وتضاف إعدادات القفل العالمي المذكورة في 174.20. لا توجد `CLAMAV_HOST/PORT` لأن لا `clamd` دائم.
 
 ---
 
@@ -2524,18 +2626,25 @@ CLAMAV_PORT=3310
 مثال:
 
 ```text
+RAG_DEPLOYMENT_MODE=cloud|local
 QDRANT_URL=http://qdrant:6333
-QDRANT_COLLECTION=rag_documents
+QDRANT_CLOUD_COLLECTION=rag_documents_cloud
+QDRANT_HYBRID_LOCAL_COLLECTION=rag_documents_hybrid_local
 
 JINAAI_API_KEY=...
 LLAMA_CLOUD_API_KEY=...
 HF_TOKEN=...
 
-EMBED_MODEL_NAME=jina-embeddings-v3
-EMBED_DIM=1024
+CLOUD_EMBED_MODEL=jina-embeddings-v3
+CLOUD_EMBED_DIM=1024
 
-RERANK_MODEL_NAME=jina-reranker-v2-base-multilingual
-LLM_MODEL_NAME=Qwen/Qwen3.5-9B
+CLOUD_RERANK_MODEL=jina-reranker-v2-base-multilingual
+CLOUD_LLM_MODEL=Qwen/Qwen3.5-9B
+
+LOCAL_EMBED_MODEL=BAAI/bge-m3
+LOCAL_RERANK_MODEL=BAAI/bge-reranker-v2-m3
+LOCAL_LLM_BASE_URL=http://127.0.0.1:11434/v1
+LOCAL_LLM_MODEL=qwen3.5:4b
 
 CHUNK_SIZE=800
 CHUNK_OVERLAP=80
@@ -2545,6 +2654,8 @@ SPARSE_CANDIDATES=12
 RRF_TOP_K=12
 RERANK_TOP_N=5
 ```
+
+Cloud image لا يثبّت Local dependencies ولا يحتاج متغيرات Local. Local Host FastAPI يستخدم `QDRANT_URL=http://127.0.0.1:6333` لأن Qdrant منشورة على Loopback فقط.
 
 ---
 
@@ -2841,7 +2952,10 @@ total question duration
 
 ---
 
-# 86. مراحل التنفيذ المقترحة
+# 86. مراحل التنفيذ الأصلية — سجل تاريخي غير نشط
+
+> [!WARNING]
+> هذا القسم حتى نهاية القسم 100 يحفظ التسلسل الأولي فقط ولا يستخدم للتنفيذ أو لتسمية المهام. خريطة المهام الوحيدة النشطة هي 174.16 كما تنعكس حرفياً في `PROJECT_RAG_EXECUTION_PROGRESS.md`. عند اختلاف رقم أو نطاق أو Definition of Done، يحذف الالتباس لصالح 174.16–174.20 وملف التقدم.
 
 > **قاعدة التنفيذ:** كل بند مرقّم مثل `A1`, `A2`, `B1` ... يمثل Task مستقلة افتراضياً ويجب تنفيذها في Chat مستقل، إلا إذا تم تسجيل قرار صريح في ملف التقدم بدمج مهمتين صغيرتين دون الإضرار بالتتبع.
 >
@@ -2915,7 +3029,7 @@ txt
 
 # المرحلة C — ClamAV
 
-## C1. إضافة ClamAV infrastructure
+## C1. إضافة Security Scan Worker مع ClamAV CLI وتواقيع دائمة
 
 ## C2. DocumentSecurityService
 
@@ -2941,7 +3055,7 @@ pending → scanning → infected
 
 ### معيار انتهاء المرحلة
 
-لا يمكن لملف لم يجتز ClamAV الوصول إلى Queue الخاصة بمعالجة AI.
+لا يمكن لملف لم يجتز `clamscan` بنجاح الوصول إلى Queue الخاصة بمعالجة AI. لا يوجد `clamd` دائم أو Docker socket، وفي Local Demo يمنع القفل العالمي تداخل Scan مع أي Local AI Stage.
 
 ---
 
@@ -2975,7 +3089,7 @@ Laravel يستطيع الاتصال بـFastAPI داخلياً والحصول ع
 
 حتى لا تضيع البيانات عند restart.
 
-## E3. إنشاء `rag_documents`
+## E3. إنشاء `rag_documents_cloud` و`rag_documents_hybrid_local`
 
 ## E4. Dense vector config
 
@@ -2996,6 +3110,8 @@ BM25 + IDF
 ```text
 user_id
 document_id
+processing_run_id
+processing_profile
 ```
 
 ## E7. اختبار الاتصال
@@ -3093,11 +3209,11 @@ jina-embeddings-v3
 
 ## I4. status handling
 
-## I5. total_chunks
+## I5. حفظ `total_chunks` على ProcessingRun
 
-## I6. total_pages
+## I6. حفظ `total_pages` على ProcessingRun
 
-## I7. failure_reason
+## I7. حفظ `failure_reason` على ProcessingRun وإسقاط حالة Document التجميعية
 
 ## I8. UI status refresh
 
@@ -3307,7 +3423,7 @@ FastAPI يعيد Answer + Sources بشكل ثابت ومنظم.
 
 ---
 
-# 87. ترتيب التنفيذ المختصر
+# 87. ترتيب التنفيذ المختصر الأصلي — غير مرجعي
 
 الترتيب الذي أنصح باتباعه بدون القفز بين المراحل:
 
@@ -3357,9 +3473,10 @@ FastAPI يعيد Answer + Sources بشكل ثابت ومنظم.
 - تم Chunking.
 - تم Embedding.
 - تم رفع Dense + Sparse representations.
-- تحمل جميع نقاط Qdrant `user_id` و`document_id`.
-- total_chunks > 0.
-- status = ready.
+- يوجد `selected_processing_run_id` يعود إلى الوثيقة نفسها.
+- الـselected Run حالتها `indexed` و`total_chunks > 0` و`vector_count` مطابق.
+- تحمل جميع نقاط Qdrant `user_id` و`document_id` و`processing_run_id` و`processing_profile`.
+- `documents.status = ready` كنتيجة تجميعية، ولا تخزن حقول العدادات أو الفشل في `documents`.
 
 ---
 
@@ -3396,11 +3513,11 @@ FastAPI يعيد Answer + Sources بشكل ثابت ومنظم.
 
 ## قاعدة 3
 
-لا يجري Qdrant query بدون `user_id`.
+لا يجري Qdrant query بدون `user_id + document_id + processing_run_id`.
 
 ## قاعدة 4
 
-عند السؤال يجب أيضاً تحديد `document_ids`.
+عند السؤال يجب تحديد document targets المخولة مع Profile/Collection الخاصة بكل selected Run؛ لا تكفي `document_ids` منفردة.
 
 ## قاعدة 5
 
@@ -3437,17 +3554,23 @@ DOCX/TXT لا يعطى لهما رقم صفحة وهمي.
              Laravel Validation
                      │
                      ▼
-             Temporary Storage
+             Private Quarantine
                      │
                      ▼
-                  ClamAV
+          security-scan queue (1)
+                     │
+                     ▼
+            short-lived clamscan
                      │
             ┌────────┴────────┐
             │                 │
-          Clean            Infected
+          Clean        Infected/Failure
             │                 │
             ▼                 ▼
-     Private Storage        Reject
+      Process exits         Fail closed
+            │
+            ▼
+     Private Storage
             │
             ▼
        Document Record
@@ -3473,16 +3596,21 @@ DOCX/TXT لا يعطى لهما رقم صفحة وهمي.
         Chunking
             │
             ▼
-    Passage Embeddings
+    Trusted Processing Profile
+       ┌────┼───────────────┐
+       ▼    ▼               ▼
+    cloud hybrid_local    compare
+       │    │            both sequentially
+       └────┴───────────────┘
             │
             ▼
- Dense + BM25 representation
+ Embeddings + Sparse + Reranking
             │
             ▼
-       Qdrant Local
+ Promote selected run only to Qdrant
             │
             ▼
-          Ready
+          Ready / Awaiting Selection
             │
             ▼
           Laravel
@@ -3502,7 +3630,8 @@ DOCX/TXT لا يعطى لهما رقم صفحة وهمي.
              Authorization
                       │
                       ▼
-        Selected Ready Documents
+        Authorized document targets
+ user_id + document_id + selected_processing_run_id
                       │
                       ▼
             Save User Message
@@ -3514,26 +3643,16 @@ DOCX/TXT لا يعطى لهما رقم صفحة وهمي.
                    FastAPI
                       │
                       ▼
-              Query Embedding
-                      │
-                      ▼
-              Qdrant Local
-                      │
-          user_id + document_ids
+        Group by selected run profile
                       │
           ┌───────────┴───────────┐
           ▼                       ▼
-    Dense Search              BM25 Search
+      Cloud group          Hybrid Local group
+   Jina query/reranker      BGE query/reranker
           │                       │
           └───────────┬───────────┘
                       ▼
-                    RRF
-                      │
-                      ▼
-               12 Candidates
-                      │
-                      ▼
-               Jina Reranker
+          rank-based cross-profile fusion
                       │
                       ▼
                  Top 5 Chunks
@@ -3545,7 +3664,8 @@ DOCX/TXT لا يعطى لهما رقم صفحة وهمي.
                     Prompt
                       │
                       ▼
-              Qwen 3.5 / HF
+        Provider Registry by trusted profile
+          Cloud HF or Local Ollama
                       │
                       ▼
               Answer + Sources
@@ -3631,10 +3751,10 @@ Loaders + Chunking + Embeddings + Retrieval + Reranking + Generation
         ↓
 
 Infrastructure
-MySQL + Redis + ClamAV + Qdrant Local + Private Storage
+MySQL + Redis + ClamAV CLI/signatures + Qdrant + Private Storage
 ```
 
-مع استمرار استخدام الخدمات الموجودة في الـNotebook للنسخة الأولى:
+في Cloud profile تستخدم الخدمات الخارجية:
 
 ```text
 LlamaParse
@@ -3642,6 +3762,8 @@ Jina Embeddings
 Jina Reranker
 Hugging Face / Qwen
 ```
+
+وفي `hybrid_local` تستخدم BGE-M3 وBGE Reranker وOllama محلياً، مع بقاء LlamaParse Cloud للـParsing.
 
 بينما أصبح:
 
@@ -3684,9 +3806,7 @@ ClamAV قبل FastAPI
 
 # 96. ملاحظة حول مفهوم "Local"
 
-بعد التعديلات الحالية، **Qdrant أصبح محلياً**، والملفات مخزنة محلياً، وLaravel/FastAPI/MySQL/Redis/ClamAV يمكن تشغيلها محلياً.
-
-لكن Pipeline المأخوذ من الـNotebook لا يزال يستخدم خدمات خارجية في النسخة الحالية:
+في Oracle، Qdrant والملفات والبنية الأساسية ذاتية الاستضافة، لكن Profile المنشورة تستخدم خدمات خارجية:
 
 ```text
 LlamaParse Cloud
@@ -3694,9 +3814,11 @@ Jina API
 Hugging Face Router
 ```
 
+في Local Demo تصبح Embeddings وReranking وGeneration محلية عبر BGE/Ollama، لكن LlamaParse Cloud يبقى خارجياً.
+
 لذلك هذه النسخة ليست Offline بالكامل.
 
-إذا أصبح الهدف لاحقاً أن يكون النظام Local/Offline بشكل كامل، يمكن استبدال هذه الخدمات تدريجياً بنماذج محلية مع الحفاظ على نفس Interfaces والـServices، بدون إعادة تصميم Laravel أو قواعد البيانات.
+إذا أصبح الهدف لاحقاً أن يكون النظام Offline بالكامل، يستبدل LlamaParse أيضاً بParser/OCR محلي بقرار مستقل، مع الحفاظ على Interfaces والـServices.
 
 ---
 
@@ -3704,19 +3826,19 @@ Hugging Face Router
 
 النسخة المقترحة ليست إعادة كتابة للـNotebook، بل تحويل منظم له من Prototype إلى Application Architecture.
 
-يتم الاحتفاظ بقلب الـRAG:
+يتم الاحتفاظ بقلب الـRAG مع Provider-specific stages:
 
 ```text
 Parsing
 → Chunking
-→ Jina Embeddings
+→ Jina Embeddings أو BGE-M3
 → Dense + BM25
 → Qdrant
 → Hybrid Search
 → RRF
-→ Jina Reranker
+→ Jina Reranker أو BGE Reranker
 → Context
-→ Qwen
+→ Cloud Qwen أو Ollama qwen3.5:4b
 → Answer + Sources
 ```
 
@@ -3752,7 +3874,7 @@ Testing
                          RagGenerationService
                                   │
                                   ▼
-                           LLMProviderFactory
+                           LLMProviderRegistry
                                   │
                     ┌─────────────┴─────────────┐
                     │                           │
@@ -3760,26 +3882,13 @@ Testing
               CloudLLMProvider            LocalLLMProvider
                     │                           │
                     ▼                           ▼
-            Hugging Face Router           llama.cpp / Ollama
+            Hugging Face Router           Host-native Ollama
                     │                           │
                     ▼                           ▼
-             Qwen3.5-9B                  Quantized Qwen
+             Qwen3.5-9B                   qwen3.5:4b
 ```
 
-الهدف ليس تشغيل المسارين معاً في كل سؤال، بل اختيار أحدهما حسب Environment.
-
-مثلاً:
-
-```text
-Development:
-LLM_PROVIDER=local
-
-Cloud Demo:
-LLM_PROVIDER=cloud
-
-Privacy Demo:
-LLM_PROVIDER=local
-```
+Online يسجل Cloud provider فقط. Local Demo يسجل Providers المتاحة ويختارها حسب Processing profile، وقد يستخدم Cloud وLocal بالتتابع في Compare. لا يوجد `LLM_PROVIDER` عالمي في العقد النهائي، لأن الاعتماد عليه سيجعل Compare غير قابل للتمثيل.
 
 ويمكن لاحقاً إضافة Providers أخرى بدون تعديل منطق الـRAG.
 
@@ -3795,10 +3904,10 @@ LLM_PROVIDER=local
 ALLOW_CLOUD_FALLBACK=false
 ```
 
-إذا كان:
+إذا كان Processing profile:
 
 ```text
-LLM_PROVIDER=local
+hybrid_local
 ```
 
 وفشل Local LLM، تفشل عملية الإجابة وتظهر رسالة مناسبة بدلاً من إرسال السياق تلقائياً إلى Cloud.
@@ -3819,14 +3928,14 @@ LLM_PROVIDER=local
 | تكلفة كل Request | تعتمد على Provider | لا توجد تكلفة API مباشرة |
 | الاعتماد على الإنترنت | نعم | لا بعد تنزيل النموذج |
 | تشغيل نموذج أكبر | أسهل | يحتاج Hardware أقوى |
-| مناسب لـOracle Free | ممتاز | ممكن مع نموذج صغير Quantized |
-| Qwen3.5-9B | مناسب عبر Provider | غير موصى به على Free VM |
+| مناسب لـOracle Free | معتمد | غير مسموح في الخطة النهائية |
+| النموذج | Qwen3.5-9B عبر Provider | Ollama `qwen3.5:4b` على Mac/ASUS |
 
 ---
 
 # 101. الهدف من خطة النشر المجاني
 
-الهدف هو نشر نسخة:
+الهدف هو نشر نسخة Online:
 
 ```text
 Demo / Master Thesis / Small-scale POC
@@ -3843,25 +3952,30 @@ Docker Engine
 Docker Compose
 ```
 
-وتشغيل:
+وتشغيل Cloud-only:
 
 ```text
 Nginx
 Laravel
 Laravel Queue Worker
+Security Scan Worker مع `clamscan` عند الطلب
 FastAPI
 MySQL
 Redis
 Qdrant Local
-ClamAV
+Scheduled `UpdateClamAvSignaturesJob` على Queue الأمنية نفسها
 ```
 
-مع مسارين للـLLM:
+وتستخدم الخدمات الخارجية للمراحل الآتية:
 
 ```text
-A. Cloud LLM
-B. Local Quantized LLM
+LlamaParse Cloud
+Jina Embeddings API
+Jina Reranker API
+Hugging Face Router / Qwen3.5-9B
 ```
+
+لا يشغّل Oracle أي Local embedding أو reranker أو LLM. يعمل `hybrid_local` و`compare` فقط في Local Demo منفصل على Mac أو ASUS وفق 174.19 و174.20.
 
 ---
 
@@ -3967,7 +4081,6 @@ redis_data
 qdrant_data
 clamav_db
 laravel_private_storage
-llm_models        # فقط في Local LLM mode
 ```
 
 ---
@@ -3980,14 +4093,11 @@ llm_models        # فقط في Local LLM mode
 │  nginx                                   │
 │  laravel                                 │
 │  queue-worker                            │
-│  fastapi                                 │
+│  security-scan-worker + clamscan         │
+│  fastapi cloud-only                      │
 │  mysql                                   │
 │  redis                                   │
 │  qdrant                                  │
-│  clamav                                  │
-│                                          │
-│  optional:                               │
-│  local-llm                               │
 │                                          │
 └──────────────────────────────────────────┘
 ```
@@ -4036,13 +4146,12 @@ laravel
 
 ```text
 laravel
-queue-worker
-fastapi
-mysql
-redis
-qdrant
-clamav
-local-llm
+    queue-worker
+    security-scan-worker
+    fastapi
+    mysql
+    redis
+    qdrant
 ```
 
 ولا يتم نشر Ports الداخلية للعالم الخارجي.
@@ -4073,9 +4182,7 @@ SSH:
 6379 Redis
 6333 Qdrant
 6334 Qdrant gRPC
-3310 ClamAV
 8000 FastAPI
-8080 Local LLM
 ```
 
 ---
@@ -4093,17 +4200,15 @@ Laravel
    │
    ├── MySQL
    ├── Redis
-   ├── ClamAV
+   ├── Security Scan Worker
+   │      └── clamscan + persistent signatures
    │
    └── FastAPI
           │
           ├── Qdrant
           ├── LlamaParse
           ├── Jina
-          │
-          └── LLM Provider
-                ├── Cloud
-                └── Local
+          └── Hugging Face Router
 ```
 
 ---
@@ -4127,6 +4232,13 @@ services:
       - redis
       - fastapi
 
+  security-scan-worker:
+    # Laravel worker image + ClamAV CLI + freshclam
+    # queue: security-scan, concurrency: 1
+    volumes:
+      - laravel_private_storage:/app/storage/app/private
+      - clamav_db:/var/lib/clamav
+
   fastapi:
     depends_on:
       - qdrant
@@ -4143,20 +4255,13 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
-  clamav:
-    volumes:
-      - clamav_db:/var/lib/clamav
-
-  local-llm:
-    profiles:
-      - local-llm
 ```
 
-`local-llm` لا يعمل عندما نستخدم Cloud Provider.
+لا توجد خدمة `clamd` أو `local-llm` أو updater دائمة في Compose الخاصة بـOracle. يملك `security-scan-worker` تطبيق Laravel و`clamscan/freshclam` مع وصول مقيد إلى Private quarantine وsignature volume. يطلق Laravel Scheduler مهمة `UpdateClamAvSignaturesJob` على Queue `security-scan` نفسها، فتتسلسل تلقائياً مع عمليات الفحص ولا تحتاج Docker socket.
 
 ---
 
-# 112. Profile A — Deployment مجاني مع Cloud LLM
+# 112. Profile Online الوحيد — Deployment مع Cloud Providers
 
 هذا هو الخيار الموصى به للنسخة المنشورة على Oracle Always Free.
 
@@ -4166,43 +4271,48 @@ services:
 Nginx
 Laravel
 Queue
-FastAPI
+Security Scan Worker
+FastAPI Cloud-only
 MySQL
 Redis
 Qdrant
-ClamAV
 ```
 
-ولا نشغّل:
+ولا نثبّت أو نشغّل:
 
 ```text
-local-llm
+Ollama
+llama.cpp
+BGE-M3
+BGE Reranker
+Torch
+Transformers
+Local model weights
 ```
 
-إعداد FastAPI:
+إعداد البيئة:
 
 ```text
-LLM_PROVIDER=cloud
+RAG_DEPLOYMENT_MODE=cloud
 ```
 
 ثم:
 
 ```text
-FastAPI
-  ↓
-Hugging Face Router
-  ↓
-Qwen/Qwen3.5-9B
+FastAPI Cloud-only
+  ├── LlamaParse Cloud
+  ├── Jina Embeddings/Reranker
+  └── Hugging Face Router → Qwen/Qwen3.5-9B
 ```
 
 ---
 
-# 113. لماذا Cloud LLM Profile هو الأفضل على Oracle Free؟
+# 113. لماذا Cloud-only هو المسار الوحيد على Oracle Free؟
 
 لأن موارد Oracle تبقى مخصصة إلى:
 
 ```text
-ClamAV
+`clamscan` عند الطلب فقط
 Qdrant
 MySQL
 Laravel
@@ -4211,7 +4321,7 @@ Queue
 Redis
 ```
 
-بدلاً من استهلاك عدة GB إضافية في LLM.
+بدلاً من استهلاك عدة GB إضافية في BGE أو LLM محلي. لا تتداخل عملية الفحص مع Model محلي لأن Cloud deployment لا يملك نماذج محلية أصلاً.
 
 هذا يعطي:
 
@@ -4245,95 +4355,49 @@ Cloud LLM != guaranteed $0 forever
 
 ---
 
-# 115. Profile B — Deployment مجاني مع Local LLM
+# 115. الفصل النهائي بين Online وLocal Demo
 
-هذا الـProfile يشغّل LLM على نفس VM:
-
-```text
-Oracle VM
-│
-├── Laravel
-├── Queue
-├── FastAPI
-├── Qdrant
-├── MySQL
-├── Redis
-├── ClamAV
-└── llama.cpp
-     ↓
-   Qwen Quantized
-```
-
-الإعداد:
+لا يوجد Local LLM profile على Oracle. النشر العام ثابت على:
 
 ```text
-LLM_PROVIDER=local
+RAG_DEPLOYMENT_MODE=cloud
 ```
 
-ثم:
-
-```text
-LOCAL_LLM_BASE_URL=http://local-llm:8080/v1
-```
+أما `hybrid_local` و`compare` فيعملان حصراً على Mac أو ASUS ضمن Local Demo منفصل. لا يتم تحويل Oracle إلى Local Mode بتغيير Environment، ولا تُنقل أوزان Ollama/BGE إليه.
 
 ---
 
-# 116. النموذج المقترح للـLocal Free Profile
+# 116. نموذج Local Demo المعتمد خارج Oracle
 
-نستخدم كبداية:
-
-```text
-Qwen/Qwen3-4B-GGUF
-```
-
-والـquantization:
+يستخدم Local Demo:
 
 ```text
-Q4_K_M
+Ollama model: qwen3.5:4b
+FastAPI: Host-native
+Ollama: Host-native
+Infrastructure: Docker Desktop
 ```
 
-ملف Q4_K_M الرسمي حجمه يقارب:
-
-```text
-2.5 GB
-```
-
-سبب اختيار 4B Quantized بدلاً من 9B:
-
-- RAM أقل.
-- Disk أقل.
-- CPU inference أخف.
-- مناسب أكثر للـDemo.
-- متوفر بصيغة GGUF رسمية.
-- يعمل مع llama.cpp.
+لا يعتمد المشروع `llama.cpp` أو `Qwen3-4B-GGUF` في Baseline النهائي. تفاصيل دورة الحياة والذاكرة في 174.19 و174.20.
 
 ---
 
-# 117. تشغيل Local LLM بواسطة llama.cpp
+# 117. Endpoint الـLocal Demo
 
-يمكن تشغيل OpenAI-compatible endpoint مثل:
-
-```bash
-llama serve   -hf Qwen/Qwen3-4B-GGUF:Q4_K_M   --host 0.0.0.0   --port 8080
-```
-
-داخل Docker يبقى Endpoint على الشبكة الداخلية فقط.
-
-FastAPI يتصل به:
+على الجهاز المضيف:
 
 ```text
-http://local-llm:8080/v1
+Host FastAPI → http://127.0.0.1:11434/v1
+Docker Laravel/Queue → http://host.docker.internal:8000
 ```
+
+هذه العناوين تخص Docker Desktop المحلي فقط ولا تستخدم في Oracle Cloud.
 
 ---
 
-# 118. إعداد Context للـLocal LLM
+# 118. إعداد Context للـLocal Demo
 
-على Free CPU VM لا نستخدم Context ضخماً بلا حاجة.
-
-RAG يرسل فقط أفضل chunks.
-
-بداية مناسبة للاختبار:
+القيم المرجعية:
 
 ```text
 LOCAL_LLM_CONTEXT_SIZE=8192
@@ -4341,106 +4405,48 @@ RERANK_TOP_N=5
 MAX_GENERATION_TOKENS=700
 ```
 
-ثم يتم القياس والتعديل.
-
-الهدف تقليل:
-
-- KV cache.
-- RAM.
-- latency.
+تثبت أو تعدل عبر Q8 بعد قياس الجودة والذاكرة على الجهازين؛ لا تطبق على Cloud deployment.
 
 ---
 
-# 119. Concurrency للـLocal LLM
-
-على:
+# 119. Concurrency للـLocal Demo
 
 ```text
-2 OCPU
+LOCAL_AI_MAX_CONCURRENCY=1
+LOCAL_AI_QUEUE_CONCURRENCY=1
+OLLAMA_NUM_PARALLEL=1
 ```
 
-يجب اعتبار Local LLM خدمة Low-concurrency.
-
-الإعداد المبدئي:
-
-```text
-LLM_MAX_CONCURRENT_REQUESTS=1
-```
-
-وتستخدم Queue لمنع عدة Generations ثقيلة بالتوازي.
+تعمل مراحل BGE وReranker وQwen بالتتابع. لا تؤثر هذه الحدود في Cloud-only Oracle الذي لا يحمل نماذج محلية.
 
 ---
 
-# 120. إدارة الموارد في Local Profile
+# 120. إدارة الموارد المحلية
 
-ClamAV نفسه يحتاج RAM كبيرة.
-
-التوثيق الرسمي يذكر تقريباً:
-
-```text
-Minimum: 3 GiB
-Preferred: 4 GiB
-```
-
-لذلك تشغيل:
-
-```text
-ClamAV + Qdrant + Local LLM + MySQL + Laravel + FastAPI
-```
-
-ضمن 12 GB يحتاج ضبطاً جيداً.
-
-هذا الـProfile:
-
-```text
-مناسب للـDemo
-ليس مناسباً لحمل Production متعدد المستخدمين
-```
+تطبق سياسة `single_active` والتحرير بعد كل Stage وفق 174.20. لا يستخدم Local Demo Oracle VM، ولا يُدّعى أنه Production متعدد المستخدمين.
 
 ---
 
-# 121. Resource Budget تقريبي — Cloud LLM Profile
+# 121. Resource Budget تقريبي — Oracle Cloud-only
 
-هذه ليست أرقام ضمان، بل Budget مبدئي:
+هذه أرقام أولية لإجمالي الحمل وليست ضماناً:
 
 ```text
-ClamAV        3–4 GB
-Qdrant        1–2 GB
-MySQL         0.5–1 GB
-Laravel       0.3–0.7 GB
-Queue Worker  0.2–0.5 GB
-FastAPI       0.3–0.7 GB
-Redis         0.1–0.3 GB
-Nginx         <0.1 GB
-OS/Docker     remaining
+Idle infrastructure بلا scan    3–6 GB
+أثناء clamscan واحدة            6–10 GB total
+الحد المتاح على VM المقترحة     12 GB
 ```
 
-هذا الـProfile أكثر راحة على 12 GB.
+- لا توجد أوزان BGE أو Qwen في Oracle RAM.
+- Queue `security-scan` ذات concurrency=1.
+- إذا اقترب Qdrant أو MySQL من الحد، يمنع رفع التوازي وتنفذ Q8/DPL-23 قياساً فعلياً قبل اعتماد النشر.
+- Swap شبكة أمان محدودة وليست معيار نجاح للأداء.
 
 ---
 
-# 122. Resource Budget تقريبي — Local LLM Profile
+# 122. Resource Budget — Local Demo
 
-تقريبياً:
-
-```text
-ClamAV           3–4 GB
-Local LLM        3–4+ GB حسب context/runtime
-Qdrant           1–2 GB
-MySQL            ~0.5 GB
-Laravel/FastAPI  0.8–1.5 GB
-Redis/Nginx      0.2–0.4 GB
-OS/Docker        remaining
-```
-
-هذا قريب جداً من الحد، لذلك يجب:
-
-- Concurrency = 1.
-- small context.
-- small model.
-- on-disk Qdrant عند الحاجة.
-- مراقبة RAM.
-- Swap محدود كشبكة أمان وليس كحل أداء.
+يعتمد Local Demo الأرقام والمعايير المحددة في 174.20.9 على أجهزة 16 GB. لا تجمع Peaks لأن `clamscan` وBGE-M3 وReranker وQwen مراحل متبادلة وليست أحمالاً متزامنة.
 
 ---
 
@@ -4506,14 +4512,14 @@ document_id IN selected_documents
 
 # 127. ClamAV في Deployment
 
-ClamAV يعمل كخدمة داخلية:
+لا يعمل `clamd` كخدمة دائمة. يملك `security-scan-worker` ClamAV CLI ويشغّل Process قصيرة العمر:
 
 ```text
-Laravel
-  ↓
-ClamAV
-  ↓
-Clean?
+Private quarantine
+  → security-scan queue (concurrency=1)
+  → clamscan
+  → clean / infected / scan_failed
+  → process exits
 ```
 
 فقط الملفات النظيفة تنتقل إلى:
@@ -4527,6 +4533,8 @@ Queue → FastAPI
 ```text
 clamav_db
 ```
+
+يحدّثها `UpdateClamAvSignaturesJob` دورياً عبر `freshclam` على Queue `security-scan` نفسها، لذلك لا يتزامن Update مع Scan. يملك العامل وصولاً إلى مسار Quarantine والـsignature volume فقط ولا يملك Docker socket. Missing أو stale signatures وTimeout وأي Process failure كلها Fail-closed.
 
 ---
 
@@ -4700,9 +4708,7 @@ Internal only:
 6379
 6333
 6334
-3310
 8000
-8080
 ```
 
 ---
@@ -4795,6 +4801,8 @@ QDRANT_API_KEY
 ```text
 Git Repository
    ↓
+Backup + verify free disk
+   ↓
 git pull
    ↓
 docker compose build
@@ -4805,8 +4813,13 @@ Laravel migrations
    ↓
 cache config/routes/views
    ↓
-health checks
+health checks + cloud capability smoke tests
 ```
+
+- تستخدم Images وإصدارات pinned تدعم `linux/arm64`؛ يمنع `latest` في النسخة المعتمدة.
+- Laravel يعمل عبر PHP-FPM خلف Nginx، وليس `php artisan serve`.
+- لا تنفذ Migration قبل نجاح Backup وفحص الاتصال بقاعدة البيانات.
+- أي Migration غير backward-compatible يحتاج Maintenance window موثق؛ هذه الخطة Demo وليست Zero-downtime production rollout.
 
 ---
 
@@ -4847,16 +4860,18 @@ configuration
 
 # 144. Health Checks
 
-كل Container مهم يملك Health Check حيثما أمكن:
+كل Container دائم مهم يملك Health Check:
 
 ```text
 mysql
 redis
 qdrant
-clamav
 fastapi
-local-llm
 ```
+
+لا يوجد Health endpoint لـ`clamscan` لأنها Process قصيرة العمر. بدلاً منه تتحقق Readiness الخاصة بـ`security-scan-worker` من وجود binary صالح وقاعدة تواقيع موجودة وغير متجاوزة للحد الزمني، ويختبر DPL-15 مسار Clean/Deny فعلياً.
+
+لا تكفي `depends_on` وحدها؛ تعتمد الخدمات الحرجة `condition: service_healthy` أو Startup retry منظم حتى لا تبدأ قبل جاهزية MySQL وRedis وQdrant.
 
 ---
 
@@ -4870,7 +4885,7 @@ local-llm
 
 # 146. Local LLM Health
 
-يمكن فحص endpoint مناسب مثل قائمة النماذج أو endpoint readiness حسب runtime المستخدم.
+يخص هذا Local Demo فقط، وليس Oracle. يمكن فحص endpoint مناسب مثل قائمة النماذج أو endpoint readiness حسب Ollama.
 
 FastAPI في Local Mode يجب أن يكتشف غياب LLM ويعيد خطأ منضبطاً.
 
@@ -4879,7 +4894,7 @@ FastAPI في Local Mode يجب أن يكتشف غياب LLM ويعيد خطأ م
 # 147. Deployment Command — Cloud Mode
 
 ```text
-LLM_PROVIDER=cloud
+RAG_DEPLOYMENT_MODE=cloud
 ```
 
 ثم:
@@ -4894,15 +4909,7 @@ docker compose up -d
 
 # 148. Deployment Command — Local Mode
 
-```text
-LLM_PROVIDER=local
-```
-
-ثم:
-
-```bash
-docker compose --profile local-llm up -d
-```
+لا ينفذ Local Mode على Oracle ولا يوجد `local-llm` Compose profile هناك. يشغّل DPL-24 البنية المحلية على Mac أو ASUS: Infrastructure داخل Docker Desktop وFastAPI/Ollama على Host OS.
 
 ---
 
@@ -4939,32 +4946,23 @@ Qdrant
   ↓
 Question
   ↓
-Local llama.cpp
+Host-native Ollama
   ↓
-Qwen Quantized
+qwen3.5:4b
   ↓
 Answer + Sources
 ```
 
+ينفذ هذا السيناريو في DPL-24/DPL-25 على الجهاز المحلي فقط، ولا يدخل Acceptance Criteria الخاصة بنجاح Oracle Cloud-only.
+
 ---
 
-# 151. اختبار التبديل بين المسارين
+# 151. الفصل بين بيئتي Cloud وLocal
 
-يجب أن نتمكن من تغيير:
-
-```text
-LLM_PROVIDER
-```
-
-بدون:
-
-- تعديل Laravel.
-- إعادة Embedding.
-- إعادة Parsing.
-- حذف Qdrant.
-- إعادة إنشاء المحادثات.
-
-فقط FastAPI Generation Layer يتغير.
+- Oracle ثابت على `RAG_DEPLOYMENT_MODE=cloud` ولا يتحول إلى Local بتغيير Environment.
+- Local Demo يملك Environment منفصلة ويعرض `cloud/hybrid_local/compare` حسب Capabilities.
+- Laravel وFastAPI يرفضان Profile غير مسموحة Server-side؛ إخفاء الخيار في UI وحده غير كافٍ.
+- Collections تبقى منفصلة بين Cloud وHybrid Local، ولا يغيّر Model أو dimension على Collection موجودة بصمت.
 
 ---
 
@@ -4978,6 +4976,8 @@ Laravel private documents
 Qdrant
 configuration
 ```
+
+لا يكفي حفظ Backup على Volume داخل VM نفسها. تحفظ نسخة مشفرة ومقيدة الصلاحيات خارج الـVM وفق Retention محددة، ولا تحتوي Secrets plaintext. يثبت DPL-22 الاسترجاع إلى بيئة معزولة، وليس إنشاء الملف فقط.
 
 ---
 
@@ -5051,6 +5051,8 @@ Nginx logs
 
 ولا يسمح لها بالنمو غير المحدود.
 
+تضبط Docker logging driver بحد أقصى للحجم وعدد الملفات، وتطبّق Laravel daily rotation وNginx logrotate. لا تسجل Tokens أو نصوص الوثائق أو محتوى Prompts.
+
 ---
 
 # 157. تحديث المشروع
@@ -5069,6 +5071,8 @@ php artisan migrate --force
 health checks
 ```
 
+بعد Health checks تنفذ Cloud capability test وطلب سؤال صغير مضبوط الكلفة قبل إنهاء Maintenance window.
+
 ---
 
 # 158. تحديث Qdrant
@@ -5085,10 +5089,10 @@ health checks
 
 يجب تحديث:
 
-- Container version.
-- virus signatures.
+- ClamAV CLI/Image version pinned ومدعوم.
+- virus signatures عبر `UpdateClamAvSignaturesJob` مجدولة على `security-scan` نفسها.
 
-ويفضل Stable release مدروسة.
+تختبر التواقيع بعد التحديث، ويعتبر غيابها أو تقادمها سبباً لعدم جاهزية الفحص. لا يبدأ `clamd`.
 
 ---
 
@@ -5097,7 +5101,7 @@ health checks
 ```text
 Oracle Infrastructure  → Free ضمن الحدود
 Qdrant                  → Local / Free
-ClamAV                  → Local / Free
+ClamAV CLI/signatures   → Local / Free، عند الطلب
 MySQL                   → Local / Free
 Redis                   → Local / Free
 Laravel                 → Free software
@@ -5120,7 +5124,7 @@ Cloud LLM API
 
 # 161. Free Deployment مع Local LLM — التقييم
 
-إذا شغّلنا Small Quantized LLM على Oracle VM:
+لا يشغّل Oracle Local LLM. عند تشغيل Ollama `qwen3.5:4b` على Mac أو ASUS:
 
 ```text
 LLM API cost per request = $0
@@ -5135,7 +5139,7 @@ higher CPU
 lower concurrency
 ```
 
-وهذا مناسب لإثبات Self-hosted LLM path في مشروع الماجستير.
+وهذا مناسب لإثبات Self-hosted LLM path في مشروع الماجستير، لكنه Local Demo منفصل لا جزء من Online hosting.
 
 ---
 
@@ -5176,7 +5180,7 @@ HF Inference Providers monthly credits
 ```text
 Oracle Always Free
 +
-Cloud LLM
+Cloud-only processing and generation
 ```
 
 للـDemo الأسرع والأكثر استقراراً.
@@ -5184,12 +5188,14 @@ Cloud LLM
 ## الوضع الثاني
 
 ```text
-Oracle Always Free
+Mac/ASUS Local Demo
 +
-Local Quantized LLM
+Host-native FastAPI/Ollama
++
+Docker infrastructure
 ```
 
-لإظهار أن المعمارية تدعم Self-hosted generation.
+لإظهار أن المعمارية تدعم Hybrid Local وCompare وSelf-hosted generation، من دون تحميل Oracle أوزاناً محلية.
 
 هذا يوضح أكاديمياً trade-off بين:
 
@@ -5219,6 +5225,8 @@ VM.Standard.A1.Flex
 Ubuntu ARM64
 ```
 
+يسجل Proof أن Shape وOCPU/RAM/Boot volume ضمن Always Free limits الفعلية للحساب، لأن السعة المجانية غير مضمونة.
+
 ## DPL-3 — إعداد الشبكة
 
 فتح فقط:
@@ -5238,7 +5246,7 @@ sudo apt upgrade
 
 ## DPL-5 — تثبيت Docker
 
-Docker Engine + Compose plugin.
+Docker Engine + Buildx + Compose plugin من Repository الرسمي، ثم إثبات `linux/arm64` لكل Image pinned مستخدمة.
 
 ## DPL-6 — Clone المشروع
 
@@ -5248,11 +5256,17 @@ git clone ...
 
 ## DPL-7 — إعداد `.env`
 
-Laravel + FastAPI + infrastructure.
+Laravel + FastAPI + infrastructure، مع:
+
+```text
+RAG_DEPLOYMENT_MODE=cloud
+```
+
+صلاحيات الملف `600`، ولا يحتوي Git أو Backup غير المشفر على Secrets.
 
 ## DPL-8 — إنشاء Volumes
 
-MySQL/Qdrant/ClamAV/documents.
+MySQL/Qdrant/ClamAV signatures/private documents، مع اختبار permissions وfree disk.
 
 ## DPL-9 — تشغيل Infrastructure
 
@@ -5260,87 +5274,106 @@ MySQL/Qdrant/ClamAV/documents.
 mysql
 redis
 qdrant
-clamav
+signature volume seeded بواسطة `freshclam` one-shot من Security Scan Worker image
 ```
+
+لا يوجد `clamd`. تتحقق المهمة من Health checks وقاعدة تواقيع حديثة، وتثبت أن `depends_on` يستخدم Readiness مناسبة لا مجرد بدء Container.
 
 ## DPL-10 — تشغيل FastAPI
 
-ثم Health Check.
+يبنى Cloud-only image ثم Health/Capabilities. يفشل الاختبار إذا احتوت Image على Torch/Transformers/Ollama أو أوزان BGE/Qwen محلية.
 
 ## DPL-11 — تشغيل Laravel
 
-ثم migrations.
+Laravel PHP-FPM خلف الشبكة الداخلية، ثم Backup gate وmigrations وcache commands؛ يمنع `php artisan serve`.
 
 ## DPL-12 — تشغيل Queue Worker
 
-ثم اختبار Job.
+تشغيل Worker عادي و`security-scan-worker` منفصل بQueue `security-scan` وconcurrency=1. يحتوي Scan worker ClamAV CLI ويشارك Private quarantine وsignature volume فقط، بلا Docker socket.
 
 ## DPL-13 — تشغيل Nginx
 
-ربط Laravel.
+ربط Laravel PHP-FPM، وضبط forwarded headers و`client_max_body_size` وtimeouts وlog rotation.
 
 ## DPL-14 — HTTPS
 
-Let's Encrypt.
+Let's Encrypt مع Domain/Subdomain موثوق وتجديد آلي واختبار HTTP→HTTPS.
 
 ## DPL-15 — اختبار PDF
 
-Validation + ClamAV + Queue + FastAPI + Qdrant.
+Validation + private quarantine + on-demand `clamscan` + خروج Process + Queue + FastAPI + Qdrant، مع Clean وinfected/fail-closed cases.
 
 ## DPL-16 — اختبار DOCX
 
+اختبار DOCX صالح End-to-End، ورفض ملف متنكر أو ZIP bomb يتجاوز `1000` entry أو `50 MB` غير مضغوط، مع بقاء الملف في Quarantine وعدم إطلاق AI عند الرفض.
+
 ## DPL-17 — اختبار TXT
 
-## DPL-18 — Cloud LLM Test
+اختبار TXT صالح End-to-End مع encoding مدعومة، ورفض binary/malformed/oversized input، ثم إثبات ظهور الإجابة والمصادر من Qdrant.
 
-```text
-LLM_PROVIDER=cloud
-```
+## DPL-18 — Cloud-only Capability/UI/API Test
 
-## DPL-19 — Local LLM Test
+- UI يعرض `cloud` فقط.
+- Laravel وFastAPI يرفضان `hybrid_local/compare` المعدلة يدوياً بحالة `422`.
+- لا Local model capability في الاستجابة.
 
-```text
-LLM_PROVIDER=local
-```
+## DPL-19 — Lightweight Online Image Verification
 
-## DPL-20 — Security Test
+يفحص SBOM/package list وfilesystem للـImage لإثبات غياب Torch/Transformers/Ollama/BGE/Qwen weights، مع اختبار Startup لا ينزّل Model.
 
-محاولة User A الوصول إلى Document User B.
+## DPL-20 — Hugging Face Cloud Generation Test
 
-## DPL-21 — Backup Test
+Smoke test فعلي لـ`Qwen/Qwen3.5-9B` عبر Provider المعتمد، مع Timeout وerror mapping وbudget awareness، من دون افتراض أن وجود Model card يعني توافر Provider دائماً.
 
-Backup + restore.
+## DPL-21 — Security Test
 
-## DPL-22 — Restart Test
+اختبار User A ضد Document User B، private downloads، FastAPI authentication، Qdrant filters، modified profile requests، infected/timeout/stale-signature fail-closed، وعدم نشر المنافذ الداخلية.
+
+## DPL-22 — Backup/Restore Test
+
+Backup مشفر لـMySQL والوثائق وQdrant configuration/snapshot إلى موقع خارج الـVM، ثم Restore فعلي في بيئة معزولة والتحقق من الملكية وعدد الوثائق والـvectors.
+
+## DPL-23 — Restart/Persistence/Readiness Test
 
 ```bash
 docker compose restart
 ```
 
-والتأكد أن MySQL وQdrant والملفات بقيت محفوظة.
+ثم إثبات بقاء MySQL وQdrant والملفات والتواقيع، وعودة الخدمات وفق Health checks من دون Startup race.
+
+## DPL-24 — Local Topology Verification
+
+على Mac وASUS فقط: Docker infrastructure + on-demand scan worker، وFastAPI/Ollama على Host OS، مع `host.docker.internal` وLoopback-only Qdrant وModel واحد فعال، وقفل Redis عالمي يمسكه Laravel workers لمنع تداخل Scan مع أي استدعاء FastAPI محلي.
+
+## DPL-25 — Local Compare Flow
+
+ينفذ Compare كاملاً على الجهاز المحلي بالتتابع، ويثبت عدم تداخل `clamscan` وBGE/Reranker/Qwen وعدم رفع سوى الفائز إلى Qdrant.
 
 ---
 
 # 166. Acceptance Criteria للنشر المجاني
 
-يعتبر Deployment ناجحاً عندما:
+يعتبر Oracle Cloud-only Deployment ناجحاً عندما:
 
 - الموقع يعمل عبر HTTPS.
 - Authentication يعمل.
 - PDF/DOCX/TXT ترفع.
-- ClamAV يفحص الملفات.
+- `clamscan` تفحص الملفات عند الطلب وتخرج قبل انتقال الملف إلى AI.
+- missing/stale signatures أو Timeout أو Process failure تمنع المعالجة Fail-closed.
 - الملفات الخاصة غير عامة.
 - Queue تعمل.
 - FastAPI داخلي.
 - Qdrant داخلي ومحلي.
 - Qdrant data persistent.
 - User isolation يعمل.
-- Cloud LLM mode يعمل.
-- Local LLM mode يعمل.
-- التبديل بينهما عبر Environment فقط.
+- Cloud processing/generation يعملان فعلياً.
+- UI وLaravel وFastAPI يقبلون `cloud` فقط ويرفضون Local/Compare.
+- Online image لا يحتوي Local AI dependencies أو weights ولا يشغّل Ollama.
 - Filament يعمل.
 - Restart لا يحذف البيانات.
 - Backup قابل للاسترجاع.
+
+نجاح Local Demo وCompare يقاس منفصلاً في DPL-24/DPL-25 على Mac وASUS، وليس شرطاً لتشغيل Oracle نفسه.
 
 ---
 
@@ -5370,7 +5403,7 @@ Oracle capacity/idle limitations
 ```text
 MySQL Local → Managed MySQL
 Qdrant Local → Qdrant Cloud
-Local llama.cpp → GPU vLLM server
+Local Ollama → GPU vLLM server
 Cloud HF Router → Different Provider
 ```
 
@@ -5378,7 +5411,7 @@ Cloud HF Router → Different Provider
 
 ---
 
-# 169. الشكل النهائي للـDeployment مع Cloud LLM
+# 169. الشكل النهائي للـOracle Cloud-only Deployment
 
 ```text
                          Internet
@@ -5387,71 +5420,58 @@ Cloud HF Router → Different Provider
                        HTTPS / Nginx
                             │
                             ▼
-                         Laravel
-                     ┌──────┼──────┐
-                     │      │      │
-                     ▼      ▼      ▼
-                   MySQL   Redis  ClamAV
-                             │
-                             ▼
-                         Queue Worker
-                             │
-                             ▼
-                           FastAPI
-                          ┌──┴───┐
-                          │      │
-                          ▼      ▼
-                       Qdrant  External AI
-                               │
-                    ┌──────────┼──────────┐
-                    ▼          ▼          ▼
-                LlamaParse    Jina     HF Router
-                                          │
-                                          ▼
-                                     Qwen3.5-9B
+                         Laravel/PHP-FPM
+                   ┌─────────┼───────────────┐
+                   │         │               │
+                   ▼         ▼               ▼
+                 MySQL     Redis      Queue Workers
+                                         │
+                          ┌──────────────┴──────────────┐
+                          ▼                             ▼
+                  Security Scan Worker              FastAPI
+                  clamscan on-demand            cloud-only image
+                          │                       ┌─────┴─────┐
+                          ▼                       ▼           ▼
+                private quarantine             Qdrant   External AI
+                                                            │
+                                                 ┌──────────┼──────────┐
+                                                 ▼          ▼          ▼
+                                             LlamaParse    Jina     HF Router
+                                                                         │
+                                                                         ▼
+                                                                  Qwen3.5-9B
 ```
 
 ---
 
-# 170. الشكل النهائي للـDeployment مع Local LLM
+# 170. الشكل النهائي للـLocal Demo على Mac/ASUS
 
 ```text
-                         Internet
-                            │
-                            ▼
-                       HTTPS / Nginx
-                            │
-                            ▼
-                         Laravel
-                     ┌──────┼──────┐
-                     │      │      │
-                     ▼      ▼      ▼
-                   MySQL   Redis  ClamAV
-                             │
-                             ▼
-                         Queue Worker
-                             │
-                             ▼
-                           FastAPI
-                          ┌──┴──────────────┐
-                          │                 │
-                          ▼                 ▼
-                       Qdrant          Local LLM
-                                      llama.cpp
-                                          │
-                                          ▼
-                                  Qwen3-4B Q4_K_M
+                   Docker Desktop infrastructure
+          ┌────────────┬─────────┬────────┬───────────────┐
+          ▼            ▼         ▼        ▼               ▼
+       Laravel       MySQL     Redis    Qdrant    Security Scan Worker
+          │                                            clamscan on-demand
+          │
+          └── host.docker.internal:8000
+                              │
+                              ▼
+                    Host-native FastAPI
+                    ┌─────────┼───────────┐
+                    ▼         ▼           ▼
+                 BGE-M3   BGE Reranker  Host Ollama
+                 lazy       lazy         qwen3.5:4b
+                    └─────────┴───────────┘
+                     one active model at a time
 ```
 
-في هذه النسخة تبقى:
+في هذه النسخة يبقى:
 
 ```text
-LlamaParse
-Jina Embedding
-Jina Reranker
+LlamaParse Cloud للـParsing فقط
 ```
 
-خدمات خارجية ما لم نستبدلها أيضاً لاحقاً.
+أما Embedding وReranking وGeneration فهي محلية. لا توصف هذه النسخة بأنها Fully Local ما دام LlamaParse خارجياً.
 
 ---
 
@@ -5459,21 +5479,23 @@ Jina Reranker
 
 لدينا ثلاثة مستويات:
 
-## المستوى 1 — Local Vector Database
+## المستوى 1 — Oracle Cloud-only مع Vector Database ذاتية الاستضافة
 
 ```text
-Qdrant Local
-```
-
-## المستوى 2 — Self-hosted LLM
-
-```text
-Qdrant Local
+Qdrant داخل Oracle
 +
-Local LLM
+Cloud parsing/embedding/reranking/generation
 ```
 
-لكن Parser وEmbedding قد يبقيان Cloud.
+## المستوى 2 — Hybrid Local Demo المعتمد
+
+```text
+LlamaParse Cloud
++
+Local BGE-M3/BM25/BGE Reranker/Qdrant/Ollama
+```
+
+الـParser وحده يبقى Cloud.
 
 ## المستوى 3 — Fully Local RAG
 
@@ -5485,9 +5507,9 @@ Local Qdrant
 Local LLM
 ```
 
-الخطة الحالية تحقق المستوى الأول دائماً وتتيح المستوى الثاني اختيارياً.
+الـOnline deployment يحقق المستوى الأول، والـLocal Demo يحقق المستوى الثاني.
 
-أما Fully Local RAG فهو توسع مستقبلي، ولا ندعي تحقيقه ما دام LlamaParse وJina يعملان عبر Cloud APIs.
+أما Fully Local RAG فهو توسع مستقبلي، ولا ندعي تحقيقه ما دام LlamaParse يعمل عبر Cloud API.
 
 ---
 
@@ -5496,7 +5518,7 @@ Local LLM
 تم التحقق من المعلومات بتاريخ:
 
 ```text
-2026-08-12
+2026-08-21
 ```
 
 ## Oracle Cloud Free Tier
@@ -5514,6 +5536,12 @@ Local LLM
 
 - Docker Compose plugin  
   https://docs.docker.com/compose/install/linux/
+
+- Compose startup order and health checks
+  https://docs.docker.com/compose/how-tos/startup-order/
+
+- Docker Desktop host networking
+  https://docs.docker.com/desktop/features/networking/networking-how-tos/
 
 ## Qdrant
 
@@ -5541,9 +5569,6 @@ Local LLM
 
 - Qwen/Qwen3.5-9B  
   https://huggingface.co/Qwen/Qwen3.5-9B
-
-- Qwen/Qwen3-4B-GGUF  
-  https://huggingface.co/Qwen/Qwen3-4B-GGUF
 
 ## Let's Encrypt
 
@@ -5576,9 +5601,9 @@ Laravel
 +
 FastAPI
 +
-Local Qdrant
+Qdrant ذاتية الاستضافة
 +
-ClamAV
+ClamAV CLI عند الطلب
 +
 MySQL
 +
@@ -5587,36 +5612,35 @@ Redis
 Laravel Queue
 ```
 
-وتجعل طبقة الـLLM قابلة للتبديل:
+وتفصل بيئتي التشغيل بوضوح:
 
 ```text
-LLM_PROVIDER=cloud
-```
-
-أو:
-
-```text
-LLM_PROVIDER=local
+Oracle Online = cloud only
+Mac/ASUS Demo = cloud | hybrid_local | compare
 ```
 
 ### Cloud mode
 
 ```text
+RAG_DEPLOYMENT_MODE=cloud
 Qwen/Qwen3.5-9B
 via Hugging Face Router
 ```
 
+لا يحتوي Oracle Torch/Transformers/Ollama/BGE/Qwen weights، ويرفض Local/Compare Server-side.
+
 ### Local mode
 
-للـFree CPU Demo:
+على Mac أو ASUS فقط:
 
 ```text
-Qwen/Qwen3-4B-GGUF
-Q4_K_M
-via llama.cpp
+Host-native FastAPI
+Ollama qwen3.5:4b
+BGE-M3 + BGE Reranker
+single_active lifecycle
 ```
 
-ولا يتغير أي جزء آخر من الـRAG أو Laravel عند التبديل بين المسارين.
+لا يتحول Oracle إلى Local Mode بتغيير Environment. تشترك البيئتان في Contracts التطبيق، لكن لكل منهما Dependencies وTopology وقدرات منشورة منفصلة.
 
 هذه هي البنية التي يجب اعتمادها في تنفيذ المشروع من الآن فصاعداً.
 
@@ -5629,13 +5653,13 @@ via llama.cpp
 هذا القسم قرار معماري نهائي معتمد بتاريخ 2026-08-15، وليس فكرة مؤجلة. وهو يوسّع الخطة الأصلية دون تغيير نقطة التنفيذ الحالية:
 
 ```text
-Last Completed Task: A5 — إعداد Queue
-Current Task: B1 — إنشاء documents migration
+Last Completed Task: B10 — ProcessingRun model/enums/relations
+Current Task: B11 — selected_processing_run_id migration/invariants
 Current Task Status: TODO
-Expected Task Branch: task/B1-documents-migration
+Expected Task Branch: task/B11-selected-processing-run
 ```
 
-لا تُنفّذ في B1 مسؤوليات B2 أو المعالجة أو الواجهة أو FastAPI. لكن يجب أن يكون Schema الذي تنشئه B1 متوافقاً مع هذه المعمارية حتى لا نضطر إلى إعادة تصميم جدول `documents` لاحقاً.
+لا تُنفّذ في B11 مسؤوليات اختيار الفائز الفعلي أو مقارنة B12 أو المعالجة أو FastAPI. تبقى حالة التنفيذ التفصيلية في `PROJECT_RAG_EXECUTION_PROGRESS.md` هي المرجع الأعلى للـHandoff ضمن هذه النسخة المنقحة.
 
 ## 174.2 المصطلحات الرسمية
 
@@ -5656,7 +5680,6 @@ Expected Task Branch: task/B1-documents-migration
 
 ```text
 RAG_DEPLOYMENT_MODE=cloud
-LLM_PROVIDER=cloud
 ```
 
 - يظهر للمستخدم خيار `cloud` فقط.
@@ -5671,14 +5694,17 @@ LLM_PROVIDER=cloud
 
 ```text
 RAG_DEPLOYMENT_MODE=local
-LLM_PROVIDER=local
-LOCAL_LLM_BASE_URL=http://ollama:11434/v1
+LOCAL_AI_TOPOLOGY=host_native
+LOCAL_LLM_BASE_URL=http://127.0.0.1:11434/v1
 LOCAL_LLM_MODEL=qwen3.5:4b
 ```
 
 - تظهر الخيارات `cloud` و`hybrid_local` و`compare`.
 - يحتاج Cloud وCompare مفاتيح LlamaParse وJina وHugging Face حسب المرحلة.
 - يستخدم Hybrid Local النموذج المثبت فعلياً في Ollama: `qwen3.5:4b`.
+- تعمل خدمات البنية التحتية `Laravel + Queue + MySQL + Redis + Qdrant` داخل Docker، ويعمل فحص ClamAV كعملية `clamscan` قصيرة العمر عند الطلب داخل Security Scan Worker مخصص، بينما تعمل `FastAPI + Ollama` كخدمتين Host-native على الجهاز المحلي للاستفادة من مسرّع الجهاز.
+- يتصل FastAPI المضيف بـOllama عبر `127.0.0.1:11434`، وتتصل خدمات Docker بـFastAPI عبر `host.docker.internal:8000`. تبقى العناوين قابلة للضبط ولا يجوز تثبيت `http://ollama` كافتراض وحيد.
+- هذه Topology واحدة على macOS وWindows؛ الاختلاف الداخلي فقط هو Backend الذي يحسمه Device resolver، وليس Processing Profile جديداً.
 - لا يوجد Fallback صامت بين Providers. الإعداد غير المتوافق يفشل مبكراً برسالة واضحة.
 
 ### إعداد Cloud LLM
@@ -5694,15 +5720,15 @@ HF_TOKEN=...
 
 ### فصل الاعتمادات
 
-ينشأ FastAPI بملفات Dependencies أو Docker stages منفصلة:
+ينشأ FastAPI بملفات Dependencies منفصلة، وتبقى Cloud image مستقلة عن بيئة Local Host-native:
 
 ```text
-base/cloud  = FastAPI + HTTP clients + Qdrant client + parsing utilities
-local       = base + local embedding/reranker dependencies
-ollama      = خدمة مستقلة ولا تدخل داخل FastAPI image
+base/cloud   = FastAPI + HTTP clients + Qdrant client + parsing utilities
+local-native = base + PyTorch + local embedding/reranker dependencies على Host OS
+ollama       = خدمة Host-native مستقلة ولا تدخل داخل FastAPI image
 ```
 
-الهدف أن تبقى النسخة Online خفيفة وقابلة للنشر ضمن Free Tier قدر الإمكان. الخدمات الخارجية نفسها قد تخضع لحصص أو Credits، لذلك لا نعد بأن سلسلة AI مجانية بلا حدود.
+لا نعتمد على GPU passthrough داخل Docker Desktop للمسار المحلي. الهدف أن تبقى النسخة Online خفيفة وقابلة للنشر ضمن Free Tier قدر الإمكان، وأن يستخدم المسار المحلي Metal/MPS أو Intel XPU/Vulkan عند توفره. الخدمات الخارجية نفسها قد تخضع لحصص أو Credits، لذلك لا نعد بأن سلسلة AI مجانية بلا حدود.
 
 ### مصفوفة Providers المعتمدة
 
@@ -5728,9 +5754,13 @@ AI_SERVICE_BASE_URL=http://fastapi:8000
 AI_SERVICE_API_KEY=...
 AI_SERVICE_TIMEOUT=600
 QUEUE_CONNECTION=redis
-CLAMAV_HOST=clamav
-CLAMAV_PORT=3310
+CLAMAV_SCAN_MODE=on_demand_cli
+CLAMAV_SCAN_QUEUE=security-scan
+CLAMAV_SCAN_CONCURRENCY=1
+CLAMAV_SCAN_TIMEOUT=300
 ```
+
+القيمة أعلاه لـ`AI_SERVICE_BASE_URL` تخص Cloud/Docker topology. في Local topology يستخدم Docker caller القيمة `http://host.docker.internal:8000`، بينما تستخدم أدوات المضيف `http://127.0.0.1:8000`.
 
 FastAPI المشتركة:
 
@@ -5766,9 +5796,29 @@ Local providers:
 ```text
 LOCAL_EMBED_MODEL=BAAI/bge-m3
 LOCAL_RERANK_MODEL=BAAI/bge-reranker-v2-m3
-LOCAL_LLM_BASE_URL=http://ollama:11434/v1
+LOCAL_LLM_BASE_URL=http://127.0.0.1:11434/v1
 LOCAL_LLM_MODEL=qwen3.5:4b
+AI_SERVICE_WORKERS=1
+LOCAL_AI_MAX_CONCURRENCY=1
+LOCAL_DEVICE=auto
+LOCAL_DTYPE=auto
+LOCAL_MODEL_LIFECYCLE=single_active
+LOCAL_RELEASE_MODEL_AFTER_STAGE=true
+LOCAL_MIN_AVAILABLE_MEMORY_RATIO=0.15
+LOCAL_AI_QUEUE=ai-local
+LOCAL_AI_QUEUE_CONCURRENCY=1
+LOCAL_EMBED_BATCH_SIZE=2
+LOCAL_RERANK_BATCH_SIZE=2
+LOCAL_EMBED_MAX_LENGTH=1024
+LOCAL_RERANK_MAX_LENGTH=1024
+LOCAL_LLM_CONTEXT_SIZE=8192
+MAX_GENERATION_TOKENS=700
+OLLAMA_MAX_LOADED_MODELS=1
+OLLAMA_NUM_PARALLEL=1
+OLLAMA_KEEP_ALIVE=0
 ```
+
+لا تستخدم قيمة `http://ollama:11434/v1` إلا إذا شُغّلت Ollama عمداً كخدمة Docker في بيئة أخرى مدعومة ومقاسة.
 
 لا توجد مفاتيح حقيقية داخل Git. يقرأ Frontend القدرات من Laravel configuration/Capabilities service، لا من Environment مباشرة.
 
@@ -5776,8 +5826,9 @@ LOCAL_LLM_MODEL=qwen3.5:4b
 
 - يرفع المستخدم ملفاً واحداً في كل عملية Upload.
 - الأنواع: PDF وDOCX وTXT.
-- يمر الملف دائماً بـValidation ثم Private Temporary Storage ثم ClamAV.
+- يمر الملف دائماً بـValidation ثم Private Quarantine Storage ثم عملية `clamscan` قصيرة العمر على Queue أمنية متسلسلة.
 - لا يصل ملف غير نظيف إلى FastAPI.
+- لا يبدأ أي عمل AI قبل انتهاء عملية الفحص وخروجها وتحرير ذاكرتها؛ فشل تشغيل الفاحص أو تقادم/غياب التواقيع يفشل Fail-closed.
 - بعد نجاح الفحص يختار المستخدم مسار المعالجة من القدرات المتاحة في البيئة.
 - لا يرتبط اختيار مسار المعالجة باختيار وثائق المحادثة لاحقاً.
 
@@ -5796,6 +5847,7 @@ LOCAL_LLM_MODEL=qwen3.5:4b
 1. يُنفّذ LlamaParse مرة واحدة قدر الإمكان وتُستخدم النتيجة الطبيعية المشتركة كمدخل للمسارين.
 2. ينشأ Run للـCloud وRun للـHybrid Local.
 3. لكل Run يُنفّذ Chunking وEmbedding وبناء Sparse representation الخاصة به.
+   أي مراحل تستخدم BGE أو Ollama تمر عبر بوابة Local AI ذات `concurrency=1` وتُنفّذ تسلسلياً؛ لا تُحمّل أو تُشغّل النماذج المحلية الثقيلة بالتوازي.
 4. تحفظ النتائج مؤقتاً داخل FastAPI ولا ترفع بعد إلى Persistent Qdrant.
 5. ترسل FastAPI إلى Laravel تقريراً مضغوطاً لكل Run، دون قيم الـvectors.
 6. يكتب المستخدم سؤال اختبار اختياري لكنه موصى به قبل القرار.
@@ -5836,7 +5888,7 @@ LOCAL_LLM_MODEL=qwen3.5:4b
 - Authentication وAuthorization وOwnership.
 - مصدر الحقيقة للمستخدمين والوثائق وحالة المعالجة والاختيار.
 - تخزين الملف الأصلي الخاص.
-- ClamAV orchestration.
+- تنسيق Security Scan Worker وتشغيل `clamscan` بوسائط آمنة من دون Shell أو Docker socket داخل Laravel.
 - Queue وJobs.
 - إنشاء Runs والمقارنة وحفظ التقارير.
 - إرسال الخيارات الموثوقة إلى FastAPI.
@@ -5872,11 +5924,13 @@ FastAPI لا يدير المستخدمين ولا المحادثات ولا يص
 
 ## 174.7 Schema Laravel المعتمد
 
-### 174.7.1 جدول `documents` — نطاق B1
+تمت مطابقة هذا القسم مع ملفات migrations ومع MySQL 8.4.11 الفعلي على `main@f23d8f6ef9a641826888cc08dd99dcc8fb72e8bb`. جميع Migrations حتى B9 منفذة. B11 وB12 ما زالتا مخططتين وليستا جزءاً من الـSchema الحالي.
 
-ينشئ B1 الأعمدة التالية فقط:
+### 174.7.1 جدول `documents` — منفذ في B1 ومثبت بعد B8
 
-| العمود | النوع المقترح | Null | الملاحظة |
+الـSchema الحالي يحتوي الأعمدة التالية فقط:
+
+| العمود | النوع الفعلي | Null | الملاحظة |
 |---|---|---:|---|
 | `id` | BIGINT UNSIGNED | لا | Primary key |
 | `user_id` | BIGINT UNSIGNED | لا | FK إلى users مع `restrictOnDelete` |
@@ -5894,14 +5948,14 @@ FastAPI لا يدير المستخدمين ولا المحادثات ولا يص
 الفهارس:
 
 ```text
-INDEX documents_user_status_index (user_id, status)
-INDEX documents_user_sha256_index (user_id, sha256)
-INDEX documents_user_created_index (user_id, created_at)
+INDEX documents_user_id_status_index (user_id, status)
+INDEX documents_user_id_sha256_index (user_id, sha256)
+INDEX documents_user_id_created_at_index (user_id, created_at)
 ```
 
-لا يفرض B1 `UNIQUE(user_id, sha256)`؛ سياسة منع تكرار الملف قرار Application في B8 ولا يجب أن تمنع Re-upload أو حالات الاختبار من مستوى قاعدة البيانات مبكراً.
+لا يفرض الـSchema الحالي `UNIQUE(user_id, sha256)`؛ سياسة منع تكرار الملف منفذة في B8 على مستوى Application داخل نطاق المستخدم.
 
-لا يضع B1 الأعمدة التالية داخل `documents`:
+لا يحتوي `documents` حالياً الأعمدة التالية:
 
 ```text
 failure_reason
@@ -5917,7 +5971,7 @@ comparison report
 
 هذه خصائص Processing Run وليست هوية الوثيقة.
 
-سيضاف `selected_processing_run_id` في Migration لاحقة بعد إنشاء جدول Runs، وليس في B1، لتجنب Foreign Key إلى جدول غير موجود.
+سيضاف `selected_processing_run_id` في B11، وليس موجوداً في قاعدة البيانات الحالية. جدول Runs موجود منذ B9، لكن الربط العكسي ينتظر Migration مستقلة حتى يبقى تاريخ الـSchema وترتيب مفاتيحه واضحين.
 
 سياسة الحذف:
 
@@ -5928,39 +5982,39 @@ comparison report
 
 ### 174.7.2 جدول `document_processing_runs`
 
-ينشأ في Task مستقلة بعد B8:
+منفذ في B9 وممثل Domain في B10. الـSchema الفعلي هو:
 
-| العمود | الغرض |
-|---|---|
-| `id` | Run ID |
-| `document_id` | FK مع `restrictOnDelete` |
-| `profile` | `cloud` أو `hybrid_local` |
-| `status` | حالة Run |
-| `profile_snapshot` JSON | Providers/models/config الفعلي وقت التشغيل |
-| `total_pages` nullable | عدد الصفحات الموثوق |
-| `total_chunks` | عدد chunks |
-| `vector_count` | عدد vectors |
-| `vector_dimension` nullable | الأبعاد |
-| `stage_timings_ms` JSON | أزمنة المراحل |
-| `warnings` JSON nullable | تحذيرات منظمة |
-| `error_code` nullable | رمز ثابت |
-| `failure_reason` TEXT nullable | رسالة منقحة لا تحتوي Secrets |
-| `comparison_report` JSON nullable | العينات والنتيجة المضغوطة، بلا vectors |
-| `temporary_artifact_ref` nullable | Opaque token |
-| `temporary_expires_at` nullable | TTL |
-| `qdrant_collection` nullable | Collection الفعلية |
-| `indexed_at` nullable | وقت اكتمال الفهرسة |
-| `selected_at` nullable | وقت الاعتماد |
-| `discarded_at` nullable | وقت الاستبعاد |
-| `expired_at` nullable | وقت الانتهاء |
-| timestamps | Audit |
+| العمود | النوع / Null / Default | الغرض |
+|---|---|---|
+| `id` | BIGINT UNSIGNED، PK | Run ID |
+| `document_id` | BIGINT UNSIGNED، NOT NULL | FK إلى `documents.id` مع `ON DELETE RESTRICT` |
+| `profile` | VARCHAR(32)، NOT NULL | `cloud` أو `hybrid_local` |
+| `status` | VARCHAR(32)، NOT NULL | حالة Run، بلا Default على مستوى DB |
+| `profile_snapshot` | JSON، NOT NULL | Providers/models/config الفعلي وقت التشغيل |
+| `total_pages` | INT UNSIGNED، NULL | عدد الصفحات الموثوق |
+| `total_chunks` | BIGINT UNSIGNED، NOT NULL، default `0` | عدد chunks |
+| `vector_count` | BIGINT UNSIGNED، NOT NULL، default `0` | عدد vectors |
+| `vector_dimension` | INT UNSIGNED، NULL | الأبعاد |
+| `stage_timings_ms` | JSON، NOT NULL | أزمنة المراحل |
+| `warnings` | JSON، NULL | تحذيرات منظمة |
+| `error_code` | VARCHAR(255)، NULL | رمز ثابت |
+| `failure_reason` | TEXT، NULL | رسالة منقحة لا تحتوي Secrets |
+| `comparison_report` | JSON، NULL | العينات والنتيجة المضغوطة، بلا vectors |
+| `temporary_artifact_ref` | VARCHAR(255)، NULL | Opaque token |
+| `temporary_expires_at` | TIMESTAMP، NULL | TTL |
+| `qdrant_collection` | VARCHAR(255)، NULL | Collection الفعلية |
+| `indexed_at` | TIMESTAMP، NULL | وقت اكتمال الفهرسة |
+| `selected_at` | TIMESTAMP، NULL | وقت الاعتماد |
+| `discarded_at` | TIMESTAMP، NULL | وقت الاستبعاد |
+| `expired_at` | TIMESTAMP، NULL | وقت الانتهاء |
+| `created_at` / `updated_at` | TIMESTAMP، NULL | Audit |
 
 الفهارس:
 
 ```text
-(document_id, status)
-(document_id, profile, created_at)
-(status, temporary_expires_at)
+document_processing_runs_document_id_status_index (document_id, status)
+document_processing_runs_document_id_profile_created_at_index (document_id, profile, created_at)
+document_processing_runs_status_temporary_expires_at_index (status, temporary_expires_at)
 ```
 
 حالات Run:
@@ -5977,7 +6031,7 @@ failed
 expired
 ```
 
-### 174.7.3 ربط selected run
+### 174.7.3 ربط selected run — مخطط B11 وغير منفذ بعد
 
 بعد إنشاء Runs، تضيف Migration مستقلة:
 
@@ -5990,7 +6044,7 @@ INDEX
 
 يتحقق Domain Service أن الـRun يعود إلى الوثيقة نفسها وأن حالته `indexed`. تغيير هذا الحقل وعلامات Run يتم داخل Transaction في Laravel بعد تأكيد FastAPI نجاح Qdrant.
 
-### 174.7.4 جدول `document_processing_comparisons`
+### 174.7.4 جدول `document_processing_comparisons` — مخطط B12 وغير منفذ بعد
 
 | العمود | الغرض |
 |---|---|
@@ -6167,9 +6221,17 @@ AND processing_run_id = selected run for each document
       "qdrant_collection": "rag_documents_cloud"
     }
   ],
-  "question": "ما أهم النتائج؟"
+  "question": "ما أهم النتائج؟",
+  "recent_completed_turns": [
+    {
+      "user": "لخص المنهجية.",
+      "assistant": "تعتمد المنهجية على ..."
+    }
+  ]
 }
 ```
+
+`recent_completed_turns` اختياري ومحدود بآخر تبادلين مكتملين فقط من المحادثة نفسها، وكل تبادل يتكون من سؤال User وجواب Assistant مكتمل. لا توجد ذاكرة مستخرجة أو Summaries أو Snapshots ذاكرة مستقلة، ولا تدخل رسالة Pending أو Failed في هذا الحقل. يستخدم هذا السياق لفهم الإحالات الحوارية فقط، بينما تبقى Chunks المسترجعة من الوثائق مصدر الحقائق الوحيد.
 
 ### Response
 
@@ -6345,6 +6407,9 @@ Top bar:
 - لا يوجد اختيار Cloud/Local هنا.
 - يمنع إرسال سؤال بلا وثيقة مع رسالة واضحة.
 - الرسائل تدعم Pending/Processing/Failed/Retry.
+- أثناء Pending/Processing تظهر عبارة `جاري التفكير` بنبض بصري هادئ، من دون Streaming حقيقي أو أجزاء جواب غير مكتملة.
+- بعد حفظ الإجابة المكتملة في MySQL، يكشف Frontend النص تدريجياً كتأثير بصري محلي فقط. لا يعاد التأثير عند فتح رسالة قديمة أو Reload، ويوجد إجراء لإظهار النص كاملاً فوراً.
+- عند تفعيل `prefers-reduced-motion` تظهر الإجابة كاملة بلا نبض أو حركة تدريجية.
 - جواب المساعد يعرض اسم نموذج التوليد بشكل ثانوي.
 - قسم Sources قابل للفتح يعرض الوثيقة والصفحة/القسم وpreview ودرجة صلة المصدر.
 - قسم Performance يعرض الزمن الإجمالي وتفصيل المراحل.
@@ -6423,6 +6488,16 @@ Widgets:
 - Local mode يعلن الخيارات وفق صحة Providers الفعلية.
 - Config غير المتوافق يفشل عند startup.
 
+### Local resources and portability
+
+- نفس القيم الدلالية لإعدادات الموارد تعمل على Mac mini M4 بذاكرة 16 GB وعلى ASUS Vivobook S16 بمعالج Intel Core Ultra 7 وذاكرة 16 GB؛ يختلف Backend المحسوم تلقائياً فقط.
+- لا يبدأ أكثر من FastAPI worker واحد، ولا تنفذ أكثر من عملية Local AI ثقيلة واحدة في الوقت نفسه.
+- لا يحدث تحميل مكرر للنموذج نفسه عند وصول طلبات متزامنة، ولا يحرر نموذج يحمل Lease فعالة.
+- بعد كل Stage يحرر النموذج المحلي قبل تحميل النموذج الثقيل التالي، وتعود الذاكرة إلى Idle envelope مقاس بلا نمو تراكمي عبر دورات التحميل والإخلاء.
+- لا يسبب اختبار المعالجة أو المحادثة OOM أو Restart لأي خدمة.
+- لا يحدث Fallback صامت من MPS/XPU/CUDA إلى CPU ولا من Local provider إلى Cloud provider.
+- فرق جودة FP16 على مجموعة التحقق الثابتة لا يتجاوز نقطة مئوية واحدة مقارنة بخط FP32، وإلا يُوثق قرار دقة مختلف بدلاً من تمريره بصمت.
+
 ### Compare
 
 - ينشأ Runان فقط للوثيقة نفسها.
@@ -6431,6 +6506,14 @@ Widgets:
 - اختيار الفائز idempotent.
 - لا يُحذف الخاسر قبل نجاح الفائز.
 - Cleanup يعلّم expired ويحذف artifacts بعد TTL.
+
+### Security scan lifecycle
+
+- يبقى الملف في Quarantine حتى نجاح `clamscan` بخروج Clean موثق.
+- يعمل Scan واحد فقط في الوقت نفسه. في Local Demo يشترك `security-scan` و`ai-local` في قفل Redis عالمي، لذلك لا يتداخل فحص أي ملف مع أي Local AI Stage حتى لو كانا لوثيقتين مختلفتين.
+- غياب التواقيع أو فشل تشغيل Process أو Timeout أو خروج غير معروف يعامل Fail-closed.
+- تنتهي Process الفحص بعد كل ملف وتتحرر ذاكرتها؛ تبقى التواقيع المحدثة على Volume دائم.
+- لا يملك Laravel أو أي Container تطبيق وصولاً إلى Docker socket.
 
 ### Qdrant
 
@@ -6448,6 +6531,7 @@ Widgets:
 - User A لا يستطيع اختيار أو البحث في Document User B حتى بطلب يدوي.
 - المصادر تعود للوثائق المختارة فقط.
 - timing totals منطقية، ودرجة reranker تعرض كصلة مصدر.
+- لا يوجد جدول أو Extractor لذاكرة محادثة. يسمح فقط بآخر تبادلين مكتملين من المحادثة نفسها كسياق إحالة محدود، ولا تعتبر إجابات المساعد السابقة مصدراً للحقائق.
 
 ### Filament
 
@@ -6465,6 +6549,7 @@ Widgets:
 - Comparison responsive وبحالات loading/error/expired.
 - اختيار عدة وثائق من أعلى المحادثة.
 - Sources وtimings ظاهرة ويمكن الوصول إليها بلوحة المفاتيح.
+- `جاري التفكير` مرئية ومفهومة لقارئ الشاشة من دون إعلان متكرر مزعج، والتأثير التدريجي لا يغير النص المحفوظ ولا يؤخر إتاحته للمستخدم الذي يفضل تقليل الحركة.
 
 ## 174.16 خريطة المهام المنقحة
 
@@ -6487,7 +6572,7 @@ Widgets:
 
 ### المرحلة C — Security Pipeline
 
-- `C1` ClamAV infrastructure.
+- `C1` On-demand ClamAV CLI scan worker مع signature volume دائم وQueue `security-scan` متسلسلة، من دون `clamd` دائم أو Docker socket داخل Laravel.
 - `C2` DocumentSecurityService.
 - `C3` Temporary upload flow.
 - `C4` clean path.
@@ -6507,6 +6592,7 @@ Widgets:
 - `D8` deployment capabilities endpoint.
 - `D9` startup configuration validation.
 - `D10` base/cloud/local dependency split.
+- `D11` Local runtime/device resolver, startup probe, readiness details and resource telemetry.
 
 ### المرحلة E — Qdrant
 
@@ -6542,6 +6628,7 @@ Widgets:
 - `G8` batching/retries/rate limits.
 - `G9` metrics/report builder بلا vectors/cost.
 - `G10` profile parity and isolation tests.
+- `G11` single-active-model coordinator مع Lazy load وLease للاستخدام الحالي وتحرير صريح بعد كل Stage وقياسات قبل/بعد.
 
 ### المرحلة H — Temporary Artifacts and Promotion
 
@@ -6566,6 +6653,7 @@ Widgets:
 - `I8` winner selection transaction.
 - `I9` aggregate status projector.
 - `I10` queue retries/timeouts.
+- `I11` dedicated `ai-local` queue/routing with one worker and bounded wait/cancellation behavior.
 
 ### المرحلة J — Blade Documents Experience
 
@@ -6605,14 +6693,16 @@ Widgets:
 
 ### المرحلة M — Generation
 
-- `M1` ContextService.
+- `M1` ContextService مع Chunks المسترجعة وآخر تبادلين مكتملين فقط كسياق إحالة محدود، بلا ذاكرة مستخرجة أو جدول إضافي.
 - `M2` prompt/insufficient-context behavior.
-- `M3` LLMProvider interface/factory.
+- `M3` LLMProvider interface/registry keyed by trusted Processing profile and capabilities، بلا global provider switch.
 - `M4` HF Router `Qwen/Qwen3.5-9B`.
 - `M5` Ollama `qwen3.5:4b`.
 - `M6` no-fallback/provider validation.
 - `M7` answer/sources/timings response.
 - `M8` provider contract tests.
+- `M9` Ollama/FastAPI resource coordination مع `keep_alive=0` وتحرير النموذج المحلي بعد انتهاء Generation.
+- `M10` Local resource lifecycle, pressure recovery and no-leak concurrency tests.
 
 ### المرحلة N — Chat Experience
 
@@ -6623,8 +6713,8 @@ Widgets:
 - `N5` save snapshots/answer/metrics.
 - `N6` sources drawer with relevance score.
 - `N7` timings display.
-- `N8` pending/failure/retry.
-- `N9` mixed-profile end-to-end chat tests.
+- `N8` pending/failure/retry مع حالة `جاري التفكير` النابضة وprogressive reveal بصري بعد اكتمال الإجابة.
+- `N9` mixed-profile end-to-end chat واختبارات عدم وجود Streaming backend واحترام reduced-motion وعدم إعادة التحريك للرسائل القديمة.
 
 ### المرحلة O — Filament
 
@@ -6658,9 +6748,9 @@ Widgets:
 - `Q5` multi-document/mixed-profile chat E2E.
 - `Q6` queue/service restart and Qdrant persistence.
 - `Q7` RAG quality/source correctness.
-- `Q8` performance report.
+- `Q8` security-scan/AI stage memory/performance/quality calibration report on both approved 16 GB devices using the same semantic configuration.
 - `Q9` Cloud-only lightweight image verification.
-- `Q10` Local Ollama profile verification.
+- `Q10` Local Ollama profile verification, including selected accelerator/backend, loaded-model count, load/generation/release timings و`keep_alive=0` بعد كل Generation.
 - `Q11` backup/restore.
 - `Q12` final documentation.
 
@@ -6708,3 +6798,547 @@ Widgets:
 12. Local generation model هو `qwen3.5:4b` عبر Ollama.
 13. Cloud generation model هو `Qwen/Qwen3.5-9B` عبر Hugging Face Router.
 14. B1 يبقى ضيقاً وينشئ جدول documents فقط وفق 174.7.1.
+15. توجد سياسة موارد محلية واحدة لجميع الأجهزة المدعومة؛ Backend العتاد تفصيل Runtime وليس Processing Profile ولا خطة مستقلة لكل جهاز.
+16. في Local topology تعمل FastAPI وOllama على Host OS، وتبقى Laravel وQueue وMySQL وRedis وQdrant داخل Docker؛ يعمل ClamAV كعملية `clamscan` قصيرة العمر عند الطلب داخل Security Scan Worker مخصص.
+17. يعمل FastAPI بعملية واحدة، وتنفذ عملية Local AI ثقيلة واحدة فقط في الوقت نفسه عبر Queue وSemaphore دفاعية.
+18. نماذج BGE تُحمّل Lazy، ولا يوجد أكثر من نموذج AI ثقيل فعال في الوقت نفسه؛ يحرر كل نموذج بعد انتهاء مرحلته قبل تحميل النموذج التالي.
+19. لا يوجد Fallback صامت بين الأجهزة أو الدقة أو Providers؛ الفشل يعاد كخطأ منظم وقابل للتشخيص.
+20. تبقى Qdrant وMySQL وRedis وLaravel عاملة، بينما ينفذ ClamAV عند الطلب مع بقاء التواقيع على Disk؛ لا يبدأ AI إلا بعد فحص ناجح وانتهاء Process الفحص.
+21. NPU/OpenVINO وQuantization لنماذج BGE ليسا Baseline للنسخة الأولى، ولا يضافان إلا بقرار لاحق مدعوم بقياسات Q8.
+
+## 174.19 إدارة الموارد المحلية الموحّدة
+
+### 174.19.1 السلطة والنطاق
+
+> **حالة هذا القسم:** تبقى تفاصيله مرجعاً للأجهزة والقياس والـBackends فقط. استبدل القسم 174.20 نهائياً أحكام ClamAV الدائم وLRU/TTL متعدد النماذج وKeep-alive؛ عند أي تعارض تطبق 174.20.
+
+هذا القسم هو المرجع الملزم لكل ما يخص استهلاك RAM/accelerator memory وتشغيل نماذج Local AI. عند التعارض، يستبدل افتراضات الموارد القديمة في الأقسام التي بُنيت على Free VM أو `llama.cpp` داخل Docker.
+
+ينطبق على المسارين المحليين `hybrid_local` و`compare` وعلى أي محادثة تستخدم وثيقة ذات selected run محلي. لا يغيّر Profiles الرسمية الثلاثة:
+
+```text
+cloud
+hybrid_local
+compare
+```
+
+الهدف هو Configuration دلالية واحدة تعمل بلا تخصيص يدوي على:
+
+- Mac mini M4 بذاكرة موحدة 16 GB.
+- ASUS Vivobook S16 بذاكرة 16 GB ومعالج Intel Core Ultra 7.
+
+لا توجد خطة Mac وخطة ASUS. يختار Runtime الـBackend المدعوم، بينما تبقى حدود الـQueue والـbatch والسياق وسياسة `single_active` نفسها. لا يعني ذلك استخدام binary wheel مطابق على نظامي التشغيل؛ يسمح D10 بـplatform markers أو Bootstrap مثبت ومدقق لاختيار Build PyTorch المتوافق، من دون تفريع منطق التطبيق أو ملفات Configuration الدلالية. النسخة Online Cloud-only خارج هذا الـbudget ولا تثبت أو تحمل أي أوزان محلية.
+
+### 174.19.2 Topology المحلية المعتمدة
+
+| مكان التشغيل | الخدمات | السبب |
+|---|---|---|
+| Docker Compose | Laravel، Queue worker، Security Scan Worker مع `clamscan/freshclam`، MySQL، Redis، Qdrant | عزل البنية التحتية وثبات الشبكات والـVolumes من دون `clamd` أو updater دائمة |
+| Host OS | FastAPI local runtime | الوصول المباشر إلى MPS على macOS أو XPU/CPU على Windows بلا افتراض GPU passthrough من Docker Desktop |
+| Host OS | Ollama | استخدام Metal أو Vulkan/المسرّع الذي يكتشفه Ollama وإبقاء LLM خارج FastAPI |
+
+العناوين الافتراضية:
+
+```text
+Host FastAPI → Host Ollama:        http://127.0.0.1:11434/v1
+Docker Laravel/Queue → Host API:  http://host.docker.internal:8000
+Host diagnostics → Host API:      http://127.0.0.1:8000
+Host FastAPI → Docker Qdrant:     http://127.0.0.1:6333 أو عنوان منشور قابل للضبط
+```
+
+- ترتبط FastAPI محلياً على `0.0.0.0:8000` فقط عند الحاجة لوصول Docker، مع بقاء Authentication الداخلي إلزامياً وعدم فتح المنفذ للإنترنت.
+- لا يثبت أي Endpoint في الكود؛ جميع القيم Environment/configuration.
+- على Cloud/Docker تبقى العناوين الداخلية مثل `http://fastapi:8000` صالحة لذلك الـTopology فقط.
+- ينشر Docker منفذ Qdrant على Loopback المحلي فقط، مثل `127.0.0.1:6333:6333`، حتى يصل إليه FastAPI المضيف من دون كشفه للشبكة العامة.
+- `TEMP_ARTIFACT_ROOT=/app/data/artifacts` قيمة Container؛ في Local Host-native يضبط لمسار Host خاص دائم وقابل للتنظيف. يبقى المرجع العائد إلى Laravel opaque token ولا يرسل filesystem path.
+- لا يتم نقل Laravel أو Qdrant إلى Host لمجرد تخفيف الذاكرة، ولا يتم تشغيل BGE داخل Laravel worker.
+
+### 174.19.3 Device resolver والدقة
+
+ينفذ `D11` حسم الجهاز مرة واحدة عند Startup بالترتيب الحتمي التالي:
+
+```text
+CUDA → Intel XPU → Apple MPS → CPU
+```
+
+القواعد:
+
+1. `LOCAL_DEVICE=auto` يعني اختيار أول Backend ينجح في Capability probe فعلي، لا الاكتفاء بوجود package أو اسم جهاز.
+2. `LOCAL_DTYPE=auto` يختار FP16 على accelerator وFP32 على CPU.
+3. يشمل Probe إنشاء Tensor صغير وتنفيذ عملية قصيرة والتحقق من إمكان تحرير الذاكرة، من دون تحميل BGE-M3 وReranker معاً.
+4. ينشر `/api/v1/health` و`/api/v1/capabilities` الـBackend والدقة المختارين وحالة الـprobe، بلا معلومات حساسة.
+5. إذا طلبت قيمة صريحة مثل `LOCAL_DEVICE=xpu` ولم تنجح، تصبح Local capability غير جاهزة ويظهر سبب منظم.
+6. إذا حدث OOM أو خطأ Backend بعد الاختيار، لا ينتقل Runtime بصمت إلى CPU. يطبق مسار الاسترداد المحدود ثم يعيد `local_resource_exhausted` أو `local_backend_failed`.
+7. اختيار CPU مسموح فقط كنتيجة Startup معلنة لـ`auto` عندما لا يوجد Accelerator صالح، أو باختيار صريح من المشغّل.
+8. NPU ليس ضمن Resolver في v1، ولا يضاف OpenVINO أو مسار رابع خاص بجهاز ASUS.
+
+بالنسبة إلى Ollama، يسجل التطبيق الـbackend الفعلي الذي أعلنه Runtime في Logs/diagnostics عند توفره. لا يفترض أن وجود Intel GPU يعني أن Vulkan استخدم فعلاً.
+
+### 174.19.4 ما الذي يُدار كنموذج ثقيل
+
+الأوزان الثقيلة المدارة هي:
+
+- `BAAI/bge-m3` للـDense embedding المحلي.
+- `BAAI/bge-reranker-v2-m3` للـReranking المحلي.
+- `qwen3.5:4b` داخل Ollama، ويدار عبر Ollama API/keep-alive لا داخل Python process.
+
+أما:
+
+- RRF فهو خوارزمية دمج رتب ولا يملك أوزاناً تُحمّل.
+- BM25 ليس Transformer model؛ بياناته/فهرسه تُدار ضمن artifacts أو Qdrant حسب تنفيذ G7 ولا يدخل Model cache الخاصة بـBGE.
+- Qdrant وMySQL وRedis وClamAV ليست نماذج، ولا تطبق عليها سياسة unload الخاصة بالأوزان.
+
+تبقى ملفات الأوزان في Disk cache المحلية بعد أول تنزيل. إخلاء نموذج من RAM/accelerator memory لا يعيد تنزيله في الطلب التالي.
+
+### 174.19.5 دورة حياة النموذج المحلي
+
+استُبدل تصميم Registry متعدد الـEntries وسياسة LRU/TTL بالمنسق البسيط `single_active` المحدد في 174.20.3. يحمل FastAPI نموذجاً ثقيلاً واحداً فقط عند بدء مرحلته، ويحرره بعد انتهائها، مع Worker واحد وبوابة تزامن واحدة. تبقى ملفات الأوزان على القرص ولا يعاد تنزيلها عند كل استخدام.
+
+### 174.19.6 Concurrency والـQueues
+
+الحماية مزدوجة:
+
+1. يوجّه Laravel كل Job يستخدم BGE أو Ollama إلى Queue موثوقة باسم `ai-local` ويعمل لها Worker واحد.
+2. يطبق FastAPI Semaphore داخلية بقيمة `LOCAL_AI_MAX_CONCURRENCY=1` كحماية من الطلبات التي تصل خارج Queue أو من أكثر من caller.
+3. عند الحاجة لتجنب حجب Event loop، تنفذ عمليات inference في bounded executor سعته `1` تحت الـSemaphore نفسها؛ لا تستخدم زيادة Uvicorn workers كبديل.
+
+```text
+LOCAL_AI_QUEUE=ai-local
+LOCAL_AI_QUEUE_CONCURRENCY=1
+LOCAL_AI_MAX_CONCURRENCY=1
+LOCAL_HEAVY_RESOURCE_LOCK_ENABLED=true
+LOCAL_HEAVY_RESOURCE_LOCK_KEY=rag:local:heavy-resource
+LOCAL_HEAVY_RESOURCE_LOCK_TIMEOUT=600
+```
+
+قواعد التوجيه:
+
+- Cloud-only processing/chat يبقى على Queue منفصلة ولا يحتاج Local model lease.
+- `hybrid_local` يمر عبر `ai-local`.
+- `compare` يعيد استخدام Parsed result المشترك، ثم يمرر كل مرحلة Local ثقيلة تسلسلياً عبر البوابة نفسها.
+- محادثة Mixed-profile تستخدم `ai-local` إذا احتوى أي Target على `hybrid_local`; لا تشغّل Local query embedding/reranker/generation بالتوازي.
+- في Local Demo يكتسب كل من Laravel `security-scan-worker` وLaravel `ai-local` worker القفل العالمي نفسه `rag:local:heavy-resource`. يمسك `ai-local` القفل طوال استدعاء FastAPI المحلي وكل مراحله، بينما يمسك Security worker القفل طوال Process الفحص أو تحديث التواقيع. يستخدم القفل Owner token وTTL/heartbeat، ويحرر في `finally` بعملية compare-and-delete ذرّية؛ يبقى Redis داخل Docker ولا يحتاج Host FastAPI إلى اتصال مباشر به.
+- في Oracle Cloud-only يعطّل هذا القفل لأن لا Model محلياً، وتبقى `security-scan` متسلسلة وحدها.
+- انتظار الـSemaphore يقاس منفصلاً عن زمن التنفيذ الفعلي، وله Timeout وإلغاء منظم وIdempotency؛ لا تبقى Jobs معلقة بلا حد.
+- لا يرفع التوازي لتسريع جهاز أقوى قبل قياس Q8 وإصدار قرار معماري جديد، حفاظاً على الخطة الموحدة.
+
+### 174.19.7 Batching وحدود السياق
+
+القيم الابتدائية المتوازنة:
+
+```text
+LOCAL_EMBED_BATCH_SIZE=2
+LOCAL_RERANK_BATCH_SIZE=2
+LOCAL_EMBED_MAX_LENGTH=1024
+LOCAL_RERANK_MAX_LENGTH=1024
+DENSE_CANDIDATES=12
+SPARSE_CANDIDATES=12
+RRF_TOP_K=12
+RERANK_TOP_N=5
+LOCAL_LLM_CONTEXT_SIZE=8192
+MAX_GENERATION_TOKENS=700
+```
+
+- الـbatch قابلة للخفض تلقائياً مرة واحدة فقط إلى `1` في مسار الاسترداد من ضغط الذاكرة.
+- لا يزيد Context أو Top-N لإخفاء مشكلة جودة قبل قياس أثره على RAM/latency.
+- أي تعديل دائم لهذه القيم يسجل في Q8 مع قياس جودة وأداء، ولا ينشئ Profile خاصاً بجهاز بعينه.
+
+### 174.19.8 تنسيق Ollama
+
+يعمل Ollama process باستمرار، لكن أوزان Qwen لا تبقى في الذاكرة بعد اكتمال Generation:
+
+```text
+OLLAMA_MAX_LOADED_MODELS=1
+OLLAMA_NUM_PARALLEL=1
+OLLAMA_KEEP_ALIVE=0
+```
+
+- يرسل Provider `keep_alive=0` مع كل طلب Generation، ويتحقق `M9` من التحرير عبر Ollama lifecycle/diagnostics API.
+- لا يطلب إخلاء Qwen أثناء Generation فعالة؛ يبدأ التحرير بعد اكتمالها فقط.
+- يسجل `load_duration` ووقت التحرير لتقييم كلفة التحميل من القرص.
+- لا يحمل Ollama أكثر من Model واحد ولا ينفذ أكثر من Generation واحدة بالتوازي في Baseline.
+
+عند الانتقال بين BGE وGeneration يتحقق المنسق من تحرير النموذج السابق أولاً ثم يعيد قياس الذاكرة، وفق 174.20.3.
+
+### 174.19.9 الخدمات التي تبقى عاملة
+
+- تبقى Qdrant وMySQL وRedis وLaravel وQueue عاملة، لأنها طبقات حالة/تنسيق وليست Model cache.
+- لا يبقى `clamd` عاملاً. تشغّل Queue `security-scan` عملية `clamscan` قصيرة العمر لكل ملف، وتنتهي العملية وتتحرر ذاكرتها قبل إطلاق أي مرحلة AI، وفق 174.20.2.
+- تبقى تواقيع ClamAV محفوظة ومحدثة على القرص، ويبقى الفشل Fail-closed.
+- لا توضع Docker memory limits عشوائية قبل قياس Q8؛ الحدود القاسية غير المقاسة قد تحول الضغط الطبيعي إلى OOM/Restart.
+- يبقى Qdrant على Persistent Volume. تفعيل on-disk/cold tier خيار تحسين بعد القياس فقط إذا أثبت Q8 حاجة فعلية، وليس Baseline مسبقاً.
+- لا تستخدم Swap كبديل عن RAM أو كدليل نجاح للأداء؛ إن وجدت فهي شبكة أمان للنظام ويجب أن تظهر في القياسات.
+
+### 174.19.10 مسار ضغط الذاكرة والفشل
+
+قبل Load، وعند Memory pressure/OOM قابل للاسترداد، ينفذ Coordinator بالترتيب:
+
+1. يمنع دخول عملية Local AI ثقيلة ثانية.
+2. يكتسب القفل العالمي ويتحقق أن لا عملية فحص أو Local AI أخرى فعالة وأن النموذج السابق تحرر.
+3. يشغل Python GC وBackend cache cleanup أو `keep_alive=0` حسب الـRuntime، ثم يعيد قياس available memory.
+4. يعيد المحاولة مرة واحدة فقط مع Batch مصغرة حتى `1` إذا كانت المرحلة تدعم batching.
+5. إذا لم يتحقق حد الذاكرة أو تكرر OOM، ينهي الطلب بخطأ منظم `local_resource_exhausted` مع `stage`, `backend`, `requested_model`, `retryable` وCorrelation ID، من دون Secrets أو محتوى وثيقة.
+
+ممنوع:
+
+- Retry loop بلا حد.
+- التحول الصامت إلى CPU أو Cloud.
+- إخلاء Model قيد الاستخدام.
+- تشغيل `clamscan` ومرحلة AI ثقيلة في الوقت نفسه.
+- قتل Qdrant أو MySQL لتوفير RAM مؤقتاً.
+- اعتبار نجاح Response بعد Restart تلقائي للخدمة اختباراً ناجحاً.
+
+### 174.19.11 Observability الإلزامية
+
+تسجل Metrics منظمة لكل Request/Stage:
+
+```text
+selected_backend
+selected_dtype
+model_id
+model_state_before/after
+model_load_duration_ms
+queue_wait_ms
+heavy_resource_lock_wait_ms
+active_duration_ms
+process_rss_bytes
+system_available_memory_bytes_before/after
+system_available_memory_bytes_after_release
+accelerator_allocated_bytes
+accelerator_cached_or_reserved_bytes
+release_duration_ms
+ollama_unload_count
+retry_count
+peak_memory_by_stage
+scan_process_peak_rss_bytes
+```
+
+- تستخدم Metrics المناسبة المتاحة لكل Backend، ولا تختلق قيمة Accelerator عند CPU.
+- لا تسجل prompts أو نص الوثيقة أو vectors.
+- تعرض Capabilities حالة Backend و`active_model` الحالية أو `none` وسبب عدم الجاهزية المنقح، لا مسارات الملفات أو Secrets.
+- Q8 يفصل زمن تحميل الأوزان عن inference والتحرير حتى لا يخفي المتوسط كلفة دورة `load/use/release`.
+
+### 174.19.12 اختبارات القبول والقياس
+
+تنفذ Q8 وQ10 على الجهازين بالقيم الدلالية نفسها. يسمح فقط بأن تختلف نتيجة `LOCAL_DEVICE=auto` والـbackend الذي يعلنه Ollama.
+
+سيناريو القياس الأدنى:
+
+1. Startup بلا أوزان BGE محملة وتسجيل baseline.
+2. فحص أمني بعملية قصيرة العمر، ثم إثبات خروجها وتحرير القفل قبل بدء Embedding، مع طلب AI لوثيقة أخرى لإثبات أن المنع عالمي.
+3. Cold embedding ثم إثبات التحرير، وبعده Cold reranking ثم إثبات التحرير.
+4. سؤال Hybrid Local كامل مع Ollama وإثبات `keep_alive=0` بعد Generation.
+5. Compare يعيد استخدام Parse ويثبت عدم توازي مرحلتين Local ثقيلتين.
+6. ضغط متعمد آمن يختبر خفض Batch مرة واحدة والخطأ المنظم عند الحاجة.
+7. ثلاث دورات load/use/release لاكتشاف تسرب أو نمو تراكمي.
+8. طلبان متزامنان يثبتان عدم duplicate load وأن العملية الثانية تنتظر البوابة، وScan متزامن يثبت انتظار القفل العالمي.
+
+معايير النجاح:
+
+- لا OOM ولا Restart للخدمات في السيناريو الطبيعي.
+- لا أكثر من FastAPI worker واحد ولا أكثر من Local heavy operation واحدة.
+- لا duplicate model loads ولا تحرير لنموذج قيد الاستخدام.
+- بعد أول دورة Warm-up/unload يحدد Idle envelope المقاس؛ في الدورتين اللاحقتين لا يظهر نمو RSS تراكمي يتجاوز الأكبر من `256 MiB` أو `10%` من ذلك الـenvelope من دون تفسير موثق.
+- تبقى ذاكرة النظام المتاحة فوق الحد الأدنى أثناء Load العادي، أو يفشل الطلب مبكراً بخطأ منظم قبل OOM.
+- فرق مقياس الجودة المختار مسبقاً، مثل Recall@K أو nDCG@K على Golden set ثابتة، بين FP16 وFP32 لا يتجاوز نقطة مئوية واحدة.
+- يسجل التقرير أزمنة ومعدل الذاكرة الأقصى لكل Stage، وload/inference/release، والـbackend والدقة والإصدارات.
+- نجاح الجهازين لا يعني تساوي الزمن؛ المطلوب سلوك آمن ومتسق، وتوثق فروق الأداء الفعلية بلا افتراضات مسبقة.
+
+### 174.19.13 نطاق المهام الجديدة
+
+| المهمة | نطاقها الملزم | لا يشمل |
+|---|---|---|
+| `D11` | Device resolver، dtype policy، startup probe، readiness/capabilities وtelemetry adapters | تحميل BGE business flow أو Queue routing |
+| `G11` | منسق `single_active`، التحميل الكسول، تحرير النموذج بعد مرحلته، memory gates وmetrics | Ollama model lifecycle أو Laravel queue |
+| `I11` | `ai-local` queue، routing trusted profiles، worker concurrency=1، وقفل Redis عالمي مشترك مع `security-scan` مع timeout/owner token/atomic release | تنفيذ النماذج نفسها |
+| `M9` | Ollama `keep_alive=0` والتحقق من التحرير قبل/بعد Generation | تغيير النموذج المحلي المعتمد |
+| `M10` | lifecycle/concurrency/pressure/recovery/no-leak tests | Hardware-specific tuning منفصل لكل جهاز |
+| `Q8` | تقرير RAM/accelerator/latency/quality على الجهازين وتثبيت Baseline | رفع concurrency أو إدخال quantization تلقائياً |
+| `Q10` | إثبات backend الفعلي وloaded-model count وload/generation/release timings و`keep_alive=0` لـOllama | دعم NPU أو Runtime جديد |
+
+تعتمد المهام `D11/G11/I11/M9/M10/Q8/Q10` هذا القسم Required Context إلزامياً عند فتح Chat التنفيذ الخاص بها.
+
+### 174.19.14 ما يؤجل لما بعد Baseline
+
+لا يدخل v1 قبل إثبات الحاجة بقياسات Q8:
+
+- ONNX/OpenVINO أو INT8 لنماذج BGE.
+- NPU execution.
+- أكثر من Local AI request متزامن.
+- أكثر من FastAPI worker في Local mode.
+- Qdrant on-disk vectors أو Docker hard memory limits.
+- Profile أو ملف Environment مختلف لكل جهاز.
+
+إذا أثبت Q8 أن BGE FP32 على CPU لا يحقق الحد المقبول أو أن الذاكرة لا تستقر، يفتح قرار تحسين مستقل يقارن ONNX/INT8 بجودة FP32. لا يغير Baseline بصمت.
+
+### 174.19.15 المراجع التنفيذية الرسمية
+
+- FastAPI deployment concepts وحقيقة أن كل worker يملك ذاكرته: https://fastapi.tiangolo.com/deployment/concepts/
+- PyTorch MPS: https://docs.pytorch.org/docs/stable/notes/mps.html
+- PyTorch Intel XPU: https://docs.pytorch.org/docs/stable/notes/get_start_xpu.html
+- Ollama FAQ للـkeep-alive والتوازي: https://docs.ollama.com/faq
+- Ollama GPU/Vulkan support: https://docs.ollama.com/gpu
+- BGE-M3 model card: https://huggingface.co/BAAI/bge-m3
+- BGE Reranker v2-m3 model card: https://huggingface.co/BAAI/bge-reranker-v2-m3
+- ClamAV Docker/resource guidance: https://docs.clamav.net/manual/Installing/Docker.html
+- Docker Desktop host networking: https://docs.docker.com/desktop/features/networking/networking-how-tos/
+- Qdrant storage options: https://qdrant.tech/documentation/manage-data/storage/
+
+---
+
+## 174.20 قرار التبسيط النهائي — الفحص عند الطلب، نموذج واحد، سياق محدود، وعرض تدريجي بصري
+
+### 174.20.1 السلطة والغاية
+
+هذا القسم قرار نهائي معتمد بتاريخ 2026-08-21، وهو المرجع الأعلى عند أي تعارض مع 174.19 أو الأقسام الأقدم. غايته إبقاء المشروع قابلاً للتنفيذ والفهم على جهازي 16 GB من دون حذف الأمان أو مكونات RAG التي تؤثر في جودة الاسترجاع والإجابة.
+
+القرارات الأساسية:
+
+1. يبقى ClamAV بوابة أمنية إلزامية، لكنه لا يبقى محملاً في RAM كخدمة `clamd` دائمة.
+2. لا يوجد أكثر من Process أو Model ثقيل فعال في الوقت نفسه.
+3. لا نبني ذاكرة محادثة مستخرجة أو طويلة الأمد في v1.
+4. لا ننفذ Streaming حقيقياً ولا NDJSON ولا Redis Stream ولا Replay في v1.
+5. نحافظ على الشكل الجمالي بواسطة حالة `جاري التفكير` النابضة ثم Progressive reveal محلي لإجابة مكتملة ومحفوظة.
+
+### 174.20.2 مسار ClamAV عند الطلب
+
+مسار الملف:
+
+```text
+Upload
+  → Validation
+  → Private quarantine
+  → security-scan queue (concurrency=1)
+  → clamscan process
+  → clean ? promote private file : infected/fail-closed
+  → process exits and RAM is returned to the OS
+  → AI processing may start only after clean result
+```
+
+التنفيذ المعتمد:
+
+- يوجد Security Scan Worker مخصص يملك ClamAV CLI ويستطيع قراءة Quarantine path المصرح فقط.
+- يستدعي العامل `clamscan` بوسائط Array آمنة عبر Process API؛ يمنع Shell interpolation وبناء command string من اسم الملف.
+- Process الفحص قصيرة العمر وتنتهي بعد كل ملف. لا يوجد `clamd` دائم ولا TCP port 3310 في Baseline.
+- تبقى قاعدة التواقيع في Volume دائم وتحدثها `UpdateClamAvSignaturesJob` مجدولة على Queue `security-scan` نفسها؛ لا تتزامن مع Scan وتتحقق من نجاح `freshclam` قبل اعتماد جاهزية الفاحص.
+- لا يحتاج Laravel إلى Docker socket ولا يسمح بتركيبه داخل أي Application container.
+- Exit code للملف النظيف فقط يسمح بالانتقال. Infected أو Timeout أو Process failure أو missing/stale signatures كلها Fail-closed بأكواد أخطاء منظمة.
+- لا يبدأ `ProcessDocumentJob` قبل تثبيت نتيجة Clean وانتهاء Process الفحص.
+- إذا وصلت ملفات متعددة، تعالجها Queue بالتسلسل؛ هذا يزيد زمن الانتظار لكنه يمنع ذروة RAM ويطابق نطاق Demo منخفض التوازي.
+- في Local Demo يكتسب Scan أو Signature Update القفل العالمي `rag:local:heavy-resource` المشترك مع `ai-local`، لذلك لا يتزامنان مع أي Model Stage لوثيقة أخرى. في Oracle Cloud-only لا حاجة لهذا القفل لأن AI خارجي ولا توجد أوزان محلية، مع بقاء Scan وUpdate متسلسلين على Queue واحدة.
+
+الإعداد المرجعي:
+
+```text
+CLAMAV_SCAN_MODE=on_demand_cli
+CLAMAV_SCAN_QUEUE=security-scan
+CLAMAV_SCAN_CONCURRENCY=1
+CLAMAV_SCAN_TIMEOUT=300
+CLAMAV_SIGNATURE_DIR=/var/lib/clamav
+CLAMAV_FAIL_CLOSED=true
+LOCAL_HEAVY_RESOURCE_LOCK_ENABLED=true   # Local Demo only
+LOCAL_HEAVY_RESOURCE_LOCK_KEY=rag:local:heavy-resource
+```
+
+### 174.20.3 دورة حياة Local AI المبسطة
+
+لا نستخدم LRU/TTL cache متعددة النماذج في Baseline. توجد بوابة واحدة و`active_model` واحد فقط داخل FastAPI worker الوحيد.
+
+```text
+Parse result ready
+  → load BGE-M3 lazily
+  → embedding/query embedding
+  → release BGE-M3 + GC/backend cleanup
+  → load BGE reranker lazily
+  → rerank
+  → release reranker + GC/backend cleanup
+  → request Ollama generation
+  → keep_alive=0 after completed generation
+```
+
+القواعد:
+
+- `LOCAL_AI_MAX_CONCURRENCY=1` وQueue `ai-local` ذات Worker واحد.
+- يكتسب Laravel `ai-local` worker قفل Redis العالمي قبل استدعاء FastAPI ويمسكه حتى اكتمال جميع المراحل المحلية أو فشلها، مع Owner token وTTL/heartbeat وatomic compare-and-delete عند التحرير. لا يحتاج Host FastAPI إلى Redis؛ تبقى Semaphore الداخلية دفاعاً إضافياً.
+- يملك الاستخدام الحالي Lease بسيطة تمنع التحرير أثناء Stage فعالة؛ لا توجد Cache entries متعددة أو Reaper دوري.
+- قبل Load يقاس available memory. إذا لم يتحقق الحد الأدنى، يفشل الطلب مبكراً بـ`local_resource_exhausted`.
+- بعد Stage تزال references، ثم `gc.collect()` وBackend cleanup المناسب، ثم يعاد قياس RAM.
+- لا يبدأ Model ثقيل جديد قبل تحرير السابق والتحقق من الذاكرة.
+- إذا أثبت Q8 أن Python process لا يعيد الذاكرة بصورة كافية، ينقل Model runner إلى subprocess قصيرة العمر بقرار تحسين محدود؛ لا يدخل ذلك Baseline قبل القياس.
+- Compare يعيد استخدام Parse المشترك وينفذ مراحل Local بالتتابع، لذلك يزيد الزمن ولا يضاعف عدد النماذج المقيمة.
+- لا يوجد Fallback صامت إلى CPU أو Cloud أو Model آخر.
+
+الإعداد المرجعي:
+
+```text
+# FastAPI Host
+AI_SERVICE_WORKERS=1
+LOCAL_MODEL_LIFECYCLE=single_active
+LOCAL_RELEASE_MODEL_AFTER_STAGE=true
+LOCAL_MIN_AVAILABLE_MEMORY_RATIO=0.15
+LOCAL_AI_MAX_CONCURRENCY=1
+
+# Laravel/Redis داخل Docker
+LOCAL_AI_QUEUE=ai-local
+LOCAL_AI_QUEUE_CONCURRENCY=1
+LOCAL_HEAVY_RESOURCE_LOCK_ENABLED=true
+LOCAL_HEAVY_RESOURCE_LOCK_KEY=rag:local:heavy-resource
+LOCAL_HEAVY_RESOURCE_LOCK_TIMEOUT=600
+
+# Ollama Host
+OLLAMA_MAX_LOADED_MODELS=1
+OLLAMA_NUM_PARALLEL=1
+OLLAMA_KEEP_ALIVE=0
+```
+
+### 174.20.4 سياق المحادثة البسيط
+
+لا تنشأ الجداول أو المكونات التالية في v1:
+
+```text
+conversation_memory_snapshots
+memory extractor
+memory reducer
+memory provenance graph
+long-term user memory
+```
+
+البديل المحدود:
+
+- تحفظ المحادثات والرسائل العادية في MySQL كما هو مخطط.
+- عند السؤال يجوز لـLaravel إرسال آخر تبادلين مكتملين فقط من Conversation نفسها ضمن `recent_completed_turns`.
+- لا تدخل Pending أو Failed أو رسالة Assistant غير مكتملة.
+- يستخدم السياق الحديث لفهم الضمائر والإحالات مثل «اشرح النقطة السابقة» فقط.
+- Retrieved document chunks تبقى مصدر الحقائق؛ Prompt يمنع الاستشهاد بإجابة سابقة كدليل.
+- إذا تجاوز السياق الحد المضبوط، يحذف الأقدم أولاً. لا يولد Summary ولا Snapshot بديل.
+- تغيير الوثائق المختارة يؤثر على السؤال الجديد، بينما يبقى `document_ids_snapshot` لكل رسالة لأغراض Audit وليس كذاكرة توليد.
+
+هذا الحل لا يضيف Migration أو Queue أو Model أو عملية استخراج جديدة.
+
+### 174.20.5 لا Streaming حقيقي في v1
+
+المكونات التالية خارج النطاق:
+
+```text
+Provider token streaming
+FastAPI NDJSON protocol
+Redis Stream relay/replay
+Laravel streaming proxy
+SSE/WebSocket
+Nginx no-buffering for chat deltas
+partial assistant message persistence
+```
+
+يبقى `AskConversationJob` عملاً خلفياً عادياً:
+
+1. تحفظ رسالة المستخدم وAssistant placeholder بحالة Pending.
+2. تعرض الواجهة `جاري التفكير` بنبض بصري هادئ أثناء Pending/Processing.
+3. ينفذ Job السؤال ويحفظ Answer وSources وTimings كاملة داخل Transaction مناسبة.
+4. تكتشف Livewire/Polling الحالة Completed بالطريقة العادية.
+5. يكشف Frontend النص المكتمل تدريجياً محلياً لإعطاء طابع محادثة حديث.
+
+### 174.20.6 عقد Progressive reveal البصري
+
+- النص الذي يكشف تدريجياً هو النص النهائي المحفوظ نفسه؛ لا ينشئ Frontend كلمات أو يجزئ جواباً قادماً من الشبكة.
+- لا يبدأ Reveal قبل حالة Completed.
+- `جاري التفكير` ليست Streaming indicator ولا تدعي وصول Tokens.
+- عند Reload أو فتح تاريخ المحادثة تظهر الرسائل القديمة كاملة فوراً ولا يعاد تحريكها.
+- يوجد زر/إجراء `إظهار الإجابة كاملة` أثناء Reveal.
+- Copy ينسخ النص النهائي الكامل، لا الجزء المرئي فقط.
+- عند `prefers-reduced-motion: reduce` لا يوجد نبض أو Reveal؛ تظهر الإجابة كاملة فوراً.
+- تستخدم حالة واحدة مفهومة لقارئ الشاشة، ولا تعاد عبارة `جاري التفكير` مع كل نبضة.
+- فشل Job يوقف النبض ويعرض Error/Retry؛ لا يظهر نص جزئي على أنه جواب مكتمل.
+
+هذا التأثير Frontend-only واستهلاكه من RAM مهمل مقارنة بالنماذج، لكنه لا يخفض زمن التوليد الحقيقي؛ المستخدم يرى `جاري التفكير` حتى اكتمال Backend ثم يبدأ العرض التدريجي.
+
+### 174.20.7 أثر القرار على خريطة المهام
+
+التعديلات الملزمة:
+
+| المهمة | النطاق بعد التبسيط |
+|---|---|
+| `C1` | Security Scan Worker + ClamAV CLI + signature volume، بلا `clamd` دائم |
+| `C2` | DocumentSecurityService يشغّل Process آمنة ويفسر exit codes بشكل Fail-closed |
+| `C3–C7` | Quarantine/clean/infected/status/tests مع Scan متسلسل وتحرير RAM بعد الخروج |
+| `D8–D10` | Capabilities/validation/dependency split: Oracle يسجل Cloud فقط وCloud image بلا Local AI packages أو weights |
+| `D11` | Device resolver وmemory probes من دون Model load عند Startup |
+| `G11` | Single-active-model coordinator بدلاً من LRU/TTL registry متعددة entries |
+| `I11` | Queue `ai-local` ذات Worker واحد وقفل Redis عالمي يمنع تداخل أي Security scan مع أي Local AI Stage عبر الوثائق |
+| `M1` | Retrieved context + آخر تبادلين مكتملين فقط، بلا ذاكرة مستخرجة |
+| `M3` | Provider Registry يختار من trusted Processing profile وCapabilities، بلا global `LLM_PROVIDER` switch |
+| `M6` | رفض Profile/Provider غير المتاح ومنع Fallback الصامت أو قيمة Provider قادمة مباشرة من Browser |
+| `M9` | Ollama `keep_alive=0` وتنسيق التحرير بين مراحل BGE وGeneration |
+| `M10` | اختبارات load/use/release/no-leak/concurrency على الجهازين |
+| `N8` | Pending/failure/retry + `جاري التفكير` نابضة + Reveal بعد Completed |
+| `N9` | E2E للمحادثة والسياق المحدود وAccessibility وعدم إعادة Reveal |
+| `Q8` | قياس Peak لكل مرحلة وإثبات عدم تداخل ClamAV/BGE/Reranker/Ollama |
+| `Q10` | Backend الفعلي وloaded-model count و`keep_alive=0` وتحرير الذاكرة |
+| `Q12` | توثيق صريح أن العرض التدريجي بصري وليس Streaming |
+| `DPL-1–DPL-23` | Oracle Cloud-only deployment واختبار Security/Images/Provider/Backup/Restart |
+| `DPL-24–DPL-25` | Local topology وCompare على Mac/ASUS فقط، خارج Oracle |
+
+لا توجد المهام `K9/M11/M12/M13/N10/N11/N12/Q13/Q14/DPL-26` في الخطة المعتمدة؛ أي ذكر سابق لها ملغى بهذا القرار.
+
+### 174.20.8 معايير القبول
+
+#### Security
+
+- لا يصل ملف إلى FastAPI قبل Clean result.
+- عند فشل ClamAV أو التواقيع لا يبدأ AI.
+- بعد انتهاء `clamscan` لا تبقى Process فحص أو محرك تواقيع مقيم في RAM.
+- لا Docker socket داخل Laravel أو Queue container.
+
+#### Memory
+
+- لا تتداخل أي ClamAV scan مع أي Local AI Stage حتى عند اختلاف الوثيقة؛ يثبت الاختبار انتظار القفل العالمي وتحريره الآمن بعد النجاح والفشل.
+- لا يوجد أكثر من BGE-M3 أو Reranker أو Qwen محملاً/فعالاً في الوقت نفسه.
+- بعد كل Stage تسجل الذاكرة قبل Load وعند Peak وبعد Release.
+- ثلاث دورات كاملة لا تظهر نمواً تراكمياً غير مفسر يتجاوز الأكبر من 256 MiB أو 10% من Idle envelope.
+- فشل تحرير الذاكرة لا يمر بصمت؛ يظهر في Q8 ويمنع وصف الجهاز بأنه Local-ready حتى اتخاذ قرار subprocess أو تحسين آخر.
+
+#### Conversation simplicity
+
+- لا يوجد جدول memory snapshots ولا Job استخراج ذاكرة.
+- لا يرسل أكثر من آخر تبادلين مكتملين.
+- لا تستخدم رسائل سابقة كمصدر Facts أو Citation.
+- سؤال مستقل يعمل من دون أي History.
+
+#### UI
+
+- تظهر `جاري التفكير` أثناء Pending/Processing فقط.
+- تبدأ الإجابة التدريجية بعد اكتمال وحفظ النص النهائي.
+- الرسائل القديمة وReload لا يعيدان الحركة.
+- reduced-motion يعرض النص فوراً.
+- لا NDJSON أو Redis relay أو long-lived chat response.
+
+### 174.20.9 Resource envelope المستهدف
+
+هذه أرقام هندسية أولية وليست ضماناً، وتثبت أو تعدل حصراً عبر Q8 على الجهازين:
+
+| المرحلة | إجمالي RAM المستهدف على جهاز 16 GB |
+|---|---:|
+| Idle infrastructure بلا Scan أو Model | 3–6 GB |
+| `clamscan` فعالة | 6–10 GB |
+| BGE-M3 embedding/query embedding | 7–11 GB |
+| Local BGE reranking | 7–11 GB |
+| Ollama `qwen3.5:4b` generation | 8–13 GB |
+
+- الهدف التشغيلي أن يبقى Peak الطبيعي أقل من 14 GB وألا يستخدم النظام Swap كثيفاً.
+- لا تجمع الأرقام لأنها مراحل متبادلة وليست خدمات ثقيلة متزامنة.
+- إذا تجاوزت مرحلة واحدة الحد أو لم تعد الذاكرة بعد Release، يفشل اعتماد Local readiness حتى معالجة السبب.
+- Cloud mode لا يحمل أي أوزان Local AI ويظل المسار الافتراضي الأكثر راحة للنشر Online.
+
+### 174.20.10 قرارات غير قابلة للتفاوض
+
+1. ClamAV لا يُحذف من المشروع، لكنه يعمل On-demand بعملية قصيرة العمر وتتحرر RAM بعد كل فحص.
+2. نتيجة الفحص Fail-closed، ولا يبدأ AI قبل Clean موثق.
+3. لا Docker socket داخل التطبيق.
+4. عملية AI ثقيلة واحدة فقط، ونموذج ثقيل واحد فقط في الذاكرة.
+5. كل Model محلي يحمل Lazy ويحرر بعد مرحلته؛ Ollama يستخدم `keep_alive=0`.
+6. لا ذاكرة محادثة مستخرجة أو طويلة الأمد في v1.
+7. آخر تبادلين مكتملين حد أقصى للسياق الحواري البسيط.
+8. وثائق RAG المسترجعة هي مصدر الحقائق الوحيد.
+9. لا Streaming حقيقي أو NDJSON أو Redis Stream أو Replay في v1.
+10. `جاري التفكير` وProgressive reveal تأثيران بصريان فقط ولا يغيران عقد FastAPI المتزامن أو محتوى الرسالة المحفوظ.
+11. Oracle Online يشغّل `cloud` فقط ولا يحتوي أي Local AI dependencies أو weights؛ Local/Compare يعملان على Mac/ASUS فقط.
+12. في Local Demo يمنع قفل Redis عالمي تداخل `clamscan` مع أي BGE/Reranker/Qwen Stage، وليس فقط للوثيقة نفسها.

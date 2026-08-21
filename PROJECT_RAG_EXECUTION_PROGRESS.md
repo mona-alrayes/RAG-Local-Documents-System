@@ -1,8 +1,8 @@
 # سجل تنفيذ مشروع RAG
 
 > **المرجع:** `PROJECT_RAG_MASTER_PLAN.md`  
-> **الغرض:** توثيق التنفيذ الفعلي خطوة بخطوة دون تعديل الخطة المعمارية الأصلية.  
-> **آخر تحديث:** 2026-08-20
+> **الغرض:** توثيق التنفيذ الفعلي خطوة بخطوة وفصله عن القرارات المعمارية الموجودة في Master Plan.
+> **آخر تحديث:** 2026-08-21
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -17,7 +17,9 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: 0d062a59022f25a41d7897b5ce2f9579e0097781
+Verified Main Commit: f23d8f6ef9a641826888cc08dd99dcc8fb72e8bb
+Schema Audit: 2026-08-21 — migrations + live MySQL 8.4.11 verified
+Live Tables: 12
 Last Merged PR: #21 — feat(B10): add processing run domain model
 Latest Task PR: #21 — feat(B10): add processing run domain model
 Last Completed Task: B10 — ProcessingRun model/enums/relations
@@ -26,7 +28,7 @@ Current Task Status: TODO
 Expected Task Branch: task/B11-selected-processing-run
 Next Task After Completion: B12 — document_processing_comparisons migration/model
 Open Blockers: لا يوجد
-Required Context: هذا الملف + القسم 174 من الخطة الرئيسية + الـNotebookين المرجعيين عند مهام AI
+Required Context: هذا الملف + القسم 174 من الخطة الرئيسية؛ B11 يعتمد 174.7.3، ومهام AI تعتمد أيضاً الـNotebookين المرجعيين، ومهام القدرات والفحص والموارد وتوجيه Providers والسياق البسيط والعرض التدريجي D8–D11/C1–C7/G11/I11/M1/M3/M6/M9/M10/N8/N9/Q8/Q10/Q12 تعتمد 174.20 إلزامياً، ومهام DPL-1–DPL-25 تعتمد الأقسام 101–172 بعد تحديثها مع 174.20 كمرجع أعلى
 ```
 
 ## قاعدة الانتقال بين المحادثات
@@ -67,7 +69,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 9. إذا ظهر قرار معماري جديد، يسجل في قسم **القرارات المعمارية**.
 10. إذا ظهر عائق، يسجل في قسم **العوائق والملاحظات**.
 11. لا يتم القفز إلى مرحلة لاحقة إذا كانت تعتمد على مهمة غير منجزة.
-12. الخطة الأصلية تبقى المرجع المعماري الثابت، بينما هذا الملف يمثل **الحالة التنفيذية الفعلية**.
+12. آخر نسخة معتمدة من Master Plan تبقى المرجع المعماري، بينما هذا الملف يمثل **الحالة التنفيذية الفعلية**؛ أي قرار جديد يحدث في الملفين بتنسيق متطابق.
 13. عند فتح Chat جديد، لا حاجة لإعادة شرح المشروع؛ آخر نسخة من هذا الملف تكفي لتحديد نقطة المتابعة.
 
 ---
@@ -132,13 +134,64 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 
 **معيار انتهاء المرحلة:** Domain الوثائق وRuns والمقارنات ممثلة بوضوح، دون تنفيذ AI.
 
+## لقطة الـSchema التنفيذية المطابقة لـB10
+
+تمت مطابقة ملفات migrations والـModels والـEnums مع MySQL الفعلي على الـcommit الموثق أعلاه. جميع Migrations التسع الحالية في حالة `Ran`، والقاعدة تحتوي 12 جدولاً:
+
+```text
+users
+password_reset_tokens
+sessions
+cache
+cache_locks
+jobs
+job_batches
+failed_jobs
+migrations
+passkeys
+documents
+document_processing_runs
+```
+
+### `documents` — الحالة الفعلية الحالية
+
+```text
+id
+user_id                    FK users.id, ON DELETE RESTRICT
+original_name
+stored_name
+title                      NULL
+file_path                  VARCHAR(1024)
+file_type                  VARCHAR(16)
+mime_type
+file_size                  BIGINT UNSIGNED
+sha256                     CHAR(64) NOT NULL
+status                     VARCHAR(32) DEFAULT pending
+created_at / updated_at    NULL
+```
+
+الفهارس: `(user_id, status)` و`(user_id, sha256)` و`(user_id, created_at)`. لا يوجد Unique constraint على `(user_id, sha256)`؛ منع duplicate منفذ في `DocumentStorageService` داخل نطاق المستخدم.
+
+### `document_processing_runs` — الحالة الفعلية الحالية
+
+يحتوي 23 عموداً مطابقاً لـMigration B9: FK `document_id` مع `ON DELETE RESTRICT`، و`profile/status/profile_snapshot`، والعدادات، وJSON timings/warnings/report، وحقول الخطأ، وtemporary artifact/TTL، وQdrant metadata، وتواريخ indexed/selected/discarded/expired، وtimestamps. يبدأ `total_chunks` و`vector_count` من `0`، بينما `total_pages` و`vector_dimension` nullable.
+
+### حدود الحالة الحالية
+
+- `documents` لا يحتوي `failure_reason` أو `total_pages` أو `total_chunks` أو `qdrant_collection` أو `processed_at`; هذه بيانات Run.
+- `documents.selected_processing_run_id` غير موجود بعد؛ هو نطاق B11 وحالته `TODO`.
+- جدول `document_processing_comparisons` غير موجود بعد؛ هو نطاق B12 وحالته `TODO`.
+- `Document::processingRuns()` و`ProcessingRun::document()` منفذتان؛ علاقة selected run لم تنفذ بعد.
+- Routes الوثائق المنفذة حالياً هي index/show/store/download فقط؛ صفحة upload المنفصلة والمقارنة وإعادة المعالجة والحذف ما زالت مهاماً لاحقة.
+- Upload الحالي ينفذ Validation والتخزين الخاص وSHA-256 وسياسة duplicate، لكنه لا ينفذ ClamAV أو Queue أو FastAPI أو Qdrant بعد.
+
 ---
 
 # 6. المرحلة C — Security Pipeline
 
 | المهمة | الحالة |
 |---|---|
-| C1 ClamAV infrastructure | TODO |
+| C1 On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract | TODO |
 | C2 DocumentSecurityService | TODO |
 | C3 Temporary upload flow | TODO |
 | C4 Clean path | TODO |
@@ -146,7 +199,7 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | C6 Aggregate status transitions | TODO |
 | C7 Security tests | TODO |
 
-**معيار انتهاء المرحلة:** لا يصل ملف غير نظيف إلى Queue أو FastAPI.
+**معيار انتهاء المرحلة:** لا يصل ملف غير نظيف إلى AI Queue أو FastAPI، ويعمل الفحص وتحديث التواقيع على Queue `security-scan` متسلسلة كعمليات قصيرة العمر تنتهي وتحرر RAM، من دون `clamd` دائم أو Docker socket داخل التطبيق. في Local Demo يشترك Scan/Signature Update و`ai-local` في قفل Redis عالمي يمنع تداخلهما مع أي Model Stage حتى عبر وثيقتين مختلفتين؛ يعطّل القفل في Oracle Cloud-only.
 
 ---
 
@@ -164,8 +217,9 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | D8 Deployment capabilities endpoint | TODO |
 | D9 Startup configuration validation | TODO |
 | D10 Base/cloud/local dependency split | TODO |
+| D11 Local runtime/device resolver + startup probe + resource telemetry | TODO |
 
-**معيار انتهاء المرحلة:** Laravel يرى صحة FastAPI وقدرات البيئة، وCloud image لا يحمل Local AI dependencies.
+**معيار انتهاء المرحلة:** Laravel يرى صحة FastAPI وقدرات البيئة، وCloud image لا يحمل Local AI dependencies، وLocal runtime يعلن Backend/dtype المقاسين بلا Fallback صامت.
 
 ---
 
@@ -217,8 +271,9 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | G8 Batch/retry/rate-limit | TODO |
 | G9 Metrics/report بلا vectors/cost | TODO |
 | G10 Profile isolation tests | TODO |
+| G11 Single-active-model coordinator + lazy load/release-after-stage | TODO |
 
-**معيار انتهاء المرحلة:** كل Profile ينتج Chunks وVectors وتقريراً صحيحاً دون خلط Providers.
+**معيار انتهاء المرحلة:** كل Profile ينتج Chunks وVectors وتقريراً صحيحاً دون خلط Providers، ولا يوجد أكثر من Model ثقيل واحد في الذاكرة؛ يحمل Lazy ويحرر بعد انتهاء Stage قبل تحميل التالي.
 
 ---
 
@@ -253,8 +308,9 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | I8 Winner selection transaction | TODO |
 | I9 Aggregate status projector | TODO |
 | I10 Queue retries/timeouts | TODO |
+| I11 Laravel serialized `ai-local` queue + global Redis lock shared with `security-scan` for full FastAPI call | TODO |
 
-**معيار انتهاء المرحلة:** Single أو Compare يكتملان بحالة متسقة بين Laravel وFastAPI وQdrant.
+**معيار انتهاء المرحلة:** Single أو Compare يكتملان بحالة متسقة بين Laravel وFastAPI وQdrant، وكل عمل Local AI ثقيل يمر عبر Queue واحدة ذات concurrency=1، ولا يبدأ قبل انتهاء Security scan وتحرير Process الفحص.
 
 ---
 
@@ -298,14 +354,14 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 |---|---|
 | K1 Conversations migration/model | TODO |
 | K2 conversation_document unique pivot | TODO |
-| K3 Messages + snapshots/metrics | TODO |
+| K3 Messages + document-target snapshots/metrics | TODO |
 | K4 message_sources + run/profile | TODO |
 | K5 Policies | TODO |
 | K6 Create/list conversations | TODO |
 | K7 Multi-document selection | TODO |
 | K8 Ready/indexed/runtime-capable filtering | TODO |
 
-**معيار انتهاء المرحلة:** المحادثة تختار ملفاً أو عدة ملفات يملكها المستخدم ومفهرسة فعلياً.
+**معيار انتهاء المرحلة:** المحادثة تختار ملفاً أو عدة ملفات يملكها المستخدم ومفهرسة فعلياً، وتحفظ الرسائل وSnapshot الوثائق لأغراض Audit من دون جدول ذاكرة أو Extractor أو Stream lifecycle.
 
 ---
 
@@ -332,16 +388,18 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 
 | المهمة | الحالة |
 |---|---|
-| M1 ContextService | TODO |
+| M1 ContextService + آخر تبادلين مكتملين كسياق إحالة محدود | TODO |
 | M2 Prompt/insufficient-context | TODO |
-| M3 LLMProvider interface/factory | TODO |
+| M3 LLMProvider interface/registry keyed by trusted processing profile/capabilities | TODO |
 | M4 HF `Qwen/Qwen3.5-9B` | TODO |
 | M5 Ollama `qwen3.5:4b` | TODO |
 | M6 No-fallback/provider validation | TODO |
 | M7 Answer/sources/timings response | TODO |
 | M8 Provider contract tests | TODO |
+| M9 Ollama/FastAPI release-after-stage + `keep_alive=0` coordination | TODO |
+| M10 Local lifecycle/pressure recovery/concurrency/no-leak tests | TODO |
 
-**معيار انتهاء المرحلة:** التوليد يعمل بالعقد نفسه في Cloud وLocal دون تحميل Local LLM في Online.
+**معيار انتهاء المرحلة:** التوليد يعمل بالعقد نفسه في Cloud وLocal دون تحميل Local LLM في Online، ويحرر Qwen بعد Generation عبر `keep_alive=0` بلا Fallback صامت. يسمح بآخر تبادلين مكتملين لفهم الإحالات فقط، وتبقى Chunks المسترجعة مصدر الحقائق، ولا يوجد Streaming backend.
 
 ---
 
@@ -353,13 +411,13 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | N2 Top document multi-selector | TODO |
 | N3 Selected chips/authorization | TODO |
 | N4 AskConversationJob | TODO |
-| N5 Save snapshots/answer/metrics | TODO |
+| N5 Save document-target snapshots/answer/metrics | TODO |
 | N6 Sources drawer/relevance score | TODO |
 | N7 Timings display | TODO |
-| N8 Pending/failure/retry | TODO |
-| N9 Mixed-profile E2E chat tests | TODO |
+| N8 Pending/failure/retry + `جاري التفكير` نابضة + completed-answer reveal | TODO |
+| N9 Mixed-profile/context-limit/progressive-reveal accessibility E2E | TODO |
 
-**معيار انتهاء المرحلة:** المستخدم يحادث وثيقة أو عدة وثائق ويشاهد المصادر والأزمنة ودرجة صلة كل مصدر.
+**معيار انتهاء المرحلة:** المستخدم يحادث وثيقة أو عدة وثائق ويشاهد المصادر والأزمنة ودرجة صلة كل مصدر. أثناء الانتظار تظهر `جاري التفكير` بنبض هادئ، وبعد حفظ الإجابة المكتملة يكشفها Frontend تدريجياً كتأثير بصري فقط، مع reduced-motion وإظهار كامل ومن دون NDJSON أو Redis relay أو Replay.
 
 ---
 
@@ -409,13 +467,13 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | Q5 Multi-document/mixed-profile chat E2E | TODO |
 | Q6 Queue/restart/Qdrant persistence | TODO |
 | Q7 RAG quality/source correctness | TODO |
-| Q8 Performance report | TODO |
+| Q8 Security-scan/AI stage memory-performance-quality calibration على الجهازين | TODO |
 | Q9 Cloud-only lightweight image verification | TODO |
-| Q10 Local Ollama profile verification | TODO |
+| Q10 Local Ollama backend/loaded-model/`keep_alive=0` verification | TODO |
 | Q11 Backup/restore | TODO |
-| Q12 Final documentation | TODO |
+| Q12 Final documentation including non-streaming visual reveal disclosure | TODO |
 
-**معيار انتهاء المرحلة:** المساران والمقارنة والمحادثة متعددة الملفات يعملون End-to-End بأمان وبعد Restart.
+**معيار انتهاء المرحلة:** المساران والمقارنة والمحادثة متعددة الملفات يعملون End-to-End بأمان وبعد Restart؛ ClamAV وBGE/Reranker/Qwen لا يتداخلون في RAM، والسياق لا يتجاوز آخر تبادلين مكتملين، والعرض التدريجي Frontend-only بعد اكتمال الإجابة.
 
 ---
 
@@ -424,36 +482,70 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | المهمة | الحالة |
 |---|---|
 | DPL-1 Oracle Account | TODO |
-| DPL-2 إنشاء VM | TODO |
-| DPL-3 إعداد الشبكة | TODO |
-| DPL-4 تحديث Ubuntu | TODO |
-| DPL-5 تثبيت Docker | TODO |
+| DPL-2 إنشاء Oracle ARM64 VM بموارد 2 OCPU/12 GB والتحقق من Free eligibility | TODO |
+| DPL-3 إعداد الشبكة وفتح 22/80/443 فقط | TODO |
+| DPL-4 تحديث Ubuntu وSSH hardening | TODO |
+| DPL-5 تثبيت Docker/Buildx/Compose والتحقق من ARM64 images | TODO |
 | DPL-6 Clone المشروع | TODO |
-| DPL-7 إعداد `.env` | TODO |
-| DPL-8 إنشاء Volumes | TODO |
-| DPL-9 تشغيل Infrastructure | TODO |
-| DPL-10 تشغيل FastAPI | TODO |
-| DPL-11 تشغيل Laravel | TODO |
-| DPL-12 تشغيل Queue Worker | TODO |
-| DPL-13 تشغيل Nginx | TODO |
-| DPL-14 HTTPS | TODO |
-| DPL-15 اختبار PDF | TODO |
-| DPL-16 اختبار DOCX | TODO |
-| DPL-17 اختبار TXT | TODO |
+| DPL-7 إعداد Cloud-only `.env` وSecrets permissions | TODO |
+| DPL-8 إنشاء Volumes واختبار permissions/free disk | TODO |
+| DPL-9 تشغيل MySQL/Redis/Qdrant وتحديث تواقيع ClamAV one-shot مع Health readiness | TODO |
+| DPL-10 تشغيل FastAPI Cloud-only image وHealth/Capabilities | TODO |
+| DPL-11 تشغيل Laravel PHP-FPM والمigrations/cache | TODO |
+| DPL-12 تشغيل Queue Worker وSecurity Scan Worker مع scheduled signature-update job على Queue نفسها | TODO |
+| DPL-13 تشغيل Nginx مع upload/timeouts/forwarded headers/log rotation | TODO |
+| DPL-14 HTTPS وتجديد تلقائي وHTTP→HTTPS | TODO |
+| DPL-15 اختبار PDF مع Clean/infected/fail-closed scan | TODO |
+| DPL-16 اختبار DOCX مع حدود ZIP bomb | TODO |
+| DPL-17 اختبار TXT والمسار الكامل | TODO |
 | DPL-18 Cloud-only capability/UI/API test | TODO |
 | DPL-19 التحقق أن Online image بلا Torch/Transformers/Ollama/models | TODO |
-| DPL-20 HF `Qwen/Qwen3.5-9B` test | TODO |
-| DPL-21 Security test | TODO |
-| DPL-22 Backup/restore test | TODO |
-| DPL-23 Restart/persistence test | TODO |
-| DPL-24 Local demo profile منفصل مع Ollama `qwen3.5:4b` | TODO |
-| DPL-25 Compare flow على الجهاز المحلي | TODO |
+| DPL-20 HF `Qwen/Qwen3.5-9B` provider smoke/error/budget test | TODO |
+| DPL-21 Security/ownership/private ports/profile rejection test | TODO |
+| DPL-22 Encrypted off-VM backup + isolated restore test | TODO |
+| DPL-23 Restart/persistence/readiness/startup-race test | TODO |
+| DPL-24 Mac/ASUS Local topology: Docker infrastructure + on-demand scan worker + global heavy-resource lock + Host-native FastAPI/Ollama | TODO |
+| DPL-25 Compare flow المتسلسل على الجهاز المحلي فقط | TODO |
 
-**قاعدة النشر:** النسخة Online تستخدم `RAG_DEPLOYMENT_MODE=cloud` ولا تشغّل أو تنزّل أي Local embedding/reranker/LLM. الـLocal demo مسار تشغيل منفصل على جهاز صاحبة المشروع.
+**قاعدة النشر:** النسخة Online تستخدم `RAG_DEPLOYMENT_MODE=cloud` ولا تشغّل أو تنزّل أي Local embedding/reranker/LLM. في Local demo تبقى البنية الأساسية داخل Docker وتعمل FastAPI/Ollama على Host؛ ينفذ ClamAV عند الطلب كـProcess قصيرة العمر، ويعمل Local AI بModel واحد وconcurrency=1. MySQL مصدر الحقيقة للرسائل، ولا يوجد Redis Stream أو NDJSON أو Chat streaming؛ `جاري التفكير` وProgressive reveal تأثيران بصريان بعد اكتمال الإجابة وفق 174.20.
+
+**حدود التنفيذ:** تعتبر DPL-1–DPL-23 بوابة Oracle Cloud-only. تنفذ DPL-24/DPL-25 منفصلتين على Mac وASUS ولا تثبتان أي Local AI داخل Oracle. لا يوجد `clamd` أو `local-llm` أو signature-updater service دائمة في Online Compose؛ يملك Security Scan Worker تطبيق Laravel و`clamscan/freshclam` وQuarantine/signature volumes بلا Docker socket، ويشغّل الفحص وتحديث التواقيع على Queue واحدة بتزامن 1. تعتمد الخدمات الدائمة Health checks فعلية، وتستخدم Images pinned تدعم `linux/arm64`، ويعمل Laravel بواسطة PHP-FPM لا Development server.
 
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-21 — مراجعة اتساق الخطة والتقدم مع Laravel
+
+Status: VERIFIED DOCUMENTATION AUDIT — لا تغيّر `Last Completed Task`
+
+### نطاق المراجعة
+
+- مطابقة `PROJECT_RAG_MASTER_PLAN.md` و`PROJECT_RAG_EXECUTION_PROGRESS.md` مع commit `f23d8f6ef9a641826888cc08dd99dcc8fb72e8bb`.
+- مراجعة migrations والـModels والـEnums و`DocumentStorageService` وRoutes واختبارات Documents.
+- فحص MySQL الفعلي بواسطة `migrate:status` و`db:show` و`db:table` لجميع الجداول الـ12.
+
+### التصحيحات التوثيقية
+
+- إزالة الـSchema القديم الذي كان يضع بيانات المعالجة داخل `documents`.
+- تثبيت `documents` على 13 عموداً حالياً، و`document_processing_runs` على 23 عموداً.
+- تصحيح أسماء الفهارس الفعلية وحدود Null/Default ومفاتيح `ON DELETE`.
+- توضيح أن `sha256` عاد إلى `NOT NULL` بعد B8 وأن منع duplicate على مستوى التطبيق لا قاعدة البيانات.
+- إضافة علاقات `Document ↔ ProcessingRun` إلى مخطط العلاقات.
+- فصل الحالة المنفذة (`DocumentStorageService`) عن `DocumentUploadService` المخطط للمرحلة C.
+- نقل `total_pages/total_chunks/failure_reason/qdrant_collection` بوضوح إلى Processing Run في جميع المقاطع النشطة.
+- توضيح أن B11/B12 غير منفذتين، لذلك لا يوجد `selected_processing_run_id` ولا جدول comparisons في الـSchema الحالي.
+- تصحيح Qdrant إلى Collection لكل Profile مع فلاتر `user_id + document_id + processing_run_id`.
+- وسم خريطة المهام الأصلية 86–100 كسجل تاريخي غير نشط؛ المرجع التنفيذي الوحيد هو 174.16–174.20 وهذا الملف.
+
+### نتيجة المراجعة
+
+- لا تغييرات على كود Laravel أو قاعدة البيانات.
+- PASS — اختبارات Laravel: 35 اختباراً، 156 assertion.
+- KNOWN — فحص Pint الشامل يبقى غير نظيف فقط في `bootstrap/providers.php` بسبب الملاحظة القديمة المسجلة في قسم العوائق؛ لم تعدل هذه المراجعة ملف PHP.
+- تبقى نقطة المتابعة B11 وحالتها `TODO`.
+
+---
 
 ## 2026-08-20 — B10 ProcessingRun model/enums/relations
 
@@ -1471,11 +1563,11 @@ A2 — إعداد Authentication
 
 | التاريخ | القرار | السبب |
 |---|---|---|
-| 2026-08-12 | إبقاء الخطة الأصلية ثابتة وإنشاء سجل تنفيذ منفصل | فصل Architecture Plan عن Execution State ومنع تشويه المرجع الأساسي |
+| 2026-08-12 | إبقاء حالة التنفيذ في سجل منفصل عن Master Plan | فصل Architecture عن Execution State، مع السماح بتحديث Master فقط عند اعتماد قرار معماري موثق |
 | 2026-08-12 | بدء المشروع من الصفر وإلغاء P0 | لا يوجد Codebase سابق يحتاج إلى Baseline Audit |
 | 2026-08-12 | Task واحدة لكل Chat | تقليل استهلاك نافذة السياق وتحسين التنظيم والتتبع |
 | 2026-08-12 | اعتماد `CURRENT HANDOFF` في أعلى ملف التقدم | تمكين أي محادثة جديدة من معرفة نقطة الاستكمال فوراً |
-| 2026-08-15 | اعتماد Profiles: `cloud` و`hybrid_local` و`compare` في البيئة المحلية | تمكين مقارنة مسارين للوثيقة نفسها ثم حفظ الفائز فقط |
+| 2026-08-15 | اعتماد أوضاع المعالجة المحلية: `cloud` و`hybrid_local` و`compare`، مع بقاء Processing Profiles الفعلية `cloud` و`hybrid_local` فقط | تمكين مقارنة مسارين للوثيقة نفسها ثم حفظ الفائز فقط، دون تمثيل `compare` كـProcessing Profile مستقلة |
 | 2026-08-15 | جعل Online deployment Cloud-only | إبقاء النسخة المنشورة خفيفة بلا تنزيل Embedding/Reranker/LLM محلي |
 | 2026-08-15 | اعتماد `Qwen/Qwen3.5-9B` عبر Hugging Face Router للـCloud | هو اسم النموذج المثبت في المرجع التقني Cloud |
 | 2026-08-15 | اعتماد Ollama `qwen3.5:4b` للتوليد المحلي | النموذج موجود محلياً لدى صاحبة المشروع ولا يدخل نسخة Online |
@@ -1491,6 +1583,19 @@ A2 — إعداد Authentication
 | 2026-08-16 | عدم الثقة باسم الملف أو امتداده أو MIME منفردًا | تطبيق دفاع متعدد الطبقات ضد التنكر والمسارات والأسماء الخطرة |
 | 2026-08-16 | اعتماد 1000 entry و50 MB غير مضغوط كحدود DOCX أولية | تقليل خطر ZIP bombs واستنزاف الذاكرة والمعالج |
 | 2026-08-16 | إبقاء التخزين وإعادة التسمية لـB7 وClamAV للمرحلة C | الحفاظ على فصل المسؤوليات ومنع الأمان الشكلي |
+| 2026-08-20 | اعتماد سياسة موارد Local موحدة للجهازين بدل إعداد مستقل لكل جهاز | تبقى Profiles وسلوك التطبيق واحداً، ويختلف فقط Backend الذي يحسمه Runtime عبر CUDA ثم XPU ثم MPS ثم CPU |
+| 2026-08-20 | تشغيل FastAPI وOllama على Host OS محلياً وإبقاء Laravel/Queue/MySQL/Redis/Qdrant داخل Docker | الاستفادة من MPS أو Intel XPU/Vulkan من دون الاعتماد على GPU passthrough داخل Docker Desktop |
+| 2026-08-20 | FastAPI worker واحد وLocal AI concurrency=1 مع Queue `ai-local` وSemaphore دفاعية | منع تكرار أوزان النماذج وذروات RAM أثناء Compare أو الطلبات المتزامنة |
+| 2026-08-20 | Lazy loading مع Single-active-model coordinator وLease للاستخدام الحالي وتحرير بعد كل Stage | منع اجتماع BGE-M3 والـReranker وQwen في RAM وتجنب تعقيد LRU/TTL متعدد النماذج |
+| 2026-08-21 | تشغيل ClamAV كـ`clamscan` قصيرة العمر على Queue أمنية متسلسلة مع signature volume دائم | الحفاظ على الفحص Fail-closed وتحرير 3–4 GB تقريباً قبل بدء AI من دون Docker socket داخل التطبيق |
+| 2026-08-20 | منع Fallback الصامت وتأجيل NPU وBGE quantization لما بعد Baseline | جعل الأعطال قابلة للتشخيص وحماية جودة الاسترجاع قبل إدخال مسارات إضافية |
+| 2026-08-21 | إلغاء الذاكرة المستخرجة والاكتفاء بآخر تبادلين مكتملين من الرسائل الموجودة | دعم الإحالات الحوارية الأساسية بلا جداول أو Extractor أو Snapshots ذاكرة، مع بقاء وثائق RAG مصدر الحقائق |
+| 2026-08-21 | إلغاء True Streaming وNDJSON وRedis Stream وReplay من v1 | تقليل التعقيد والاتصالات الطويلة واستهلاك التطوير من دون تغيير محتوى الإجابة أو دقتها |
+| 2026-08-21 | عرض `جاري التفكير` بنبض هادئ ثم كشف الإجابة المكتملة تدريجياً داخل Frontend | منح الواجهة طابعاً حديثاً بتأثير بصري منخفض الكلفة مع reduced-motion ومن دون ادعاء Streaming حقيقي |
+| 2026-08-21 | تثبيت Oracle Online على مسار `cloud` فقط وفصل DPL-1–23 عن Local DPL-24–25 | منع تثبيت Ollama/BGE/Torch على Free VM وإزالة التعارض بين Cloud hosting وLocal Demo |
+| 2026-08-21 | Security Scan Worker يملك ClamAV CLI وVolumes اللازمة بلا `clamd` أو Docker socket | جعل الفحص عند الطلب قابلاً للتنفيذ داخل Compose مع بقاء التواقيع دائمة وفشل المسار Fail-closed |
+| 2026-08-21 | قفل Redis عالمي مشترك بين `security-scan` و`ai-local` في Local Demo | منع تداخل ClamAV مع أي نموذج محلي عبر الوثائق المختلفة وضمان أن Peaks ليست متزامنة؛ القفل غير مطلوب في Oracle Cloud-only |
+| 2026-08-21 | اختيار LLM Provider من Processing profile موثوقة عبر Provider Registry وإلغاء global `LLM_PROVIDER` switch | تمكين Compare من استخدام Cloud وLocal بالتتابع مع إبقاء Oracle Cloud-only ومنع قيم Browser غير الموثوقة |
 ---
 
 # 24. العوائق والملاحظات
@@ -1554,7 +1659,7 @@ Status: DONE
 
 في كل محادثة جديدة:
 
-1. ارفع **آخر نسخة** من `PROJECT_RAG_EXECUTION_PROGRESS.md`.
+1. ارفع **آخر نسخة** من `PROJECT_RAG_EXECUTION_PROGRESS.md` ومعها `PROJECT_RAG_MASTER_PLAN.md` عند الحاجة إلى التفاصيل المعمارية.
 2. اكتب:
 
 ```text
@@ -1562,4 +1667,3 @@ Status: DONE
 ```
 
 3. لا حاجة لرفع الخطة الرئيسية في كل مرة، إلا إذا كانت المهمة تحتاج الرجوع إلى تفاصيل معمارية أو قرارات موجودة فيها.
-
