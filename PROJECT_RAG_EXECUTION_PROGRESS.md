@@ -17,14 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 7da4829985877f19b82d276e4158417c46c2c64d
-Last Merged PR: #27 — docs(C2): finalize execution progress
+Verified Main Commit: f0ee07a452f981f296bee1db8d0af0e7aa052613
+Last Merged PR: #28 — feat(C3): add temporary document quarantine flow
 Latest Task PR: #28 — feat(C3): add temporary document quarantine flow
-Latest Task PR State: Draft / pending final progress update and merge
 
 C3 Implementation Commit: f4ec89e
-Last Completed Implementation: C3 — Temporary upload flow
-Current Task After C3 Merge: C4 — Clean path
+Last Completed Task: C3 — Temporary upload flow
+Current Task: C4 — Clean path
 Current Task Status: TODO
 Expected Task Branch: task/C4-clean-path
 Next Task After Completion: C5 — Infected/fail-closed path
@@ -33,8 +32,6 @@ Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
 Open Blockers: لا يوجد
 ```
-
-> **قبل بدء C4:** يجب أن يكون PR #28 مدموجاً، ثم يتم البدء من أحدث `main` والتحقق من حالة Git محلياً.
 
 ## المراجع المطلوبة
 
@@ -573,7 +570,7 @@ Private Quarantine
 | B12 — Processing comparisons | #24 | comparison schema/model/status/relations |
 | C1 — ClamAV runtime | #25 | on-demand scan worker + persistent signatures + shared heavy-resource lock |
 | C2 — DocumentSecurityService | #26 | clean/infected/scan_failed contract + fail-closed + sanitized logging |
-| C3 — Temporary upload flow | #28 Draft | quarantine + `DocumentUploadService`; 9 tests / 60 assertions; Pint/diff-check PASS؛ بانتظار دمج PR |
+| C3 — Temporary upload flow | #28 | quarantine + `DocumentUploadService`; 9 tests / 60 assertions; Pint/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
