@@ -2,7 +2,7 @@
 
 > **المرجع:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** توثيق التنفيذ الفعلي خطوة بخطوة وفصله عن القرارات المعمارية الموجودة في Master Plan.
-> **آخر تحديث:** 2026-08-21
+> **آخر تحديث:** 2026-08-22
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -17,16 +17,16 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: c0f746e36d94c16bd1bb6e9f7af6e53a2df1d037
+Verified Main Commit: 2014869dcf777daeb7194d229c719ecbdfb8e5a2
 Schema Audit: 2026-08-21 — B12 migration up/down/up + live MySQL 8.4.11 verified
 Live Tables: 13
-Last Merged PR: #23 — feat(B11): link documents to selected processing runs
+Last Merged PR: #24 — feat(B12): add processing comparisons model and schema
 Latest Task PR: #24 — feat(B12): add processing comparisons model and schema
-Last Completed Task: B12 — document_processing_comparisons migration/model
-Current Task: C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
+Last Completed Task: C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
+Current Task: C2 — DocumentSecurityService
 Current Task Status: TODO
-Next Task After Completion: C2 — DocumentSecurityService
-Next Task After Completion: C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
+Expected Task Branch: task/C2-document-security-service
+Next Task After Completion: C3 — Temporary upload flow
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية؛ B12 يعتمد 174.7.4، ومهام AI تعتمد أيضاً الـNotebookين المرجعيين، ومهام القدرات والفحص والموارد وتوجيه Providers والسياق البسيط والعرض التدريجي D8–D11/C1–C7/G11/I11/M1/M3/M6/M9/M10/N8/N9/Q8/Q10/Q12 تعتمد 174.20 إلزامياً، ومهام DPL-1–DPL-25 تعتمد الأقسام 101–172 بعد تحديثها مع 174.20 كمرجع أعلى
 ```
@@ -207,7 +207,7 @@ selected_processing_run_id BIGINT UNSIGNED NULL
 
 | المهمة | الحالة |
 |---|---|
-| C1 On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract | TODO |
+| C1 On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract | DONE |
 | C2 DocumentSecurityService | TODO |
 | C3 Temporary upload flow | TODO |
 | C4 Clean path | TODO |
@@ -530,6 +530,75 @@ selected_processing_run_id BIGINT UNSIGNED NULL
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-22 — C1 On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
+
+Status: DONE
+
+Task:
+C1
+
+Branch:
+`task/C1-clamav-security-scan`
+
+Pull Request:
+Pending — سيتم فتحه بعد commit/push.
+
+### تم التنفيذ
+
+- إضافة إعدادات ClamAV وQueue `security-scan`.
+- إضافة `security-worker` بتزامن فعلي `1`.
+- تشغيل `clamscan` و`freshclam` كعمليات CLI قصيرة العمر دون `clamd`.
+- إضافة Persistent Volume دائم لتواقيع ClamAV.
+- تثبيت ClamAV `1.4.6` من الحزم الرسمية الموقعة مع دعم ARM64 وAMD64.
+- إضافة `LocalHeavyResourceLock` باستخدام Redis owner token وTTL وrefresh وatomic safe release.
+- إضافة `UpdateClamAvSignaturesJob` وجدولتها يومياً الساعة `03:00`.
+- إضافة خدمة `scheduler` لتشغيل Laravel Scheduler.
+- إضافة `scripts/update-clamav.sh` لتحديث ClamAV Engine ضمن release line `1.4.x`.
+- ضبط `REDIS_QUEUE_RETRY_AFTER=360` مقابل worker timeout بقيمة `300`.
+- إبقاء `DocumentSecurityService` وTemporary Upload وانتقالات حالات الوثيقة خارج نطاق C1.
+
+### الملفات المنشأة أو المعدلة
+
+- `PROJECT_RAG_EXECUTION_PROGRESS.md`
+- `laravel-app/.env.example`
+- `laravel-app/compose.yaml`
+- `laravel-app/routes/console.php`
+- `laravel-app/config/security.php`
+- `laravel-app/app/Jobs/UpdateClamAvSignaturesJob.php`
+- `laravel-app/app/Services/Infrastructure/LocalHeavyResourceLock.php`
+- `laravel-app/docker/security-worker/Dockerfile`
+- `laravel-app/docker/security-worker/clamav.version`
+- `laravel-app/docker/security-worker/freshclam.conf`
+- `laravel-app/scripts/update-clamav.sh`
+
+### التحقق
+
+- PASS — Heavy-resource lock acquire/refresh/release ورفض token غير المالك.
+- PASS — `UpdateClamAvSignaturesJob` نفذت عبر `security-scan` worker.
+- PASS — Laravel Scheduler يعمل كخدمة مستقلة.
+- PASS — Persistent ClamAV signatures بقيت بعد إعادة إنشاء الحاوية.
+- PASS — `clamscan` و`freshclam` يعملان على ClamAV `1.4.6`.
+- PASS — تحديث Engine تجريبياً من `1.4.5` إلى `1.4.6`.
+- PASS — clean-file smoke scan و`Infected files: 0`.
+- PASS — `REDIS_QUEUE_RETRY_AFTER=360`.
+- PASS — Laravel Pint.
+- PASS — `git diff --check`.
+- PASS — `docker compose config`.
+- لم تتم إضافة Test Suite جديدة لأن التحقق التشغيلي المباشر غطّى نطاق C1.
+
+Review Result:
+IMPLEMENTED AND LOCALLY VERIFIED — pending commit/PR.
+
+Open Issues:
+
+- لا توجد عوائق تخص C1.
+- تنفيذ فحص الوثيقة وتفسير `clean` / `infected` / `scan_failed` ينتقل إلى C2.
+
+Next Task:
+C2 — DocumentSecurityService
+
+---
 
 ## 2026-08-21 — B12 document_processing_comparisons migration/model
 
@@ -1759,30 +1828,46 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
+C2 — DocumentSecurityService
 Status: TODO
 ```
 
 ## الهدف
 
-تأسيس طبقة الفحص الأمني للوثائق باستخدام ClamAV كعمليات قصيرة العمر عند الطلب، مع الاحتفاظ بتواقيع الفحص بشكل دائم، ومنع التداخل بين عمليات الفحص الأمني وعمليات Local AI الثقيلة على الأجهزة المحلية.
+إنشاء `DocumentSecurityService` كطبقة مستقلة مسؤولة عن تشغيل فحص ClamAV للوثيقة وتفسير النتيجة إلى Contract موحد يمكن لباقي Security Pipeline الاعتماد عليه، مع التمييز بين:
 
-تشمل المهمة إعداد عقد التنفيذ الأساسي لـSecurity Scan Worker، بحيث تعمل عمليات `clamscan` و`freshclam` بطريقة متسلسلة وآمنة، مع استخدام Redis lock مشترك للموارد الثقيلة في Local Demo، دون تنفيذ كامل منطق `DocumentSecurityService` أو انتقالات حالات الوثيقة أو أي تكامل مع FastAPI/Qdrant/RAG ضمن هذه المهمة.
+- `clean`
+- `infected`
+- `scan_failed`
+
+يجب أن تبقى تفاصيل `clamscan` وExit Codes وTimeout وstdout/stderr معزولة داخل الخدمة، وألا تتسرب إلى Controller أو الطبقات الأعلى.
+
+يجب الحفاظ على سياسة Fail-closed، بحيث لا يعتبر فشل ClamAV أو تعطل عملية الفحص نتيجة آمنة تسمح باستمرار الوثيقة إلى المراحل التالية.
 
 ## ملاحظة البدء
 
-قبل تنفيذ C1 يجب مراجعة القسم `174.20` من `PROJECT_RAG_MASTER_PLAN.md` باعتباره المرجع الأعلى لسياسة الموارد المحلية والفحص الأمني، مع مراجعة إعداد Redis والـQueue المنفذ في A4/A5 ومسار رفع وتخزين الوثائق المنفذ في B6–B8.
+تراجع أولاً البنية المنفذة في C1، وخصوصاً:
 
-يجب الحفاظ على القرارات المعمارية التالية أثناء التنفيذ:
+- `config/security.php`
+- `LocalHeavyResourceLock`
+- Queue `security-scan`
+- `security-worker`
+- ClamAV CLI runtime
+- Persistent signatures
+- سياسة Fail-closed في القسم `174.20` من `PROJECT_RAG_MASTER_PLAN.md`
 
-- عدم تشغيل `clamd` كخدمة دائمة.
-- تشغيل `clamscan` و`freshclam` كعمليات قصيرة العمر تنتهي بعد إنجاز المهمة.
-- الاحتفاظ بتواقيع ClamAV في Storage/Persistent Volume دائم.
-- تشغيل Queue الفحص الأمني بتزامن `1`.
-- مشاركة Local Security وLocal AI في Redis global lock واحد للموارد الثقيلة.
-- عدم استخدام Docker socket من داخل التطبيق.
-- عدم السماح بوصول الوثيقة إلى AI Pipeline قبل نجاح الفحص الأمني في المراحل اللاحقة.
-- عدم توسيع نطاق C1 إلى C2 أو C3 أو إضافة FastAPI/Qdrant/RAG logic.
+يجب أن يستخدم `DocumentSecurityService` البنية الموجودة في C1 بدلاً من إنشاء آلية فحص أو Lock جديدة.
+
+لا يتم ضمن C2 تنفيذ:
+
+- Temporary Upload Flow.
+- انتقالات حالات الوثيقة الكاملة.
+- Clean/Infected orchestration الكامل.
+- FastAPI.
+- Qdrant.
+- RAG.
+
+تبقى هذه المسؤوليات للمهام اللاحقة ابتداءً من C3.
 
 ---
 
