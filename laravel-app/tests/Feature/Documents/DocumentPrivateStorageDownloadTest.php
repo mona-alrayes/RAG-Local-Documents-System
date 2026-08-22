@@ -2,10 +2,8 @@
 
 namespace Tests\Feature\Documents;
 
-use App\Models\Document;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -14,71 +12,33 @@ class DocumentPrivateStorageDownloadTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_valid_upload_is_privately_stored_owned_and_downloadable_by_owner(): void
+    public function test_owner_can_download_private_stored_document(): void
     {
         Storage::fake('documents');
 
         $user = User::factory()->create();
 
         $content = "Private UTF-8 document content.\n";
+        $storedName = Str::ulid().'.txt';
+        $filePath = $user->id.'/'.$storedName;
 
-        $upload = UploadedFile::fake()->createWithContent(
-            'notes.txt',
+        Storage::disk('documents')->put(
+            $filePath,
             $content,
         );
 
+        $document = $user->documents()->create([
+            'original_name' => 'notes.txt',
+            'stored_name' => $storedName,
+            'file_path' => $filePath,
+            'file_type' => 'txt',
+            'mime_type' => 'text/plain',
+            'file_size' => strlen($content),
+            'sha256' => hash('sha256', $content),
+        ]);
+
         $this->actingAs($user)
-            ->post('/documents', [
-                'document' => $upload,
-            ])
-            ->assertNoContent();
-        $document = Document::query()->sole();
-
-        $this->assertTrue($document->user->is($user));
-        $this->assertSame('notes.txt', $document->original_name);
-        $this->assertSame('txt', $document->file_type->value);
-        $this->assertSame('text/plain', $document->mime_type);
-        $this->assertSame(strlen($content), $document->file_size);
-
-        $this->assertNotSame(
-            $document->original_name,
-            $document->stored_name,
-        );
-
-        $this->assertTrue(
-            Str::isUlid(
-                pathinfo($document->stored_name, PATHINFO_FILENAME),
-            ),
-        );
-
-        $this->assertSame(
-            'txt',
-            pathinfo($document->stored_name, PATHINFO_EXTENSION),
-        );
-
-        $this->assertSame(
-            $document->stored_name,
-            basename($document->file_path),
-        );
-
-        $this->assertStringStartsWith(
-            $user->id.'/',
-            $document->file_path,
-        );
-
-        $this->assertStringNotContainsString(
-            'notes',
-            $document->file_path,
-        );
-
-        Storage::disk('documents')
-            ->assertExists($document->file_path);
-
-        $download = $this->get(
-            "/documents/{$document->id}/download",
-        );
-
-        $download
+            ->get("/documents/{$document->id}/download")
             ->assertOk()
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertDownload('notes.txt');

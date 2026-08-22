@@ -15,8 +15,7 @@ class DocumentSha256DuplicateTest extends TestCase
 
     public function test_upload_stores_sha256_calculated_from_stored_content(): void
     {
-        Storage::fake('documents');
-
+        Storage::fake('document_quarantine');
         $user = User::factory()->create();
         $content = "SHA-256 document content.\n";
 
@@ -36,14 +35,13 @@ class DocumentSha256DuplicateTest extends TestCase
             $document->sha256,
         );
 
-        Storage::disk('documents')
+        Storage::disk('document_quarantine')
             ->assertExists($document->file_path);
     }
 
     public function test_duplicate_content_for_same_user_is_rejected_and_new_file_is_removed(): void
     {
-        Storage::fake('documents');
-
+        Storage::fake('document_quarantine');
         $user = User::factory()->create();
         $content = "Same document content.\n";
 
@@ -80,10 +78,10 @@ class DocumentSha256DuplicateTest extends TestCase
 
         $this->assertCount(
             1,
-            Storage::disk('documents')->allFiles(),
+            Storage::disk('document_quarantine')->allFiles()
         );
 
-        Storage::disk('documents')
+        Storage::disk('document_quarantine')
             ->assertExists($original->file_path);
     }
 }

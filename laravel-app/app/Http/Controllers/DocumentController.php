@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\DuplicateDocumentException;
 use App\Http\Requests\UploadDocumentRequest;
 use App\Models\Document;
-use App\Services\Documents\DocumentStorageService;
+use App\Services\Documents\DocumentUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -37,10 +37,10 @@ class DocumentController extends Controller
 
     public function store(
         UploadDocumentRequest $request,
-        DocumentStorageService $storage,
+        DocumentUploadService $uploadService,
     ): Response|JsonResponse {
         try {
-            $storage->store(
+            $uploadService->store(
                 $request->user(),
                 $request->file('document'),
             );

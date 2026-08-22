@@ -1,91 +1,82 @@
 # سجل تنفيذ مشروع RAG
 
-> **المرجع:** `PROJECT_RAG_MASTER_PLAN.md`  
-> **الغرض:** توثيق التنفيذ الفعلي خطوة بخطوة وفصله عن القرارات المعمارية الموجودة في Master Plan.
+> **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`
+> **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات، دون تكرار التفاصيل الموجودة في الـMaster Plan أو Git/PRs.
 > **آخر تحديث:** 2026-08-22
 > **الحالة العامة:** قيد التنفيذ
 
 ---
 
-# CURRENT HANDOFF — نقطة الاستلام للمحادثة الجديدة
+# CURRENT HANDOFF — نقطة الاستلام
 
-> **هذا القسم هو أول شيء يجب قراءته في أي Chat جديد.**
-> يكفي رفع آخر نسخة من هذا الملف وطلب: **«نكمل مشروع RAG حسب ملف التقدم المرفق»**.
+> **هذا هو أول قسم يُقرأ في أي Chat جديد.**
 
 ```text
 Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: 272bf7eb13142ac9dbf10d5aca8c2fabb399e932
-Schema Audit: 2026-08-21 — B12 migration up/down/up + live MySQL 8.4.11 verified
-Live Tables: 13
-Last Merged PR: #26 — feat(C2): add document security service
-Latest Task PR: #26 — feat(C2): add document security service
-Last Completed Task: C2 — DocumentSecurityService
-Current Task: C3 — Temporary upload flow
+
+Verified Main Commit: 7da4829985877f19b82d276e4158417c46c2c64d
+Last Merged PR: #27 — docs(C2): finalize execution progress
+Latest Task PR: #28 — feat(C3): add temporary document quarantine flow
+Latest Task PR State: Draft / pending final progress update and merge
+
+C3 Implementation Commit: f4ec89e
+Last Completed Implementation: C3 — Temporary upload flow
+Current Task After C3 Merge: C4 — Clean path
 Current Task Status: TODO
-Expected Task Branch: task/C3-temporary-upload-flow
-Next Task After Completion: C4 — Clean path
+Expected Task Branch: task/C4-clean-path
+Next Task After Completion: C5 — Infected/fail-closed path
+
+Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
+Live Tables: 13
 Open Blockers: لا يوجد
-Required Context: هذا الملف + القسم 174 من الخطة الرئيسية؛ B12 يعتمد 174.7.4، ومهام AI تعتمد أيضاً الـNotebookين المرجعيين، ومهام القدرات والفحص والموارد وتوجيه Providers والسياق البسيط والعرض التدريجي D8–D11/C1–C7/G11/I11/M1/M3/M6/M9/M10/N8/N9/Q8/Q10/Q12 تعتمد 174.20 إلزامياً، ومهام DPL-1–DPL-25 تعتمد الأقسام 101–172 بعد تحديثها مع 174.20 كمرجع أعلى
 ```
 
-## قاعدة الانتقال بين المحادثات
+> **قبل بدء C4:** يجب أن يكون PR #28 مدموجاً، ثم يتم البدء من أحدث `main` والتحقق من حالة Git محلياً.
 
-- كل **Task واحدة** تنفذ في **Chat مستقل**.
-- لا نبدأ Task ثانية داخل نفس المحادثة بعد إنهاء الحالية؛ يتم أولاً تحديث هذا الملف ثم فتح Chat جديد.
-- آخر نسخة من هذا الملف هي **Single Source of Truth للحالة التنفيذية**.
-- لا نعتمد على ذاكرة المحادثات السابقة لتحديد أين وصل المشروع.
-- الخطة الرئيسية تحدد **ماذا سنبني**، وهذا الملف يحدد **أين وصلنا فعلياً**.
+## المراجع المطلوبة
 
----
-
-# 1. منهجية العمل
-
-سيتم تنفيذ المشروع وفق القواعد التالية:
-
-1. المشروع يبدأ **من الصفر**؛ لا توجد مرحلة Baseline Audit لكود سابق.
-2. نعمل على **Task واحدة محددة في كل Chat**.
-3. في بداية كل Chat نقرأ قسم `CURRENT HANDOFF` من آخر نسخة لهذا الملف.
-4. لكل Task نحدد قبل التنفيذ:
-   - الهدف.
-   - سبب وجودها في المعمارية.
-   - الملفات أو المكونات المتأثرة.
-   - خطوات التنفيذ.
-   - الاختبارات المطلوبة.
-   - معيار القبول / Definition of Done.
-5. لا تعتبر المهمة منجزة لمجرد كتابة الكود.
-6. لا يتم وضع الحالة `DONE` إلا بعد نجاح التحقق والاختبارات المناسبة.
-7. عند انتهاء المهمة يتم تحديث هذا الملف **في نفس Chat** قبل الانتقال للمحادثة التالية.
-8. يسجل لكل مهمة منجزة:
-   - ما تم تنفيذه.
-   - الملفات التي أُنشئت أو عُدلت.
-   - الأوامر المهمة التي تم تشغيلها.
-   - الاختبارات ونتائجها.
-   - القرارات المعمارية الجديدة.
-   - المشاكل أو الملاحظات المتبقية.
-   - اسم المهمة التالية.
-9. إذا ظهر قرار معماري جديد، يسجل في قسم **القرارات المعمارية**.
-10. إذا ظهر عائق، يسجل في قسم **العوائق والملاحظات**.
-11. لا يتم القفز إلى مرحلة لاحقة إذا كانت تعتمد على مهمة غير منجزة.
-12. آخر نسخة معتمدة من Master Plan تبقى المرجع المعماري، بينما هذا الملف يمثل **الحالة التنفيذية الفعلية**؛ أي قرار جديد يحدث في الملفين بتنسيق متطابق.
-13. عند فتح Chat جديد، لا حاجة لإعادة شرح المشروع؛ آخر نسخة من هذا الملف تكفي لتحديد نقطة المتابعة.
+- هذا الملف = **Single Source of Truth للحالة التنفيذية**.
+- `PROJECT_RAG_MASTER_PLAN.md` = **المرجع الأعلى للمعمارية والنطاق**.
+- القسم `174` هو المرجع المعماري النشط، و`174.20` له الأولوية ضمن القرارات التي يغطيها.
+- مهام AI ترجع أيضاً إلى الـNotebookين المرجعيين عند الحاجة.
+- **Task واحدة = Chat مستقل**.
 
 ---
 
-# 2. حالات المهام
+# 1. قواعد التنفيذ
+
+1. لا تعتبر أي Task `DONE` إلا بعد التنفيذ والتحقق المناسب.
+2. لا نفترض نجاح أي أمر دون رؤية مخرجاته.
+3. نحافظ على Clean Code وSeparation of Concerns ولا نوسع Scope المهمة.
+4. الاختبارات تقتصر على الضروري للمهمة والـregression المرتبط مباشرة بها.
+5. أي قرار معماري جديد يجب أن ينعكس في الـMaster Plan؛ هذا الملف يسجل الحالة التنفيذية فقط.
+6. Git commits وPull Requests هي المرجع التفصيلي للملفات والـdiffs والأوامر التاريخية، لذلك لا نكررها هنا.
+7. عند إغلاق أي Task:
+   - نغير حالتها في جدول المرحلة إلى `DONE`.
+   - نضيف سطراً مختصراً في سجل الإنجاز.
+   - نحدّث `CURRENT HANDOFF`.
+   - نحدد المهمة التالية.
+
+## حالات المهام
 
 | الحالة | المعنى |
 |---|---|
 | `TODO` | لم تبدأ بعد |
 | `IN PROGRESS` | قيد التنفيذ |
-| `VERIFY` | التنفيذ موجود ويحتاج تحقق/اختبارات |
-| `BLOCKED` | متوقفة بسبب اعتماد أو مشكلة |
+| `VERIFY` | التنفيذ موجود ويحتاج تحقق |
+| `BLOCKED` | متوقفة بسبب عائق |
 | `DONE` | منجزة ومتحقق منها |
 | `N/A` | غير مطلوبة وفق قرار موثق |
 
 ---
+
+# 2. جداول المهام حسب المراحل
+
+> هذه الجداول تبقى كاملة عمداً لأنها المرجع البصري السريع لتغيير حالة كل Task بين `TODO` و`DONE`.
+> تفاصيل المعمارية لكل مهمة تبقى في `PROJECT_RAG_MASTER_PLAN.md`، أما التفاصيل التاريخية للتنفيذ فتبقى في Git/PRs.
 
 # 3. بوابة البداية — P0 Baseline Audit
 
@@ -98,6 +89,8 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 | P0 Baseline Audit | N/A | لا يوجد مشروع سابق يحتاج إلى مراجعة قبل التنفيذ |
 
 **الانتقال المباشر:** `A1 — إنشاء Laravel Application`.
+
+---
 
 ---
 
@@ -134,73 +127,6 @@ Required Context: هذا الملف + القسم 174 من الخطة الرئي�
 
 **معيار انتهاء المرحلة:** Domain الوثائق وRuns والمقارنات ممثلة بوضوح، دون تنفيذ AI.
 
-## لقطة الـSchema التنفيذية المطابقة لـB12
-
-تمت مطابقة ملفات Migrations والـModels والـEnums مع MySQL 8.4.11 الفعلي بعد تنفيذ B11. جميع Migrations العشر الحالية في حالة `Ran`، والقاعدة تحتوي 13 جدولاً:
-
-```text
-users
-password_reset_tokens
-sessions
-cache
-cache_locks
-jobs
-job_batches
-failed_jobs
-migrations
-passkeys
-documents
-document_processing_runs
-document_processing_comparisons
-```
-
-### `documents` — الحالة الفعلية الحالية
-
-```text
-id
-user_id                    FK users.id, ON DELETE RESTRICT
-original_name
-stored_name
-title                      NULL
-file_path                  VARCHAR(1024)
-file_type                  VARCHAR(16)
-mime_type
-file_size                  BIGINT UNSIGNED
-sha256                     CHAR(64) NOT NULL
-status                     VARCHAR(32) DEFAULT pending
-created_at / updated_at    NULL
-selected_processing_run_id BIGINT UNSIGNED NULL
-                            FK document_processing_runs.id
-                            ON DELETE RESTRICT
-```
-
-الفهارس: `(user_id, status)` و`(user_id, sha256)` و`(user_id, created_at)` و`(selected_processing_run_id)`.
-
-لا يوجد Unique constraint على `(user_id, sha256)`؛ منع duplicate منفذ في `DocumentStorageService` داخل نطاق المستخدم.
-
-### `document_processing_runs` — الحالة الفعلية الحالية
-
-يحتوي 23 عموداً مطابقاً لـMigration B9: FK `document_id` مع `ON DELETE RESTRICT`، و`profile/status/profile_snapshot`، والعدادات، وJSON timings/warnings/report، وحقول الخطأ، وtemporary artifact/TTL، وQdrant metadata، وتواريخ indexed/selected/discarded/expired، وtimestamps.
-
-يبدأ `total_chunks` و`vector_count` من `0`، بينما `total_pages` و`vector_dimension` nullable.
-
-### حدود الحالة الحالية
-
-- `documents` لا يحتوي `failure_reason` أو `total_pages` أو `total_chunks` أو `qdrant_collection` أو `processed_at`؛ هذه بيانات Processing Run.
-- `documents.selected_processing_run_id` موجود كحقل nullable مع Index وForeign Key إلى `document_processing_runs.id` وسياسة `ON DELETE RESTRICT`.
-- يضمن الـForeign Key وجود الـRun المشار إليها ويمنع حذفها أثناء اعتمادها.
-- لا يضمن الـForeign Key أن `document_processing_runs.document_id` يساوي `documents.id`.
-- لا يفرض الـForeign Key أن حالة الـRun هي `indexed`.
-- يبقى فرض تطابق الوثيقة وحالة `indexed` مسؤولية Domain Service وTransaction الاختيار في مهام orchestration اللاحقة بعد تأكيد نجاح Qdrant.
-- لم يضف B11 Trigger أو Composite Foreign Key أو Service أو منطق اختيار فعلي.
-- جدول `document_processing_comparisons` منفذ وفق 174.7.4، ويربط الوثيقة والمستخدم وCloud/Hybrid Runs والـselected Run الاختياري.
-- جميع Foreign Keys في جدول المقارنات تستخدم `ON DELETE RESTRICT`.
-- حالات المقارنة ممثلة عبر `DocumentProcessingComparisonStatus`: `processing`, `ready`, `decided`, `expired`, `failed`.
-- فرض أن جميع الـRuns تعود إلى الوثيقة والمستخدم نفسيهما مؤجل إلى Domain/Orchestration logic اللاحق.
-- العلاقات `Document::processingRuns()` و`ProcessingRun::document()` و`Document::selectedProcessingRun()` منفذة.
-- Routes الوثائق المنفذة حالياً هي index/show/store/download فقط؛ صفحة المقارنة وإعادة المعالجة والحذف ما زالت مهاماً لاحقة.
-- Upload الحالي ينفذ Validation والتخزين الخاص وSHA-256 وسياسة duplicate، لكنه لا ينفذ ClamAV أو Queue أو FastAPI أو Qdrant بعد.
-
 ---
 
 # 6. المرحلة C — Security Pipeline
@@ -209,7 +135,7 @@ selected_processing_run_id BIGINT UNSIGNED NULL
 |---|---|
 | C1 On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract | DONE |
 | C2 DocumentSecurityService | DONE |
-| C3 Temporary upload flow | TODO |
+| C3 Temporary upload flow | DONE |
 | C4 Clean path | TODO |
 | C5 Infected/fail-closed path | TODO |
 | C6 Aggregate status transitions | TODO |
@@ -343,22 +269,6 @@ selected_processing_run_id BIGINT UNSIGNED NULL
 | J7 Trial-question interaction | TODO |
 | J8 Select-winner confirmation/states | TODO |
 | J9 Accessibility/responsive/error states | TODO |
-
-### متطلبات UX مرتبطة برفع الملفات
-
-ضمن `J4`:
-
-- عند محاولة رفع ملف مكرر لنفس المستخدم، لا تُنشأ وثيقة جديدة.
-- تعرض الواجهة رسالة واضحة بأن الملف مرفوع مسبقًا.
-- يجب أن تتضمن الرسالة `original_name` للوثيقة الأصلية، حتى يعرف المستخدم أي ملف موجود مسبقًا.
-- تستخدم الواجهة `duplicate_document.id` لإتاحة الانتقال مباشرة إلى صفحة الوثيقة الأصلية.
-- لا تعرض الواجهة `sha256` أو `stored_name` أو `file_path` للمستخدم.
-- اختلاف اسم الملف المرفوع لا يغيّر حالة duplicate إذا كان المحتوى مطابقًا للوثيقة الأصلية.
-
-ضمن `J9`:
-
-- تعامل حالة duplicate upload كـUX error state واضح وقابل للتصرف، وليس كرسالة خطأ عامة.
-- يجب أن تبقى رسالة duplicate مفهومة على الشاشات الصغيرة ومتوافقة مع RTL وAccessibility.
 
 **معيار انتهاء المرحلة:** المستخدم يرفع ويتابع ويقارن ويعتمد النتيجة من واجهة RTL واضحة.
 
@@ -525,1451 +435,269 @@ selected_processing_run_id BIGINT UNSIGNED NULL
 
 **قاعدة النشر:** النسخة Online تستخدم `RAG_DEPLOYMENT_MODE=cloud` ولا تشغّل أو تنزّل أي Local embedding/reranker/LLM. في Local demo تبقى البنية الأساسية داخل Docker وتعمل FastAPI/Ollama على Host؛ ينفذ ClamAV عند الطلب كـProcess قصيرة العمر، ويعمل Local AI بModel واحد وconcurrency=1. MySQL مصدر الحقيقة للرسائل، ولا يوجد Redis Stream أو NDJSON أو Chat streaming؛ `جاري التفكير` وProgressive reveal تأثيران بصريان بعد اكتمال الإجابة وفق 174.20.
 
-**حدود التنفيذ:** تعتبر DPL-1–DPL-23 بوابة Oracle Cloud-only. تنفذ DPL-24/DPL-25 منفصلتين على Mac وASUS ولا تثبتان أي Local AI داخل Oracle. لا يوجد `clamd` أو `local-llm` أو signature-updater service دائمة في Online Compose؛ يملك Security Scan Worker تطبيق Laravel و`clamscan/freshclam` وQuarantine/signature volumes بلا Docker socket، ويشغّل الفحص وتحديث التواقيع على Queue واحدة بتزامن 1. تعتمد الخدمات الدائمة Health checks فعلية، وتستخدم Images pinned تدعم `linux/arm64`، ويعمل Laravel بواسطة PHP-FPM لا Development server.
-
 ---
 
-# 22. سجل الإنجاز
+# 22. الحالة التنفيذية الحالية
 
-## 2026-08-22 — C2 DocumentSecurityService
+هذا القسم لا يكرر الـMaster Plan؛ يحتفظ فقط بالمعلومات التنفيذية التي تحتاجها المهام القريبة.
 
-Status: DONE
+## 22.1 Schema / Domain Snapshot
 
-Task:
-C2
+تم التحقق من الـSchema على MySQL 8.4.11 بعد B12.
 
-Branch:
-`task/C2-document-security-service`
+### `documents`
 
-Pull Request:
-#26 — feat(C2): add document security service
+- يمثل ملكية الوثيقة وبيانات الملف والحالة التجميعية.
+- `user_id` مرتبط بـ`users.id` مع `ON DELETE RESTRICT`.
+- `sha256` هو `NOT NULL`.
+- منع duplicate يتم على مستوى التطبيق ضمن `(user_id, sha256)` ولا يوجد Unique constraint.
+- `selected_processing_run_id` nullable ويرتبط بـ`document_processing_runs.id` مع `ON DELETE RESTRICT`.
+- الـForeign Key وحده لا يضمن أن الـselected Run تعود لنفس الوثيقة أو أن حالتها `indexed`؛ هذه Invariants تبقى مسؤولية Domain/Orchestration logic.
 
-### تم التنفيذ
+### `document_processing_runs`
 
-- إضافة `DocumentSecurityScanStatus` كـDomain Contract موحد لنتائج الفحص:
+- يمثل كل Processing Run بصورة مستقلة عن `documents`.
+- يحتوي Profile/Status/Snapshot والعدادات والتوقيتات والتحذيرات والأخطاء وTemporary Artifact/Qdrant metadata.
+- `total_chunks` و`vector_count` يبدأان من `0`.
+- `total_pages` و`vector_dimension` nullable.
+
+### `document_processing_comparisons`
+
+- منفذ وفق القسم `174.7.4`.
+- يربط الوثيقة والمستخدم وCloud/Hybrid Runs والـselected Run الاختياري.
+- جميع Foreign Keys تستخدم `ON DELETE RESTRICT`.
+- الحالات: `processing`, `ready`, `decided`, `expired`, `failed`.
+- تطابق جميع الـRuns مع نفس الوثيقة والمستخدم يبقى مسؤولية Domain/Orchestration logic.
+
+## 22.2 Document Components المنفذة
+
+Routes الحالية:
+
+```text
+index
+show
+store
+download
+```
+
+المكونات المهمة للمسار الحالي:
+
+```text
+UploadDocumentRequest
+SecureDocumentUpload
+DocumentStorageService
+DocumentUploadService
+DocumentSecurityService
+DocumentSecurityScanStatus
+LocalHeavyResourceLock
+```
+
+## 22.3 مسار الرفع بعد C3
+
+```text
+Upload
+  ↓
+Validation
+  ↓
+DocumentController
+  ↓
+DocumentUploadService
+  ↓
+DocumentStorageService::storeQuarantined()
+  ↓
+Private Quarantine
+```
+
+الحالة المعتمدة:
+
+- الملف الجديد يخزن في `document_quarantine` وليس `documents`.
+- SHA-256 وسياسة duplicate تبقيان داخل `DocumentStorageService`.
+- حالة الوثيقة تبدأ `pending`.
+- التنزيل الرسمي يقرأ من `documents` فقط، لذلك الملف المعزول غير متاح كوثيقة موثوقة.
+- لا يصل الملف إلى FastAPI أو Qdrant أو AI Pipeline قبل نجاح Security Pipeline.
+
+## 22.4 Security Runtime المنفذ
+
+- ClamAV يعمل عبر `clamscan` كـProcess قصيرة العمر؛ لا يوجد `clamd` دائم.
+- Queue الأمنية `security-scan` تعمل بتزامن `1`.
+- تواقيع ClamAV محفوظة بشكل دائم ويتم تحديثها مجدولاً.
+- `DocumentSecurityService` يعيد:
   - `clean`
   - `infected`
   - `scan_failed`
-- إضافة `DocumentSecurityService` كطبقة مستقلة تعزل تفاصيل ClamAV عن بقية التطبيق.
-- تشغيل `clamscan` عبر Symfony Process باستخدام argument array دون Shell command.
-- تفسير Exit Codes داخل الخدمة فقط:
-  - `0` → `clean`
-  - `1` → `infected`
-  - أي نتيجة أخرى → `scan_failed`
-- تطبيق Fail-closed بحيث لا يتحول أي فشل أو Timeout أو Exception إلى نتيجة آمنة.
-- استخدام `LocalHeavyResourceLock` الموجود من C1 دون إنشاء Lock جديد.
-- ضمان محاولة تحرير الـLock داخل `finally` مع حماية فشل عملية release.
-- تسجيل ClamAV scan summary وExit Code وstderr داخل Laravel logs.
-- استخدام مستويات Log مناسبة للحالات `clean`, `infected`, `scan_failed`.
-- إخفاء المسار الكامل للوثيقة ومسار ClamAV signatures من معلومات الـlog.
-- إبقاء Temporary Upload Flow وانتقالات حالات الوثيقة وFastAPI/Qdrant/RAG خارج نطاق C2.
-
-### الملفات المنشأة أو المعدلة
-
-- `PROJECT_RAG_EXECUTION_PROGRESS.md`
-- `laravel-app/app/Enums/DocumentSecurityScanStatus.php`
-- `laravel-app/app/Services/Documents/DocumentSecurityService.php`
-
-### التحقق
-
-- PASS — PHP syntax check للـEnum والخدمة.
-- PASS — Laravel Pint.
-- PASS — `git diff --check`.
-- PASS — clean-file smoke scan → `clean`.
-- PASS — EICAR test file → `infected`.
-- PASS — ClamAV Exit Code `1` فسّر إلى `infected`.
-- PASS — missing signatures → Exit Code `2` → `scan_failed`.
-- PASS — Fail-closed: فشل ClamAV لم يتحول إلى `clean`.
-- PASS — ClamAV `SCAN SUMMARY` يظهر في Laravel log.
-- PASS — EICAR signature تظهر في log عند الإصابة.
-- PASS — document path وsignature directory يتم sanitization لهما في log.
-- لم تتم إضافة Test Suite جديدة لأن التحقق التشغيلي المباشر غطّى Contract الخاص بـC2.
-
-Review Result:
-IMPLEMENTED, LOCALLY VERIFIED, AND MERGED.
-
-Open Issues:
-
-- لا توجد عوائق تخص C2.
-- ربط الخدمة بمسار الرفع المؤقت وSecurity Pipeline يبدأ في C3.
-- Clean/Infected orchestration الكامل يبقى للمهام C4/C5.
-
-Next Task:
-C3 — Temporary upload flow
+- أي Failure/Timeout/Exception يطبق Fail-closed ولا يتحول إلى `clean`.
+- `LocalHeavyResourceLock` موجود ويعاد استخدامه للأعمال الثقيلة المحلية؛ لا ينشأ Lock موازٍ.
 
 ---
 
-## 2026-08-22 — C1 On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
+# 23. Baseline معماري تنفيذي
 
-Status: DONE
+> التفاصيل الكاملة موجودة في `PROJECT_RAG_MASTER_PLAN.md`. هذه القائمة فقط لمنع فقدان القرارات التي تؤثر مباشرة على التنفيذ القادم.
 
-Task:
-C1
-
-Branch:
-`task/C1-clamav-security-scan`
-
-Pull Request:
-Pending — سيتم فتحه بعد commit/push.
-
-### تم التنفيذ
-
-- إضافة إعدادات ClamAV وQueue `security-scan`.
-- إضافة `security-worker` بتزامن فعلي `1`.
-- تشغيل `clamscan` و`freshclam` كعمليات CLI قصيرة العمر دون `clamd`.
-- إضافة Persistent Volume دائم لتواقيع ClamAV.
-- تثبيت ClamAV `1.4.6` من الحزم الرسمية الموقعة مع دعم ARM64 وAMD64.
-- إضافة `LocalHeavyResourceLock` باستخدام Redis owner token وTTL وrefresh وatomic safe release.
-- إضافة `UpdateClamAvSignaturesJob` وجدولتها يومياً الساعة `03:00`.
-- إضافة خدمة `scheduler` لتشغيل Laravel Scheduler.
-- إضافة `scripts/update-clamav.sh` لتحديث ClamAV Engine ضمن release line `1.4.x`.
-- ضبط `REDIS_QUEUE_RETRY_AFTER=360` مقابل worker timeout بقيمة `300`.
-- إبقاء `DocumentSecurityService` وTemporary Upload وانتقالات حالات الوثيقة خارج نطاق C1.
-
-### الملفات المنشأة أو المعدلة
-
-- `PROJECT_RAG_EXECUTION_PROGRESS.md`
-- `laravel-app/.env.example`
-- `laravel-app/compose.yaml`
-- `laravel-app/routes/console.php`
-- `laravel-app/config/security.php`
-- `laravel-app/app/Jobs/UpdateClamAvSignaturesJob.php`
-- `laravel-app/app/Services/Infrastructure/LocalHeavyResourceLock.php`
-- `laravel-app/docker/security-worker/Dockerfile`
-- `laravel-app/docker/security-worker/clamav.version`
-- `laravel-app/docker/security-worker/freshclam.conf`
-- `laravel-app/scripts/update-clamav.sh`
-
-### التحقق
-
-- PASS — Heavy-resource lock acquire/refresh/release ورفض token غير المالك.
-- PASS — `UpdateClamAvSignaturesJob` نفذت عبر `security-scan` worker.
-- PASS — Laravel Scheduler يعمل كخدمة مستقلة.
-- PASS — Persistent ClamAV signatures بقيت بعد إعادة إنشاء الحاوية.
-- PASS — `clamscan` و`freshclam` يعملان على ClamAV `1.4.6`.
-- PASS — تحديث Engine تجريبياً من `1.4.5` إلى `1.4.6`.
-- PASS — clean-file smoke scan و`Infected files: 0`.
-- PASS — `REDIS_QUEUE_RETRY_AFTER=360`.
-- PASS — Laravel Pint.
-- PASS — `git diff --check`.
-- PASS — `docker compose config`.
-- لم تتم إضافة Test Suite جديدة لأن التحقق التشغيلي المباشر غطّى نطاق C1.
-
-Review Result:
-IMPLEMENTED AND LOCALLY VERIFIED — pending commit/PR.
-
-Open Issues:
-
-- لا توجد عوائق تخص C1.
-- تنفيذ فحص الوثيقة وتفسير `clean` / `infected` / `scan_failed` ينتقل إلى C2.
-
-Next Task:
-C2 — DocumentSecurityService
+- Processing Profiles الفعلية: `cloud` و`hybrid_local`؛ أما `compare` فهو Orchestration وليس Profile ثالثة.
+- Oracle Online = Cloud-only بلا Local AI weights/dependencies.
+- Local Demo = Docker للبنية الأساسية وFastAPI/Ollama على Host.
+- Local heavy work = concurrency `1` + global Redis lock + single-active-model + release-after-stage.
+- ClamAV = on-demand + fail-closed، بلا `clamd` دائم وبلا Docker socket.
+- Qdrant = Collection منفصلة لكل Processing Profile مع mandatory user/document/run filters.
+- Persistent Qdrant يحتفظ بالـselected winner فقط بعد التحقق.
+- Laravel/MySQL هو مصدر الحقيقة للتطبيق؛ لا توجد DB علائقية مستقلة لـFastAPI في v1.
+- المحادثة تستخدم آخر تبادلين مكتملين فقط لفهم الإحالات؛ لا توجد ذاكرة مستخرجة في v1.
+- لا يوجد True Streaming/NDJSON/Redis Stream في v1؛ `جاري التفكير` وProgressive Reveal تأثيران Frontend-only.
+- LLM Provider يحدد من Processing Profile موثوقة/Capabilities عبر Registry، بلا global `LLM_PROVIDER` switch وبلا Fallback صامت.
 
 ---
 
-## 2026-08-21 — B12 document_processing_comparisons migration/model
-
-Status: DONE
-
-Task:
-B12
-
-Branch:
-`task/B12-processing-comparisons`
-
-Pull Request:
-#24 — feat(B12): add processing comparisons model and schema
-
-### تم التنفيذ
-
-- إنشاء جدول `document_processing_comparisons` وفق القسم `174.7.4`.
-- إضافة العلاقات مع `documents`, `users` و`document_processing_runs`.
-- إضافة `cloud_run_id` و`hybrid_local_run_id` كـRuns إلزامية للمقارنة.
-- إضافة `selected_run_id` كـnullable لاختيار الفائز لاحقاً.
-- اعتماد `restrictOnDelete` لجميع Foreign Keys.
-- إضافة `status`, `trial_question`, `decided_at`, `expires_at` وtimestamps.
-- إنشاء `DocumentProcessingComparisonStatus` بالقيم:
-  - `processing`
-  - `ready`
-  - `decided`
-  - `expired`
-  - `failed`
-- إنشاء `DocumentProcessingComparison` Model.
-- إضافة casts للحالة والتواريخ.
-- إضافة علاقات `document`, `user`, `cloudRun`, `hybridLocalRun`, `selectedRun`.
-- إبقاء جميع Relationship IDs خارج Mass Assignment.
-- عدم تنفيذ Compare orchestration أو winner selection أو AI/Qdrant logic ضمن B12.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/app/Enums/DocumentProcessingComparisonStatus.php`
-- `laravel-app/app/Models/DocumentProcessingComparison.php`
-- `laravel-app/database/migrations/2026_08_21_185233_create_document_processing_comparisons_table.php`
-- `PROJECT_RAG_EXECUTION_PROGRESS.md`
-
-### التحقق
-
-- PASS — Migration على MySQL.
-- PASS — `php artisan db:table document_processing_comparisons`.
-- PASS — جميع Foreign Keys الخمسة و`ON DELETE RESTRICT`.
-- PASS — rollback ثم إعادة Migration.
-- PASS — `php artisan migrate:status`.
-- PASS — `php artisan model:show DocumentProcessingComparison`.
-- PASS — Enum cast وDatetime casts والعلاقات الخمس.
-- PASS — Laravel Pint.
-- PASS — `git diff --cached --check`.
-- لم تتم إضافة Test Suite جديدة لأن التحقق المباشر غطّى نطاق B12.
-
-### حدود الـDomain
-
-- Foreign Keys تضمن وجود السجلات المشار إليها فقط.
-- لا تضمن قاعدة البيانات وحدها أن Cloud/Hybrid/Selected Runs تعود إلى نفس `document_id` و`user_id`.
-- هذه الـinvariants وTransaction اختيار الفائز تبقى مسؤولية Domain/Orchestration في المهام اللاحقة.
-
-Review Result:
-IMPLEMENTED AND LOCALLY VERIFIED — PR #24.
-
-Open Issues:
-
-- لا توجد عوائق تخص B12.
-- Compare orchestration واختيار الفائز مؤجلان للمرحلة المخصصة لهما.
-
-Next Task:
-C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
-
----
-
-## 2026-08-21 — B11 selected_processing_run_id migration/invariants
-
-Status: DONE
-
-Task:
-B11
-
-Branch:
-`task/B11-selected-processing-run`
-
-Pull Request:
-#23 — feat(B11): link documents to selected processing runs
-
-### تم التنفيذ
-
-- إنشاء Migration مستقلة تضيف `documents.selected_processing_run_id` كحقل `BIGINT UNSIGNED NULL`.
-- إضافة Index صريح للحقل الجديد.
-- إضافة Foreign Key صريح إلى `document_processing_runs.id` مع `restrictOnDelete`.
-- تنفيذ rollback مرتب يحذف الـForeign Key ثم الـIndex ثم العمود.
-- إضافة علاقة `Document::selectedProcessingRun()` من نوع `BelongsTo` مع تحديد `selected_processing_run_id` صراحة.
-- إبقاء `selected_processing_run_id` خارج `Fillable`.
-- عدم إضافة cast غير ضروري للحقل.
-- عدم إضافة Domain Service أو Transaction اختيار أو Queue أو FastAPI أو Qdrant أو AI/RAG logic.
-
-### الملفات المنشأة أو المعدلة
-
-- `PROJECT_RAG_EXECUTION_PROGRESS.md`
-- `laravel-app/database/migrations/2026_08_21_165713_add_selected_processing_run_id_to_documents_table.php`
-- `laravel-app/app/Models/Document.php`
-
-### التحقق
-
-- PASS — تشغيل Pint على ملفي PHP المستهدفين.
-- PASS — تنفيذ Migration على MySQL 8.4.11.
-- PASS — أكد `php artisan db:table documents` وجود العمود nullable والـIndex والـForeign Key وسياسة `ON DELETE RESTRICT`.
-- PASS — أكد `php artisan model:show Document` اكتشاف علاقة `selectedProcessingRun` كـ`BelongsTo`.
-- PASS — تنفيذ rollback لآخر Migration بنجاح.
-- PASS — إعادة تنفيذ Migration بعد rollback بنجاح.
-- PASS — `git diff --cached --check`.
-- لم تتم إضافة Test Suite جديدة لأن التحقق المباشر عبر Laravel وMySQL غطّى السلوك المطلوب ضمن نطاق B11.
-
-### حدود الـinvariants
-
-- تضمن قاعدة البيانات أن `selected_processing_run_id` يشير إلى Processing Run موجودة.
-- تمنع سياسة `restrictOnDelete` حذف Run ما دامت وثيقة تشير إليها كـselected Run.
-- الـForeign Key المفرد لا يضمن أن الـRun تعود إلى الوثيقة نفسها.
-- لا يستطيع هذا الـForeign Key فرض أن حالة الـRun هي `indexed`.
-- يؤجل التحقق من تطابق `document_processing_runs.document_id` مع الوثيقة وحالة `indexed` إلى Domain Service في مهام orchestration اللاحقة.
-- يتم لاحقاً تغيير `selected_processing_run_id` وحالات الـRuns داخل Transaction واحدة بعد تأكيد نجاح Qdrant.
-- لم تتم إضافة Trigger أو Composite Foreign Key أو منطق اختيار فعلي ضمن B11.
-
-Review Result:
-IMPLEMENTED AND LOCALLY VERIFIED — PR #23 مفتوح للمراجعة والدمج.
-
-Open Issues:
-
-- لا توجد عوائق تنفيذية تخص B11.
-- فرض الـinvariants العابرة للجدولين مؤجل عمداً إلى مهام orchestration اللاحقة.
-
-Next Task:
-B12 — document_processing_comparisons migration/model
-
----
-
-## 2026-08-21 — مراجعة اتساق الخطة والتقدم مع Laravel
-
-Status: VERIFIED DOCUMENTATION AUDIT — لا تغيّر `Last Completed Task`
-
-### نطاق المراجعة
-
-- مطابقة `PROJECT_RAG_MASTER_PLAN.md` و`PROJECT_RAG_EXECUTION_PROGRESS.md` مع commit `f23d8f6ef9a641826888cc08dd99dcc8fb72e8bb`.
-- مراجعة migrations والـModels والـEnums و`DocumentStorageService` وRoutes واختبارات Documents.
-- فحص MySQL الفعلي بواسطة `migrate:status` و`db:show` و`db:table` لجميع الجداول الـ12.
-
-### التصحيحات التوثيقية
-
-- إزالة الـSchema القديم الذي كان يضع بيانات المعالجة داخل `documents`.
-- تثبيت `documents` على 13 عموداً حالياً، و`document_processing_runs` على 23 عموداً.
-- تصحيح أسماء الفهارس الفعلية وحدود Null/Default ومفاتيح `ON DELETE`.
-- توضيح أن `sha256` عاد إلى `NOT NULL` بعد B8 وأن منع duplicate على مستوى التطبيق لا قاعدة البيانات.
-- إضافة علاقات `Document ↔ ProcessingRun` إلى مخطط العلاقات.
-- فصل الحالة المنفذة (`DocumentStorageService`) عن `DocumentUploadService` المخطط للمرحلة C.
-- نقل `total_pages/total_chunks/failure_reason/qdrant_collection` بوضوح إلى Processing Run في جميع المقاطع النشطة.
-- توضيح أن B11/B12 غير منفذتين، لذلك لا يوجد `selected_processing_run_id` ولا جدول comparisons في الـSchema الحالي.
-- تصحيح Qdrant إلى Collection لكل Profile مع فلاتر `user_id + document_id + processing_run_id`.
-- وسم خريطة المهام الأصلية 86–100 كسجل تاريخي غير نشط؛ المرجع التنفيذي الوحيد هو 174.16–174.20 وهذا الملف.
-
-### نتيجة المراجعة
-
-- لا تغييرات على كود Laravel أو قاعدة البيانات.
-- PASS — اختبارات Laravel: 35 اختباراً، 156 assertion.
-- KNOWN — فحص Pint الشامل يبقى غير نظيف فقط في `bootstrap/providers.php` بسبب الملاحظة القديمة المسجلة في قسم العوائق؛ لم تعدل هذه المراجعة ملف PHP.
-- تبقى نقطة المتابعة B11 وحالتها `TODO`.
-
----
-
-## 2026-08-20 — B10 ProcessingRun model/enums/relations
-
-Status: DONE
-
-Task:
-B10
-
-Branch:
-`task/B10-processing-run-model`
-
-Pull Request:
-#21 — feat(B10): add processing run domain model
-
-### تم التنفيذ
-
-* إنشاء `ProcessingProfile` Enum بالقيمتين المعتمدتين:
-
-  * `cloud`
-  * `hybrid_local`
-* إنشاء `ProcessingRunStatus` Enum بحالات دورة حياة الـRun التسع المعتمدة.
-* إنشاء `ProcessingRun` Model وربطه صراحة بجدول `document_processing_runs`.
-* إضافة `Fillable` للحقول التشغيلية الخاصة بالـRun، مع إبقاء `document_id` خارج الـmass assignment.
-* إضافة Enum casts لحقلي `profile` و`status`.
-* إضافة Array casts للحقول:
-
-  * `profile_snapshot`
-  * `stage_timings_ms`
-  * `warnings`
-  * `comparison_report`
-* إضافة Datetime casts للحقول:
-
-  * `temporary_expires_at`
-  * `indexed_at`
-  * `selected_at`
-  * `discarded_at`
-  * `expired_at`
-* إضافة علاقة `ProcessingRun -> document` من نوع `BelongsTo`.
-* إضافة علاقة `Document -> processingRuns` من نوع `HasMany`.
-* عدم إضافة `selected_processing_run_id` أو منطق اختيار Run.
-* عدم إضافة Services أو Queue أو FastAPI أو Qdrant أو AI logic.
-* عدم إنشاء Migration جديدة أو Test Suite إضافية.
-
-### الملفات المنشأة أو المعدلة
-
-* `PROJECT_RAG_EXECUTION_PROGRESS.md`
-* `laravel-app/app/Enums/ProcessingProfile.php`
-* `laravel-app/app/Enums/ProcessingRunStatus.php`
-* `laravel-app/app/Models/ProcessingRun.php`
-* `laravel-app/app/Models/Document.php`
-
-### التحقق
-
-* PASS — تشغيل Pint على ملفات B10 الأربعة.
-* PASS — `php artisan model:show ProcessingRun`.
-* PASS — التحقق من اسم جدول `document_processing_runs`.
-* PASS — التحقق من Enum وJSON وDatetime casts.
-* PASS — التحقق من علاقة `ProcessingRun::document()` كـ`BelongsTo`.
-* PASS — `php artisan model:show Document`.
-* PASS — التحقق من علاقة `Document::processingRuns()` كـ`HasMany`.
-* PASS — `git diff --check`.
-* PASS — `git diff --cached --check`.
-* لم تتم إضافة اختبارات جديدة لأن فحص Laravel المباشر غطّى سلوك الـModel والـcasts والعلاقات ضمن نطاق B10.
-
-### القرارات
-
-* استخدم الاسم `ProcessingRun` مع تعريف `$table` صراحة لأن الاسم الافتراضي الذي يستنتجه Eloquent لا يطابق `document_processing_runs`.
-* تحفظ قيم `profile` و`status` كـstrings في MySQL وتعرض داخل Laravel كـEnums.
-* تحول حقول JSON إلى Arrays وحقول التوقيت التشغيلية إلى Datetime objects.
-* يبقى `document_id` خارج `Fillable` ليُربط عبر علاقة الوثيقة.
-* يبقى `selected_processing_run_id` ومنطق اختيار الـRun للمهمة B11 وما بعدها.
-
-Review Result:
-APPROVED — PR #21 مطابق للقسم 174.7.2 ولنطاق B10، ولا توجد ملاحظات مانعة.
-
-Open Issues:
-
-* لا توجد عوائق تخص B10.
-
-Next Task:
-B11 — selected_processing_run_id migration/invariants
-
----
-
-## 2026-08-20 — B9 document_processing_runs migration
-
-Status: DONE
-
-Task:
-B9
-
-Branch:
-`task/B9-document-processing-runs-migration`
-
-Pull Request:
-#19 — feat(B9): add document processing runs schema
-
-### تم التنفيذ
-
-- إنشاء جدول `document_processing_runs` وفق القسم `174.7.2` من Master Plan.
-- إضافة `document_id` كـForeign Key إلى `documents.id`.
-- اعتماد `restrictOnDelete` حسب سياسة حذف الوثائق المعتمدة.
-- إضافة حقول Profile وحالة الـRun وConfiguration snapshot.
-- إضافة عدادات الصفحات والـchunks والـvectors وأبعاد الـvectors.
-- إضافة أزمنة مراحل المعالجة والتحذيرات ومعلومات الفشل.
-- إضافة تقرير المقارنة والـtemporary artifact metadata وTTL.
-- إضافة معلومات Qdrant وحالات indexed/selected/discarded/expired.
-- إضافة الفهارس المطلوبة:
-  - `(document_id, status)`
-  - `(document_id, profile, created_at)`
-  - `(status, temporary_expires_at)`
-- إبقاء ProcessingRun Model والـEnums والـcasts والعلاقات خارج نطاق B9.
-- إبقاء `selected_processing_run_id` خارج B9 للمهمة B11.
-- عدم إضافة Queue أو FastAPI أو Qdrant logic أو Processing services.
-
-### الملفات المنشأة أو المعدلة
-
-- `PROJECT_RAG_EXECUTION_PROGRESS.md`
-- `laravel-app/database/migrations/2026_08_19_223046_create_document_processing_runs_table.php`
-
-### التحقق
-
-- PASS — migration `up()`.
-- PASS — migration `down()` عبر rollback.
-- PASS — إعادة تنفيذ migration بعد rollback.
-- PASS — `php artisan migrate:status`.
-- PASS — فحص Schema الفعلي عبر `php artisan db:table document_processing_runs`.
-- PASS — Foreign Key مع `ON DELETE RESTRICT`.
-- PASS — الفهارس الثلاثة المطلوبة موجودة.
-- PASS — `git diff --check`.
-- لم يتم إنشاء Test suite إضافية لأن التحقق المباشر من MySQL كافٍ لنطاق B9.
-
-### القرارات
-
-- يحتفظ جدول `document_processing_runs` ببيانات كل محاولة/مسار معالجة بصورة مستقلة عن `documents`.
-- محتوى الـchunks الكامل لا يخزن في MySQL؛ التخزين الدائم للـselected chunks سيكون في Qdrant.
-- Laravel يعرض Chunks الإدارية لاحقاً عبر FastAPI وليس باتصال مباشر مع Qdrant.
-- `total_chunks` و`vector_count` يبدأان من `0`.
-- تفاصيل Domain الخاصة بالـProfile والـStatus والـcasts والعلاقات تؤجل إلى B10.
-
-Review Result:
-APPROVED — Schema مطابقة للقسم 174.7.2 والتحقق المباشر على MySQL ناجح.
-
-Open Issues:
-- لا توجد عوائق تخص B9.
-
-Next Task:
-B10 — ProcessingRun model/enums/relations
-
----
-
-## 2026-08-19 — B8 SHA-256 وسياسة duplicate في Application
-
-Status: DONE
-
-Task:
-B8
-
-Branch:
-`task/B8-sha256-duplicate-policy`
-
-Pull Request:
-#18
-
-Implementation Commit:
-`86df0b5b95ce78f64f86c2e56e06fc41a8441e7c`
-
-### تم التنفيذ
-
-- حساب SHA-256 من محتوى الملف المخزن فعليًا على Server-side بعد التخزين الخاص.
-- استخدام stream من filesystem لحساب الـhash دون الاعتماد على اسم الملف أو metadata مقدمة من المستخدم.
-- حفظ SHA-256 داخل `documents.sha256` عند إنشاء الوثيقة.
-- تطبيق سياسة duplicate على مستوى Application ضمن نطاق المستخدم الحالي فقط عبر `user_id + sha256`.
-- اعتبار الملف Duplicate حتى عند اختلاف الاسم إذا كان المحتوى مطابقًا.
-- السماح لمستخدم مختلف برفع نفس المحتوى دون كشف وجود وثائق مستخدمين آخرين.
-- إضافة `DuplicateDocumentException` لفصل منطق التخزين عن طبقة HTTP.
-- حذف النسخة الجديدة المخزنة فور اكتشاف duplicate مع الإبقاء على الوثيقة الأصلية.
-- إعادة HTTP 422 عند رفع duplicate مع `id` و`original_name` للوثيقة الأصلية فقط.
-- عدم كشف `stored_name` أو `file_path` أو SHA-256 في استجابة duplicate.
-- إعادة عمود `sha256` إلى `NOT NULL` بعد انتهاء الفترة المؤقتة التي احتاجتها B7.
-- الإبقاء على index الحالي `(user_id, sha256)` دون إضافة UNIQUE constraint لأن منع التكرار سياسة Application-level حسب الخطة.
-- تحديث fixture واحد من اختبار B7 ليتوافق مع عودة `sha256` إلى `NOT NULL`.
-- إبقاء Queue وClamAV وFastAPI وAI/RAG خارج نطاق B8.
-
-### الملفات المنشأة أو المعدلة
-
-- `PROJECT_RAG_EXECUTION_PROGRESS.md`
-- `laravel-app/app/Exceptions/DuplicateDocumentException.php`
-- `laravel-app/app/Http/Controllers/DocumentController.php`
-- `laravel-app/app/Services/Documents/DocumentStorageService.php`
-- `laravel-app/database/migrations/2026_08_19_182038_make_sha256_required_on_documents_table.php`
-- `laravel-app/tests/Feature/Documents/DocumentPrivateStorageDownloadTest.php`
-- `laravel-app/tests/Feature/Documents/DocumentSha256DuplicateTest.php`
-
-### التحقق والاختبارات
-
-- PASS — اختبارات B8: اختباران و14 assertions.
-- PASS — اختبارات B6 وB7 المرتبطة بعد تحديث الـfixture.
-- PASS — مجموعة Laravel الكاملة: 35 اختبارًا.
-- PASS — migration `up()` لتثبيت `sha256 NOT NULL`.
-- PASS — migration `down()` لإعادة `sha256` nullable.
-- PASS — إعادة تنفيذ migration بعد rollback.
-- PASS — Laravel Pint على ملفات المهمة.
-- PASS — `git diff --check`.
-- PASS — `git diff --cached --check`.
-- PASS — التحقق أن duplicate لا ينشئ سجل `Document` إضافيًا ولا يترك ملفًا إضافيًا.
-
-### القرارات
-
-- SHA-256 يحسب حصريًا من المحتوى المخزن Server-side.
-- نطاق duplicate هو المستخدم نفسه فقط: `user_id + sha256`.
-- الاسم الأصلي لا يدخل في قرار duplicate.
-- منع duplicate يبقى Application-level دون `UNIQUE(user_id, sha256)` في B8.
-- النسخة الجديدة تحذف عند اكتشاف duplicate، بينما تبقى الوثيقة الأصلية دون تعديل.
-- استجابة duplicate تعرض فقط معلومات آمنة تساعد المستخدم على الوصول إلى الوثيقة الأصلية.
-- إبقاء معالجة race condition المتزامنة خارج نطاق B8 وعدم إضافة locking أو Redis complexity دون حاجة حالية.
-
-Review Result:
-APPROVED — التنفيذ والاختبارات والتحقق المحلي ناجحة، وPR #18 جاهز للدمج بعد تحديث سجل التنفيذ.
-
-Open Issues:
-- لا توجد عوائق تخص B8.
-- تبقى ملاحظة تنسيق Pint القديمة في `laravel-app/bootstrap/providers.php` خارج نطاق المهمة.
-
-Next Task:
-B9 — document_processing_runs migration
-
----
-
-## 2026-08-19 — B7 Private storage/download authorization
-
-Status: DONE
-
-Task:
-B7
-
-Branch:
-`task/B7-private-storage-download`
-
-Pull Request:
-#16
-
-Reviewed Commit:
-`bb82d433cad7d5b2f099391ae3ccb97794d06085`
-
-Merge Commit:
-`f4adb45774133b6b081a6682a03d4b85581c1cc7`
-
-### تم التنفيذ
-
-- إعادة استخدام `UploadDocumentRequest` و`SecureDocumentUpload` من B6 دون تكرار منطق التحقق.
-- إضافة private filesystem disk مخصص للوثائق داخل `storage/app/private/documents`.
-- إضافة `DocumentStorageService` لفصل مسؤولية التخزين وإنشاء سجل الوثيقة عن الـController.
-- توليد اسم تخزين Server-side باستخدام ULID دون استخدام أي جزء من الاسم الأصلي.
-- استخدام الامتداد الذي اجتاز Validation في B6.
-- تخزين الملفات داخل مسار خاص بالمستخدم باستخدام معرف المستخدم واسم التخزين العشوائي.
-- إنشاء سجل `Document` من خلال علاقة المستخدم مع metadata الموثوقة.
-- استخدام MIME والحجم المكتشفين Server-side.
-- منع overwrite عبر التحقق من عدم وجود المسار المولد قبل التخزين.
-- حذف الملف المخزن إذا فشل إنشاء سجل `Document`.
-- إضافة `DocumentPolicy::download` للتحكم بتنزيل الوثائق حسب الملكية.
-- إضافة Route خاص بتنزيل الوثيقة عبر Controller.
-- تنزيل الملف كـattachment بالاسم الأصلي للمستخدم.
-- إضافة `X-Content-Type-Options: nosniff` إلى استجابة التنزيل.
-- التأكد من عدم تخزين الوثائق على public disk وعدم السماح لمستخدم آخر بتنزيلها.
-- جعل `sha256` nullable مؤقتًا حتى تنفيذ B8، لأن حساب SHA-256 وسياسة duplicate خارج نطاق B7.
-- تحديث اختبار B6 ليتوافق مع انتقال `POST /documents` من validation-only إلى persistence بعد نجاح Validation.
-- استخدام fake private storage في الاختبارات لمنع إنشاء ملفات اختبار حقيقية.
-
-### الملفات المنشأة أو المعدلة
-
-- `PROJECT_RAG_EXECUTION_PROGRESS.md`
-- `laravel-app/app/Http/Controllers/DocumentController.php`
-- `laravel-app/app/Policies/DocumentPolicy.php`
-- `laravel-app/app/Services/Documents/DocumentStorageService.php`
-- `laravel-app/config/filesystems.php`
-- `laravel-app/routes/web.php`
-- `laravel-app/database/migrations/2026_08_16_230641_make_sha256_nullable_on_documents_table.php`
-- `laravel-app/tests/Feature/Documents/DocumentPrivateStorageDownloadTest.php`
-- `laravel-app/tests/Feature/Documents/DocumentUploadValidationTest.php`
-
-### التحقق والاختبارات
-
-- PASS — اختبارات B6: 4 اختبارات و33 assertions.
-- PASS — اختبارات B7: 2 اختبار و22 assertions.
-- PASS — مجموعة Laravel الكاملة: 33 اختبارًا و142 assertions.
-- PASS — Laravel Pint.
-- PASS — `git diff --check`.
-
-### القرارات
-
-- اعتماد disk مستقل باسم `documents` للوثائق الخاصة.
-- عدم استخدام الاسم الأصلي في filesystem path نهائيًا.
-- اعتماد ULID كاسم تخزين Server-generated.
-- إبقاء الاسم الأصلي كـdisplay/download metadata فقط.
-- فصل التخزين وإنشاء سجل الوثيقة داخل `DocumentStorageService`.
-- تطبيق authorization على download عبر `DocumentPolicy`.
-- جعل `sha256` nullable مؤقتًا حتى B8 دون تنفيذ hash أو duplicate policy داخل B7.
-- إبقاء ClamAV وQueue وAI خارج نطاق B7.
-
-Review Result:
-APPROVED — التنفيذ والاختبارات المحلية ناجحة، بانتظار Commit وPull Request.
-
-Open Issues:
-- `sha256` nullable مؤقتًا؛ تتم معالجة SHA-256 وسياسة duplicate في B8.
-
-Next Task:
-B8 — SHA-256 وسياسة duplicate في Application
-
----
-
-## 2026-08-16 — B6 Upload validation لملف واحد
-
-Status: DONE
-
-Task:
-B6
-
-Branch:
-`task/B6-upload-validation`
-
-Pull Request:
-#15
-
-Reviewed Commit:
-`b98174e5ad1872763063b198d920024fb3ad4ed6`
-
-Merge Commit:
-`b02a94dbe8f35eb4e04cafb2c3bcaa56e7d6fdfc`
-
-### تم التنفيذ
-
-- إضافة Route من نوع `POST /documents` داخل مجموعة `auth` و`verified`.
-- إضافة `UploadDocumentRequest` مع Authorization عبر `DocumentPolicy::create`.
-- إضافة `SecureDocumentUpload` كقاعدة تحقق أمنية متخصصة.
-- السماح برفع ملف واحد فقط من نوع PDF أو DOCX أو TXT.
-- مطابقة الامتداد مع MIME المكتشف من المحتوى.
-- تطبيق فحص بنيوي أولي لكل نوع:
-  - التحقق من توقيع PDF وعلامة النهاية.
-  - التحقق من بنية DOCX الأساسية كحزمة OOXML.
-  - التحقق من أن TXT نص UTF-8 صالح وليس ملفًا ثنائيًا أو PDF/ZIP متنكرًا.
-- رفض أسماء الملفات الخطرة، والمسارات، والامتدادات المركبة، والأسماء المخفية، ومحارف HTML والتحكم.
-- دعم أسماء الملفات العربية وUnicode ضمن سياسة أحرف مسموحة.
-- اعتماد حد رفع افتراضي قابل للضبط بقيمة 10 MB.
-- حماية DOCX من الحزم الشاذة عبر حد 1000 entry و50 MB للحجم غير المضغوط.
-- رفض المسارات الداخلية الخطرة داخل حزم DOCX.
-- إعلان `ext-zip` كمتطلب منصة في Composer.
-- إبقاء الاسم الأصلي كبيانات غير موثوقة وعدم استخدامه للتخزين.
-- إعادة `204 No Content` عند نجاح التحقق دون تخزين الملف أو إنشاء سجل `Document`.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/.env.example`
-- `laravel-app/app/Http/Controllers/DocumentController.php`
-- `laravel-app/app/Http/Requests/UploadDocumentRequest.php`
-- `laravel-app/app/Rules/SecureDocumentUpload.php`
-- `laravel-app/composer.json`
-- `laravel-app/composer.lock`
-- `laravel-app/config/documents.php`
-- `laravel-app/routes/web.php`
-- `laravel-app/tests/Feature/Documents/DocumentUploadValidationTest.php`
-
-### التحقق والاختبارات
-
-- PASS — قبول PDF وDOCX وTXT السليمة دون Persistence.
-- PASS — رفض عدم تطابق الامتداد والمحتوى وDOCX غير السليم.
-- PASS — رفض أسماء الملفات الخطرة.
-- PASS — رفض الملف المتجاوز للحد المضبوط.
-- PASS — اختبارات B6: 4 اختبارات و34 assertions.
-- PASS — مجموعة Laravel الكاملة: 31 اختبارًا و121 assertions.
-- PASS — ملفات المهمة اجتازت Laravel Pint.
-- PASS — `composer validate --no-check-publish`.
-- PASS — `git diff --check`.
-- PASS — لم يُنشأ أي سجل `Document` ولم يُخزن أي ملف.
-
-### القرارات
-
-- اعتماد 10 MB كحد رفع افتراضي قابل للضبط عبر `DOCUMENT_UPLOAD_MAX_SIZE_KB`.
-- عدم الثقة باسم الملف أو امتداده أو MIME منفردًا.
-- استخدام الاسم الأصلي كـdisplay metadata فقط.
-- تأجيل توليد اسم التخزين العشوائي والتخزين الخاص والتنزيل المفوض إلى B7.
-- تأجيل quarantine وClamAV والفحص fail-closed إلى المرحلة C.
-- اعتماد 1000 entry و50 MB غير مضغوط كحدود أولية لحزم DOCX.
-
-Review Result:
-APPROVED
-
-Open Issues:
-- يوجد تنسيق Pint قديم في `bootstrap/providers.php` خارج نطاق B6؛ غير حاجب ولم يُعدّل ضمن المهمة.
-
-Next Task:
-B7 — Private storage/download authorization
-
----
-
-## 2026-08-15 — B5 Documents index/details Blade skeleton
-
-Status: DONE
-
-Task:
-B5
-
-Branch:
-`task/B5-documents-blade-skeleton`
-
-Pull Request:
-#14
-
-Reviewed Commit:
-`b7bb41ede04a787d32452c2798d132316ddf4ffd`
-
-### تم التنفيذ
-
-- إنشاء `DocumentController` بمسؤوليتي `index` و`show`.
-- إضافة Routes محمية بـ`auth` و`verified` لفهرس الوثائق وتفاصيل الوثيقة.
-- تصفية قائمة الوثائق عبر علاقة `documents` للمستخدم الحالي.
-- تطبيق `DocumentPolicy::viewAny` عند عرض القائمة.
-- تطبيق `DocumentPolicy::view` عند عرض تفاصيل الوثيقة.
-- إنشاء صفحتي Blade للفهرس والتفاصيل باستخدام App layout الحالي.
-- إضافة Pagination وEmpty state ورابط الانتقال إلى التفاصيل.
-- عرض بيانات الوثيقة الحالية دون إضافة Upload أو Processing.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/app/Http/Controllers/DocumentController.php`
-- `laravel-app/resources/views/documents/index.blade.php`
-- `laravel-app/resources/views/documents/show.blade.php`
-- `laravel-app/routes/web.php`
-- `laravel-app/tests/Feature/Documents/DocumentPagesTest.php`
-
-### التحقق والاختبارات
-
-- نجحت اختبارات B5: 3 اختبارات و6 assertions.
-- نجحت مجموعة Laravel الكاملة: 27 اختبارًا و87 assertions.
-- نجح Laravel Pint.
-- نجح `git diff --check`.
-- تم التحقق من منع المستخدم من عرض تفاصيل وثيقة لا يملكها.
-- لم يُضف Upload أو Processing أو Storage أو Services أو AI integration.
-
-Review Result:
-APPROVED
-
-Open Issues:
-- None
-
-Next Task:
-B6 — Upload validation لملف واحد
-
----
-
-## 2026-08-15 — B4 DocumentPolicy واختبارات ownership
-
-Status: DONE
-
-Task:
-B4
-
-Branch:
-`task/B4-document-policy`
-
-Pull Request:
-#13
-
-Reviewed Commit:
-`62b2fb5679f5beafa4c140022e17490a063975a7`
-
-### تم التنفيذ
-
-- إنشاء `DocumentPolicy` وفق naming conventions القياسية في Laravel.
-- السماح للمستخدم المصادق له بقدرتَي `viewAny` و`create`.
-- تقييد قدرات `view` و`update` و`delete` بملكية الوثيقة عبر `document.user_id`.
-- الاعتماد على Laravel كمصدر الحقيقة للـOwnership.
-- استخدام Policy discovery التلقائي دون تسجيل يدوي أو تعديل `bootstrap/app.php`.
-- إضافة اختبارَي ownership فقط: السماح للمالك والمنع عن المستخدم الآخر.
-- التحقق من القدرات الثلاث داخل كل اختبار باستخدام loop واضح.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/app/Policies/DocumentPolicy.php`
-- `laravel-app/tests/Feature/Policies/DocumentPolicyTest.php`
-
-### التحقق والاختبارات
-
-- نجحت مجموعة اختبارات Laravel الحالية.
-- نجح `git diff --check`.
-- تم إثبات Policy discovery ضمنيًا عبر `Gate::forUser(...)` في اختبارات ownership.
-- تمت مراجعة الـdiff والتأكد من اقتصاره على الملفين المقصودين.
-- لم يُنشأ `DocumentFactory` أو Migration أو Route أو Controller أو UI.
-- لم يتغير `Document.php` أو `User.php`.
-
-Review Result:
-APPROVED
-
-Open Issues:
-- None
-
-Next Task:
-B5 — Documents index/details Blade skeleton
-
----
-
-## 2026-08-15 — B3 FileType وDocumentStatus enums/casts
-
-Status: DONE
-
-Task:
-B3
-
-Branch:
-`task/B3-document-enums-casts`
-
-Pull Request:
-#12
-
-Reviewed Commit:
-`b82528525455e9d1f980a51d6d76b3c8568b8ab6`
-
-### تم التنفيذ
-
-- إنشاء `FileType` كـstring-backed enum لأنواع الملفات المدعومة.
-- إنشاء `DocumentStatus` كـstring-backed enum للحالات التجميعية المعتمدة.
-- ربط `file_type` و`status` بالـEnums المناسبة عبر `Document::casts()`.
-- الإبقاء على أعمدة قاعدة البيانات من نوع string.
-- الحفاظ على استبعاد `user_id` و`status` من Mass Assignment.
-- عدم إضافة Transition Logic أو UI helpers أو Business Logic.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/app/Enums/FileType.php`
-- `laravel-app/app/Enums/DocumentStatus.php`
-- `laravel-app/app/Models/Document.php`
-
-### التحقق والاختبارات
-
-- نجحت اختبارات Laravel الحالية.
-- نجح `git diff --cached --check`.
-- تم التحقق من حفظ الملفات بترميز UTF-8 دون BOM.
-- تمت مراجعة الـdiff والتأكد من اقتصاره على الملفات الثلاثة المقصودة.
-- لم تُضف Tests جديدة لأن التنفيذ يعتمد على سلوك PHP Enum وEloquent casts القياسي.
-
-Review Result:
-APPROVED
-
-Open Issues:
-- None
-
-Next Task:
-B4 — DocumentPolicy واختبارات ownership
-
----
-
-## 2026-08-15 — B2 Document model والعلاقات الأساسية
-
-Status: DONE
-
-Task:
-B2
-
-Branch:
-`task/B2-document-model`
-
-Pull Request:
-#11
-
-Reviewed Commit:
-`17656baf066e6cc5c9c6c80d4dc9f492e021702a`
-
-### تم التنفيذ
-
-- إنشاء `Document` model لتمثيل الوثائق المملوكة للمستخدمين.
-- إضافة علاقة `Document::user()` من نوع `BelongsTo`.
-- إضافة علاقة `User::documents()` من نوع `HasMany`.
-- إضافة Return Types صريحة للعلاقات.
-- اعتماد Mass Assignment allowlist لبيانات الوثيقة.
-- استبعاد `user_id` و`status` من Mass Assignment.
-- إضافة توثيق مختصر بالإنجليزية والعربية.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/app/Models/Document.php`
-- `laravel-app/app/Models/User.php`
-
-### التحقق والاختبارات
-
-- نجحت اختبارات Laravel الحالية.
-- نجح `git diff --cached --check`.
-- تمت مراجعة الـdiff والتأكد من اقتصاره على الملفين المقصودين.
-
-Review Result:
-APPROVED
-
-Open Issues:
-- None
-
-Next Task:
-B3 — FileType وDocumentStatus enums/casts
-
----
-
-## 2026-08-15 — B1 إنشاء documents migration
-
-Status: DONE
-
-Task:
-B1
-
-Branch:
-`task/B1-documents-migration`
-
-Pull Request:
-#10
-
-Reviewed Commit:
-`4ffb6bd407fc3ebdca95c83f7bed0bdd93f2a5ef`
-
-### تم التنفيذ
-
-- إنشاء migration لجدول `documents` وفق القسم `174.7.1` من الخطة الرئيسية.
-- إضافة ملكية الوثيقة عبر `user_id` مع `ON DELETE RESTRICT`.
-- إضافة بيانات الملف الخاص: الاسم الأصلي، الاسم المخزن، العنوان، المسار، النوع، MIME، الحجم وSHA-256.
-- إضافة الحالة التجميعية للوثيقة بقيمة افتراضية `pending`.
-- إضافة فهارس مركبة للحالة وSHA-256 وتاريخ الإنشاء ضمن نطاق المستخدم.
-- إبقاء Processing Runs وQdrant وAI metrics خارج نطاق B1.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/database/migrations/2026_08_15_172815_create_documents_table.php`
-
-### التحقق والاختبارات
-
-- نجح فحص PHP syntax.
-- تمت مراجعة SQL الناتجة بواسطة `migrate --pretend`.
-- نجح تنفيذ migration.
-- نجح Rollback.
-- نجحت إعادة تنفيذ migration بعد Rollback.
-- نجحت اختبارات Laravel.
-- نجح `git diff --cached --check`.
-
-Review Result:
-APPROVED
-
-Open Issues:
-- None
-
-Next Task:
-B2 — Document model والعلاقات الأساسية
-
----
-
-## 2026-08-15 — A5 إعداد Queue
-
-Status: DONE
-
-Task:
-A5
-
-Branch:
-`task/A5-queue-setup`
-
-Pull Request:
-#9
-
-Reviewed Commit:
-`d068820a557322b5af112c74bbcf6ca6861e87ed`
-
-### تم التنفيذ
-
-- اعتماد Redis كاتصال Laravel Queue الافتراضي.
-- تحديث `QUEUE_CONNECTION` من `database` إلى `redis` في ملف البيئة النموذجي.
-- التحقق من اتصال Laravel بـRedis ومن سلامة Queue الافتراضية.
-- إرسال Job اختبارية إلى Redis وتشغيلها بنجاح بواسطة Queue Worker.
-- حذف Job الاختبارية بعد اكتمال التحقق، دون ترك كود مؤقت في المشروع.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/.env.example`
-
-### التحقق والاختبارات
-
-- أعاد Redis الأمر `PONG` وكانت الحاوية في حالة `healthy`.
-- أظهر `queue:monitor` أن اتصال `[redis] default` سليم.
-- دخلت Job الاختبارية إلى Redis وأصبح عدد المهام المعلقة `1`.
-- نفّذ Worker الـJob بنجاح، ثم عاد عدد المهام المعلقة إلى `0`.
-- أكد السجل تنفيذ Job باستخدام الاتصال `redis`.
-- لم توجد Jobs فاشلة.
-- نجحت اختبارات Laravel: `22 passed (75 assertions)`.
-- نجح `git diff --check`.
-- لا يوجد CI مهيأ للـCommit على GitHub.
-
-Review Result:
-APPROVED
-
-Open Issues:
-- None
-
-Next Task:
-B1 — إنشاء documents migration
-
----
-
-## 2026-08-15 — A4 إعداد Redis
-
-Status: DONE
-
-Task:
-A4
-
-Branch:
-`task/A4-redis-setup`
-
-Pull Request:
-#7
-
-Reviewed Commit:
-`9ba1908d37cd934e8d59defafa7afd5f7b6dbcfc`
-
-Merge Commit:
-`419444c838168da2071c6e41e3af6836b3c4670e`
-
-### تم التنفيذ
-
-* إضافة خدمة Redis 8.10 Alpine إلى Docker Compose.
-* إضافة Health Check باستخدام `redis-cli ping`.
-* تقييد المنفذ المنشور على `127.0.0.1`.
-* إضافة متغير البيئة `REDIS_FORWARD_PORT`.
-* إضافة Docker named volume دائم باسم `redis_data`.
-* تفعيل AOF باستخدام `appendonly yes`.
-* اعتماد `appendfsync everysec`.
-* إبقاء Queue وCache وSessions بدون تغيير ضمن نطاق A4.
-
-### الملفات المعدلة
-
-* `laravel-app/.env.example`
-* `laravel-app/compose.yaml`
-
-### الاختبارات والتحقق
-
-* PASS — `docker compose config --quiet`.
-* PASS — `docker compose up -d --wait redis`.
-* PASS — انتقال حاوية Redis إلى `healthy`.
-* PASS — ظهور الربط `127.0.0.1:6379->6379/tcp`.
-* PASS — `redis-cli ping` أعاد `PONG`.
-* PASS — التحقق من أن `appendonly` يساوي `yes`.
-* PASS — التحقق من أن `appendfsync` يساوي `everysec`.
-* PASS — بقاء مفتاح الاختبار بعد إعادة تشغيل Redis.
-* PASS — تفعيل امتداد PhpRedis في PHP.
-* PASS — اتصال Laravel بـRedis وإعادة `true` من `ping()`.
-* PASS — تنظيف مفتاح اختبار Persistence.
-* PASS — `php artisan test`: عدد 22 اختبارًا و75 assertion.
-* PASS — إعادة التحقق من الاختبارات وRedis على Merge Commit.
-* PASS — التأكد من أن `.env` مستبعد بواسطة `.gitignore`.
-* PASS — `git diff --check`.
-
-Review Result:
-APPROVED — تمت مراجعة PR #7 يدويًا بعد الدمج وفق GitHub Review Protocol، ولم تظهر مشاكل من مستوى BLOCKER أو MAJOR. لا توجد GitHub Actions أو مراجعات GitHub مسجلة؛ اعتمد القرار على مراجعة الـdiff وأدلة التحقق المحلي وإعادة التحقق على النسخة المدمجة.
-
-### القرارات
-
-* استخدام Redis 8.10 Alpine.
-* استخدام AOF مع `appendfsync everysec` لتحقيق توازن بين المتانة والأداء.
-* حفظ بيانات Redis في Docker named volume دائم.
-* نشر منفذ Redis على Loopback فقط في التطوير المحلي.
-* عدم إضافة Redis authentication محليًا بسبب تقييد المنفذ على Loopback؛ وفي Production يبقى Redis داخل الشبكة الداخلية دون منفذ عام.
-* تأجيل تفعيل Redis كـQueue backend وتشغيل Queue Worker إلى A5.
-
-Open Issues:
-
-* None
-
-Next Task:
-A5 — إعداد Queue
-
----
-
-## 2026-08-15 — A3 إعداد MySQL
-
-Status: DONE
-
-Task:
-A3
-
-Branch:
-`task/A3-mysql-setup`
-
-Pull Request:
-#5
-
-Reviewed Commit:
-`d5b07049f63a71953a359e435fedb6e344903bb2`
-
-Merge Commit:
-`e14a70cbae750e4af63df0179d78521418021547`
-
-### تم التنفيذ
-
-- تحويل اتصال Laravel الافتراضي من SQLite إلى MySQL.
-- إضافة إعدادات MySQL الآمنة إلى `.env.example`.
-- إضافة خدمة MySQL 8.4 في `laravel-app/compose.yaml`.
-- إضافة Health Check لخدمة MySQL.
-- إضافة Volume دائم باسم `mysql_data`.
-- اعتماد `utf8mb4` و`utf8mb4_unicode_ci`.
-- تقييد المنفذ المنشور على `127.0.0.1`.
-- التأكد من عدم تتبع ملف `.env` أو كلمات المرور المحلية.
-
-### الملفات المعدلة
-
-- `laravel-app/.env.example`
-- `laravel-app/config/database.php`
-- `laravel-app/compose.yaml`
-
-### الاختبارات والتحقق
-
-- PASS — `docker compose config --quiet`.
-- PASS — تشغيل MySQL وانتقال الحاوية إلى `healthy`.
-- PASS — ظهور الربط `127.0.0.1:3306->3306/tcp`.
-- PASS — نجاح `Test-NetConnection` إلى المنفذ 3306.
-- PASS — `php artisan config:clear`.
-- PASS — `php artisan migrate`.
-- PASS — `php artisan migrate:status`.
-- PASS — التحقق من استخدام Driver بقيمة `mysql`.
-- PASS — التحقق من قاعدة `rag_local_documents`.
-- PASS — التحقق من `utf8mb4` و`utf8mb4_unicode_ci`.
-- PASS — `php artisan test`.
-- PASS — اختبار الموقع يدويًا.
-- PASS — `git diff --check`.
-
-Review Result:
-تم دمج PR #5؛ تم تجاوز المراجعة الرسمية النهائية بقرار مالكة المشروع بعد نجاح الاختبارات والتحقق المحلي.
-
-### القرارات
-
-- استخدام MySQL 8.4 لخدمة قاعدة البيانات المحلية.
-- حفظ البيانات في Docker named volume دائم.
-- نشر منفذ MySQL على Loopback فقط.
-- استخدام شبكة Compose الافتراضية في بيئة التطوير، لأن الشبكة `internal` منعت Docker Desktop من نشر المنفذ إلى Windows host.
-
-Open Issues:
-- None
-
-Next Task:
-A4 — إعداد Redis
-
----
-
-## 2026-08-13 — A2 إعداد Authentication
-
-Status: DONE
-
-Task:
-A2
-
-Branch:
-`task/A2-authentication`
-
-Pull Request:
-#3
-
-Merged Commit:
-`62d96a1`
-
-### تم التنفيذ
-
-- تثبيت وإعداد Laravel Fortify.
-- إضافة إنشاء الحساب وتسجيل الدخول والخروج.
-- إضافة استعادة كلمة المرور وإعادة تعيينها.
-- تفعيل التحقق من البريد الإلكتروني.
-- حماية مساحة العمل وإعدادات الحساب بواسطة `auth` و`verified`.
-- إضافة تحديث الاسم والبريد الإلكتروني وكلمة المرور.
-- إعادة طلب التحقق عند تغيير البريد الإلكتروني.
-- إنشاء واجهات عربية RTL للمصادقة والصفحة الرئيسية ومساحة العمل وإعدادات الحساب.
-- إضافة Rate Limiting لمحاولات تسجيل الدخول.
-- إضافة اختبارات Feature لمسارات المصادقة والحماية وإعدادات الحساب.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/app/Actions/Fortify/`
-- `laravel-app/app/Models/User.php`
-- `laravel-app/app/Providers/FortifyServiceProvider.php`
-- `laravel-app/config/fortify.php`
-- `laravel-app/database/migrations/`
-- `laravel-app/resources/views/auth/`
-- `laravel-app/resources/views/components/`
-- `laravel-app/resources/views/settings/`
-- `laravel-app/resources/views/workspace/`
-- `laravel-app/resources/views/welcome.blade.php`
-- `laravel-app/resources/css/app.css`
-- `laravel-app/routes/web.php`
-- `laravel-app/tests/Feature/Authentication/`
-- `laravel-app/composer.json`
-- `laravel-app/composer.lock`
-- `laravel-app/.env.example`
-
-### الأوامر المهمة
-
-- `php artisan migrate`
-- `php artisan migrate:status`
-- `php artisan route:list -vv`
-- `php artisan test`
-- `npm run build`
-- `git diff --check`
-
-### الاختبارات والتحقق
-
-- PASS — إنشاء الحساب.
-- PASS — تسجيل الدخول ببيانات صحيحة.
-- PASS — رفض بيانات الدخول الخاطئة.
-- PASS — تسجيل الخروج.
-- PASS — التحقق من البريد الإلكتروني.
-- PASS — رفض رابط تحقق غير موقّع.
-- PASS — استعادة كلمة المرور وإعادة تعيينها.
-- PASS — حماية مساحة العمل وإعدادات الحساب.
-- PASS — تحديث بيانات الحساب وكلمة المرور.
-- PASS — كامل PHPUnit test suite.
-- PASS — Vite production build.
-- PASS — الاختبار اليدوي لجميع تدفقات المصادقة.
-
-Review Result:
-تم دمج PR #3؛ تم تجاوز المراجعة الرسمية بقرار مالكة المشروع.
-
-### القرارات
-
-- استخدام Fortify كطبقة Backend للمصادقة مع واجهات Blade مخصصة.
-- اشتراط تسجيل الدخول والتحقق من البريد للوصول إلى مساحة العمل.
-- إبقاء المصادقة الثنائية وPasskeys غير مفعّلتين ضمن نطاق A2.
-- الاحتفاظ بالـmigrations التي أنشأها Fortify لهذه الميزات.
-
-Open Issues:
-- None
-
-Next Task:
-A3 — إعداد MySQL
-
----
-
-## 2026-08-12 — إنشاء سجل التنفيذ واعتماد البدء من الصفر
-
-- تم اعتماد ملف الخطة الرئيسية كمرجع معماري ثابت.
-- تم اعتماد هذا الملف كسجل الحالة التنفيذية ومرجع الـhandoff بين المحادثات.
-- تم اعتماد سياسة: **Task واحدة = Chat مستقل**.
-- تم إلغاء `P0 Baseline Audit` لأن المشروع سيبدأ من الصفر.
-- لم يتم وضع أي مهمة تقنية على أنها `DONE` حتى الآن.
-- المهمة الحالية: **A1 — إنشاء Laravel Application**.
-
----
-
-## 2026-08-12 — GitHub Repository Bootstrap
-
-- تم إنشاء وربط المستودع الرسمي: `mona-alrayes/RAG-Local-Documents-System`.
-- تم اعتماد `main` كـDefault Branch.
-- تم رفع ملفات إدارة المشروع والـRAG Notebook المرجعي إلى root المستودع.
-- تم اعتماد GitHub كمصدر الحقيقة للكود بعد بدء التنفيذ.
-- لم يبدأ التنفيذ التقني للمهمة `A1` بعد؛ حالتها ما تزال `TODO`.
-- أول Branch تنفيذي مخطط: `task/A1-laravel-foundation`.
-
----
-
-## 2026-08-13 — A1 إنشاء Laravel Application
-
-Status: DONE
-
-Task:
-A1
-
-Branch:
-`task/A1-laravel-foundation`
-
-Pull Request:
-#2
-
-Reviewed Commit:
-`ca2e1db`
-
-### تم التنفيذ
-
-- إنشاء Laravel 13 داخل `laravel-app/`.
-- تثبيت Livewire 4 وFlux UI Free 2.
-- إعداد Blade وTailwind CSS 4 وVite وJavaScript.
-- إضافة ملفات Composer وnpm lock.
-- إبقاء `ai-service/` مؤجلاً إلى D1.
-
-### الملفات المنشأة أو المعدلة
-
-- `laravel-app/`
-
-### الأوامر المهمة
-
-- `composer require livewire/livewire:^4.0 livewire/flux:^2.0`
-- `npm install`
-- `npm run build`
-- `php artisan test`
-
-### الاختبارات والتحقق
-
-- PASS — Laravel Framework 13.25.0.
-- PASS — Livewire 4.4.0.
-- PASS — Flux 2.16.0.
-- PASS — PHPUnit: 2 tests passed.
-- PASS — Vite production build.
-- PASS — npm audit: 0 vulnerabilities.
-- PASS — `.env` و`vendor/` و`node_modules/` و`public/build/` مستبعدة من Git.
-
-Review Result:
-APPROVED
-
-Open Issues:
-- None
-
-Next Task:
-A2 — إعداد Authentication
-
----
----
-
-# 23. القرارات المعمارية
-
-| التاريخ | القرار | السبب |
-|---|---|---|
-| 2026-08-12 | إبقاء حالة التنفيذ في سجل منفصل عن Master Plan | فصل Architecture عن Execution State، مع السماح بتحديث Master فقط عند اعتماد قرار معماري موثق |
-| 2026-08-12 | بدء المشروع من الصفر وإلغاء P0 | لا يوجد Codebase سابق يحتاج إلى Baseline Audit |
-| 2026-08-12 | Task واحدة لكل Chat | تقليل استهلاك نافذة السياق وتحسين التنظيم والتتبع |
-| 2026-08-12 | اعتماد `CURRENT HANDOFF` في أعلى ملف التقدم | تمكين أي محادثة جديدة من معرفة نقطة الاستكمال فوراً |
-| 2026-08-15 | اعتماد أوضاع المعالجة المحلية: `cloud` و`hybrid_local` و`compare`، مع بقاء Processing Profiles الفعلية `cloud` و`hybrid_local` فقط | تمكين مقارنة مسارين للوثيقة نفسها ثم حفظ الفائز فقط، دون تمثيل `compare` كـProcessing Profile مستقلة |
-| 2026-08-15 | جعل Online deployment Cloud-only | إبقاء النسخة المنشورة خفيفة بلا تنزيل Embedding/Reranker/LLM محلي |
-| 2026-08-15 | اعتماد `Qwen/Qwen3.5-9B` عبر Hugging Face Router للـCloud | هو اسم النموذج المثبت في المرجع التقني Cloud |
-| 2026-08-15 | اعتماد Ollama `qwen3.5:4b` للتوليد المحلي | النموذج موجود محلياً لدى صاحبة المشروع ولا يدخل نسخة Online |
-| 2026-08-15 | فصل Document عن Processing Runs | الوثيقة تمثل الملكية والملف والحالة التجميعية، بينما Run يمثل النماذج والنتائج والأخطاء والأزمنة |
-| 2026-08-15 | عدم إضافة قاعدة بيانات علائقية مستقلة لـFastAPI في v1 | Laravel/MySQL مصدر الحقيقة، وFastAPI يستخدم temporary artifacts وQdrant فقط |
-| 2026-08-15 | حفظ selected winner فقط في Persistent Qdrant | منع مضاعفة الفهرس، مع إبقاء تقارير Audit للمقارنة في MySQL |
-| 2026-08-15 | Collection منفصلة لكل Embedding profile | منع خلط فضاءات Jina وBGE-M3 حتى إن تساوت الأبعاد |
-| 2026-08-15 | اختيار وثيقة أو عدة وثائق لكل محادثة | البحث يقيد بـuser/document/selected-run metadata ولا يبحث في كامل Qdrant |
-| 2026-08-15 | دمج نتائج Profiles المختلطة رتبياً | raw reranker scores من نماذج مختلفة غير قابلة للمقارنة المباشرة |
-| 2026-08-15 | عرض Sources وtimings ودرجة صلة المصدر | `reranker_score` لا يمثل دقة الإجابة ولا يسمى Confidence |
-| 2026-08-15 | عرض Chunks في Filament عبر FastAPI read-only | الحفاظ على Separation of Concerns ومنع وصول Laravel المباشر إلى Qdrant |
-| 2026-08-16 | اعتماد حد رفع افتراضي 10 MB قابل للضبط | منع استنزاف الموارد مع إبقاء السياسة قابلة للتغيير حسب بيئة التشغيل |
-| 2026-08-16 | عدم الثقة باسم الملف أو امتداده أو MIME منفردًا | تطبيق دفاع متعدد الطبقات ضد التنكر والمسارات والأسماء الخطرة |
-| 2026-08-16 | اعتماد 1000 entry و50 MB غير مضغوط كحدود DOCX أولية | تقليل خطر ZIP bombs واستنزاف الذاكرة والمعالج |
-| 2026-08-16 | إبقاء التخزين وإعادة التسمية لـB7 وClamAV للمرحلة C | الحفاظ على فصل المسؤوليات ومنع الأمان الشكلي |
-| 2026-08-20 | اعتماد سياسة موارد Local موحدة للجهازين بدل إعداد مستقل لكل جهاز | تبقى Profiles وسلوك التطبيق واحداً، ويختلف فقط Backend الذي يحسمه Runtime عبر CUDA ثم XPU ثم MPS ثم CPU |
-| 2026-08-20 | تشغيل FastAPI وOllama على Host OS محلياً وإبقاء Laravel/Queue/MySQL/Redis/Qdrant داخل Docker | الاستفادة من MPS أو Intel XPU/Vulkan من دون الاعتماد على GPU passthrough داخل Docker Desktop |
-| 2026-08-20 | FastAPI worker واحد وLocal AI concurrency=1 مع Queue `ai-local` وSemaphore دفاعية | منع تكرار أوزان النماذج وذروات RAM أثناء Compare أو الطلبات المتزامنة |
-| 2026-08-20 | Lazy loading مع Single-active-model coordinator وLease للاستخدام الحالي وتحرير بعد كل Stage | منع اجتماع BGE-M3 والـReranker وQwen في RAM وتجنب تعقيد LRU/TTL متعدد النماذج |
-| 2026-08-21 | تشغيل ClamAV كـ`clamscan` قصيرة العمر على Queue أمنية متسلسلة مع signature volume دائم | الحفاظ على الفحص Fail-closed وتحرير 3–4 GB تقريباً قبل بدء AI من دون Docker socket داخل التطبيق |
-| 2026-08-20 | منع Fallback الصامت وتأجيل NPU وBGE quantization لما بعد Baseline | جعل الأعطال قابلة للتشخيص وحماية جودة الاسترجاع قبل إدخال مسارات إضافية |
-| 2026-08-21 | إلغاء الذاكرة المستخرجة والاكتفاء بآخر تبادلين مكتملين من الرسائل الموجودة | دعم الإحالات الحوارية الأساسية بلا جداول أو Extractor أو Snapshots ذاكرة، مع بقاء وثائق RAG مصدر الحقائق |
-| 2026-08-21 | إلغاء True Streaming وNDJSON وRedis Stream وReplay من v1 | تقليل التعقيد والاتصالات الطويلة واستهلاك التطوير من دون تغيير محتوى الإجابة أو دقتها |
-| 2026-08-21 | عرض `جاري التفكير` بنبض هادئ ثم كشف الإجابة المكتملة تدريجياً داخل Frontend | منح الواجهة طابعاً حديثاً بتأثير بصري منخفض الكلفة مع reduced-motion ومن دون ادعاء Streaming حقيقي |
-| 2026-08-21 | تثبيت Oracle Online على مسار `cloud` فقط وفصل DPL-1–23 عن Local DPL-24–25 | منع تثبيت Ollama/BGE/Torch على Free VM وإزالة التعارض بين Cloud hosting وLocal Demo |
-| 2026-08-21 | Security Scan Worker يملك ClamAV CLI وVolumes اللازمة بلا `clamd` أو Docker socket | جعل الفحص عند الطلب قابلاً للتنفيذ داخل Compose مع بقاء التواقيع دائمة وفشل المسار Fail-closed |
-| 2026-08-21 | قفل Redis عالمي مشترك بين `security-scan` و`ai-local` في Local Demo | منع تداخل ClamAV مع أي نموذج محلي عبر الوثائق المختلفة وضمان أن Peaks ليست متزامنة؛ القفل غير مطلوب في Oracle Cloud-only |
-| 2026-08-21 | اختيار LLM Provider من Processing profile موثوقة عبر Provider Registry وإلغاء global `LLM_PROVIDER` switch | تمكين Compare من استخدام Cloud وLocal بالتتابع مع إبقاء Oracle Cloud-only ومنع قيم Browser غير الموثوقة |
----
-
-# 24. العوائق والملاحظات
-
+# 24. سجل الإنجاز المختصر
+
+> **القاعدة الجديدة:** سطر واحد لكل Task منجزة. التفاصيل الكاملة محفوظة في Git commits وPull Requests.
+
+| Task | PR | ملخص الإنجاز |
+|---|---:|---|
+| A1 — Laravel Application | #2 | Laravel 13 + Livewire/Flux + Vite؛ tests/build PASS |
+| A2 — Authentication | #3 | Fortify + auth/email verification/settings RTL؛ tests/build PASS |
+| A3 — MySQL | #5 | MySQL 8.4 + persistent volume + migrations/tests PASS |
+| A4 — Redis | #7 | Redis 8.10 AOF + health/persistence؛ tests PASS |
+| A5 — Queue | #9 | Redis default queue + worker smoke test؛ tests PASS |
+| B1 — documents migration | #10 | Documents schema + ownership/indexes |
+| B2 — Document model | #11 | Document/User relations + mass-assignment boundaries |
+| B3 — Enums/casts | #12 | `FileType` + `DocumentStatus` |
+| B4 — DocumentPolicy | #13 | Ownership policy + minimal tests |
+| B5 — Documents pages | #14 | index/show Blade + authorization |
+| B6 — Upload validation | #15 | PDF/DOCX/TXT validation + MIME/content/name/size/ZIP safeguards |
+| B7 — Private storage/download | #16 | private `documents` disk + ULID names + authorized download |
+| B8 — SHA-256/duplicate | #18 | Server-side SHA-256 + per-user duplicate policy |
+| B9 — Processing runs schema | #19 | `document_processing_runs` migration |
+| B10 — ProcessingRun domain | #21 | Model/enums/casts/relations |
+| B11 — Selected processing run | #23 | nullable FK + relation؛ cross-table invariants deferred to Domain logic |
+| B12 — Processing comparisons | #24 | comparison schema/model/status/relations |
+| C1 — ClamAV runtime | #25 | on-demand scan worker + persistent signatures + shared heavy-resource lock |
+| C2 — DocumentSecurityService | #26 | clean/infected/scan_failed contract + fail-closed + sanitized logging |
+| C3 — Temporary upload flow | #28 Draft | quarantine + `DocumentUploadService`; 9 tests / 60 assertions; Pint/diff-check PASS؛ بانتظار دمج PR |
+
+## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
+
+- B12 Schema تم التحقق منه فعلياً على MySQL 8.4.11 مع rollback وإعادة migration.
+- البيانات الخاصة بالمعالجة بقيت في Processing Runs وليست داخل `documents`.
+- 2026-08-22: أعيد تنظيم ملف التقدم نفسه ليبقى خفيفاً بين المحادثات: جداول المهام بقيت كاملة، بينما اختُصر سجل الإنجاز واعتمد Git/PRs للتاريخ التفصيلي.
 - لا توجد عوائق حالية.
-- توجد ملاحظة تنسيق Pint قديمة في `laravel-app/bootstrap/providers.php` خارج نطاق B6؛ لا تؤثر في الاختبارات أو تشغيل المهمة.
+
 ---
 
 # 25. المهمة الحالية
 
 ```text
-C3 — Temporary upload flow
+C4 — Clean path
 Status: TODO
+Expected Branch: task/C4-clean-path
+Next: C5 — Infected/fail-closed path
 ```
 
 ## الهدف
 
-إنشاء مسار رفع مؤقت وآمن للوثيقة قبل اعتمادها في التخزين الدائم، بحيث تنتقل الوثيقة بعد نجاح الـValidation إلى Private Quarantine وتصبح جاهزة للفحص عبر Security Pipeline.
+تنفيذ مسار الوثيقة التي يعيد `DocumentSecurityService` نتيجتها `clean`، بحيث تنتقل بأمان من الـPrivate Quarantine إلى التخزين الخاص الدائم، ولا تصبح جاهزة للمراحل اللاحقة قبل اكتمال النقل بنجاح.
 
-يجب أن يبقى الملف المعزول خارج مسار المعالجة بالذكاء الاصطناعي إلى أن يجتاز `DocumentSecurityService` بنجاح في المهام اللاحقة.
+```text
+Private Quarantine
+  ↓
+DocumentSecurityService
+  ↓
+clean
+  ↓
+Permanent Private Storage (`documents`)
+  ↓
+Ready for subsequent processing
+```
 
 ## ملاحظة البدء
 
-تراجع أولاً البنية المنفذة في:
+ابدأ من المكونات الموجودة ولا تكرر مسؤولياتها:
 
-- `B6` — Upload validation.
-- `B7` — Private storage/download authorization.
-- `B8` — SHA-256 وسياسة duplicate.
-- `C1` — Security worker و`LocalHeavyResourceLock`.
-- `C2` — `DocumentSecurityService`.
+- `DocumentSecurityService`
+- `DocumentSecurityScanStatus`
+- `DocumentUploadService`
+- `DocumentStorageService`
+- `DocumentStatus`
+- disk `document_quarantine`
+- disk `documents`
+- أي Queue/Job قائم مرتبط بالـSecurity أو Processing
 
-يجب أن يبنى Temporary Upload Flow فوق هذه المكونات الموجودة دون تكرار مسؤولياتها.
+حدود المسؤوليات المطلوبة:
 
-لا يتم ضمن `C3` تنفيذ:
+```text
+Controller              → HTTP فقط
+DocumentUploadService   → Upload/Security orchestration
+DocumentSecurityService → Scan contract
+DocumentStorageService  → Storage/SHA-256/Duplicate/Cleanup primitives
+```
 
-- Clean path الكامل.
-- Infected/fail-closed orchestration الكامل.
-- FastAPI.
-- Qdrant.
-- RAG.
+## نطاق C4
 
-تبقى نتائج الفحص النهائية وانتقالات الحالات اللاحقة ضمن `C4` و`C5` وما بعدها.
+- التعامل مع نتيجة `clean` فقط.
+- نقل الملف من `document_quarantine` إلى `documents` بطريقة آمنة.
+- الحفاظ على `Document` metadata و`file_path` متسقين.
+- حذف النسخة المؤقتة بعد نجاح النقل.
+- عدم اعتبار الملف جاهزاً للمراحل التالية قبل اكتمال النقل.
+- ربط النجاح بالمرحلة التالية فقط بالقدر المحدد في الـMaster Plan.
+
+## خارج النطاق
+
+- `infected` / `scan_failed` / fail-closed orchestration الكامل → C5.
+- Aggregate status transitions الكامل → C6.
+- Security test matrix الكامل → C7.
+- FastAPI / Parsing / Embeddings / Qdrant / RAG implementation.
+
+## الاختبارات المطلوبة
+
+اختبارات مركزة فقط:
+
+- نتيجة `clean` تنقل الملف من quarantine إلى permanent storage.
+- لا تبقى نسخة quarantine بعد نجاح النقل.
+- بيانات `Document` تبقى متسقة.
+- لا يحدث promotion قبل نجاح الفحص والنقل.
+
+## Definition of Done
+
+- Clean path يعمل ضمن حدود Laravel/Security الحالية.
+- النقل آمن ولا يترك artifact مؤقتاً غير ضروري.
+- لا يتكرر منطق SHA-256/duplicate/storage.
+- لا يدخل منطق C5 أو AI ضمن C4.
+- Pint و`git diff --check` والاختبارات المركزة ناجحة.
+- يتغير C4 في الجدول إلى `DONE` ويضاف سطر مختصر لسجل الإنجاز.
+- يحدّث `CURRENT HANDOFF` إلى C5.
 
 ---
 
-# 26. قالب إغلاق أي Task
+# 26. العوائق والملاحظات
 
-يضاف سجل مشابه لما يلي بعد التحقق من كل مهمة:
+- لا توجد عوائق حالية.
+- توجد ملاحظة تنسيق Pint قديمة في `laravel-app/bootstrap/providers.php` خارج نطاق المهام الحالية؛ غير حاجبة.
+
+---
+
+# 27. قالب إغلاق أي Task
+
+من الآن فصاعداً لا نضيف سجلاً طويلاً. يكفي:
 
 ```markdown
-## YYYY-MM-DD — [Task ID] [Task Name]
-
-Status: DONE
-
-### تم التنفيذ
-- ...
-
-### الملفات المنشأة أو المعدلة
-- `path/to/file`
-
-### الأوامر المهمة
-- `...`
-
-### الاختبارات والتحقق
-- PASS — ...
-
-### القرارات
-- ...
-
-### مشاكل/ملاحظات متبقية
-- لا يوجد / ...
-
-### المهمة التالية
-- [Next Task ID] — [Next Task Name]
+| [Task ID] — [Task Name] | #[PR] | [3–12 كلمة تلخص المنجز]؛ tests/Pint PASS |
 ```
 
-# 27. تعليمات بدء Chat جديد
+ثم:
 
-في كل محادثة جديدة:
+1. تغيير حالة المهمة في جدول مرحلتها إلى `DONE`.
+2. تحديث `CURRENT HANDOFF`.
+3. استبدال قسم `# 25. المهمة الحالية` بالمهمة التالية.
+4. تسجيل أي Invariant أو قرار تنفيذي جديد فقط إذا كان سيؤثر على المهام اللاحقة.
 
-1. ارفع **آخر نسخة** من `PROJECT_RAG_EXECUTION_PROGRESS.md` ومعها `PROJECT_RAG_MASTER_PLAN.md` عند الحاجة إلى التفاصيل المعمارية.
-2. اكتب:
+---
+
+# 28. بدء Chat جديد
+
+ارفع آخر نسخة من هذا الملف واكتب:
 
 ```text
-نكمل مشروع RAG حسب ملف التقدم المرفق. نفذ المهمة الحالية فقط، وبعد نجاحها حدّث ملف التقدم وحدد المهمة التالية.
+نكمل مشروع RAG حسب ملف التقدم المرفق. نفذ المهمة الحالية فقط، وبعد نجاحها حدّث ملف التقدم باختصار وحدد المهمة التالية.
 ```
 
-3. لا حاجة لرفع الخطة الرئيسية في كل مرة، إلا إذا كانت المهمة تحتاج الرجوع إلى تفاصيل معمارية أو قرارات موجودة فيها.
+ارفع `PROJECT_RAG_MASTER_PLAN.md` أيضاً عندما تحتاج المهمة تفاصيل معمارية أو عقوداً غير موجودة في هذا الـhandoff.
