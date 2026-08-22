@@ -17,11 +17,11 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: c569ac28c20b699fca2e9e4ed4632f9c7bbadd63
+Verified Main Commit: 272bf7eb13142ac9dbf10d5aca8c2fabb399e932
 Schema Audit: 2026-08-21 — B12 migration up/down/up + live MySQL 8.4.11 verified
 Live Tables: 13
-Last Merged PR: #25 — feat(C1): add ClamAV security scan runtime
-Latest Task PR: Pending — C2 will be opened after commit/push
+Last Merged PR: #26 — feat(C2): add document security service
+Latest Task PR: #26 — feat(C2): add document security service
 Last Completed Task: C2 — DocumentSecurityService
 Current Task: C3 — Temporary upload flow
 Current Task Status: TODO
@@ -542,7 +542,7 @@ Branch:
 `task/C2-document-security-service`
 
 Pull Request:
-Pending — سيتم فتحه بعد commit/push.
+#26 — feat(C2): add document security service
 
 ### تم التنفيذ
 
@@ -586,7 +586,7 @@ Pending — سيتم فتحه بعد commit/push.
 - لم تتم إضافة Test Suite جديدة لأن التحقق التشغيلي المباشر غطّى Contract الخاص بـC2.
 
 Review Result:
-IMPLEMENTED AND LOCALLY VERIFIED — pending commit/PR.
+IMPLEMENTED, LOCALLY VERIFIED, AND MERGED.
 
 Open Issues:
 
