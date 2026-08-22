@@ -45,9 +45,65 @@ services:
       timeout: 3s
       retries: 10
       start_period: 5s
-
+  security-worker:
+    build:
+      context: .
+      dockerfile: docker/security-worker/Dockerfile
+    restart: unless-stopped
+    init: true
+    working_dir: /var/www/html
+    command:
+      - php
+      - artisan
+      - queue:work
+      - redis
+      - --queue=${CLAMAV_SCAN_QUEUE:-security-scan}
+      - --sleep=1
+      - --tries=1
+      - --timeout=${CLAMAV_SCAN_TIMEOUT:-300}
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+      CLAMAV_SIGNATURE_DIR: /var/lib/clamav
+    volumes:
+      - ./:/var/www/html
+      - clamav_signatures:/var/lib/clamav
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/security-worker/Dockerfile
+    restart: unless-stopped
+    init: true
+    working_dir: /var/www/html
+    command:
+      - php
+      - artisan
+      - schedule:work
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 volumes:
   mysql_data:
     name: mysql_data
   redis_data:
     name: redis_data
+  clamav_signatures:
+    name: clamav_signatures
