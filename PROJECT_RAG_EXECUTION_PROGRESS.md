@@ -17,16 +17,16 @@ Project Mode: Start From Scratch
 Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
-Verified Main Commit: 2014869dcf777daeb7194d229c719ecbdfb8e5a2
+Verified Main Commit: c569ac28c20b699fca2e9e4ed4632f9c7bbadd63
 Schema Audit: 2026-08-21 — B12 migration up/down/up + live MySQL 8.4.11 verified
 Live Tables: 13
-Last Merged PR: #24 — feat(B12): add processing comparisons model and schema
-Latest Task PR: #24 — feat(B12): add processing comparisons model and schema
-Last Completed Task: C1 — On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
-Current Task: C2 — DocumentSecurityService
+Last Merged PR: #25 — feat(C1): add ClamAV security scan runtime
+Latest Task PR: Pending — C2 will be opened after commit/push
+Last Completed Task: C2 — DocumentSecurityService
+Current Task: C3 — Temporary upload flow
 Current Task Status: TODO
-Expected Task Branch: task/C2-document-security-service
-Next Task After Completion: C3 — Temporary upload flow
+Expected Task Branch: task/C3-temporary-upload-flow
+Next Task After Completion: C4 — Clean path
 Open Blockers: لا يوجد
 Required Context: هذا الملف + القسم 174 من الخطة الرئيسية؛ B12 يعتمد 174.7.4، ومهام AI تعتمد أيضاً الـNotebookين المرجعيين، ومهام القدرات والفحص والموارد وتوجيه Providers والسياق البسيط والعرض التدريجي D8–D11/C1–C7/G11/I11/M1/M3/M6/M9/M10/N8/N9/Q8/Q10/Q12 تعتمد 174.20 إلزامياً، ومهام DPL-1–DPL-25 تعتمد الأقسام 101–172 بعد تحديثها مع 174.20 كمرجع أعلى
 ```
@@ -208,7 +208,7 @@ selected_processing_run_id BIGINT UNSIGNED NULL
 | المهمة | الحالة |
 |---|---|
 | C1 On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract | DONE |
-| C2 DocumentSecurityService | TODO |
+| C2 DocumentSecurityService | DONE |
 | C3 Temporary upload flow | TODO |
 | C4 Clean path | TODO |
 | C5 Infected/fail-closed path | TODO |
@@ -530,6 +530,74 @@ selected_processing_run_id BIGINT UNSIGNED NULL
 ---
 
 # 22. سجل الإنجاز
+
+## 2026-08-22 — C2 DocumentSecurityService
+
+Status: DONE
+
+Task:
+C2
+
+Branch:
+`task/C2-document-security-service`
+
+Pull Request:
+Pending — سيتم فتحه بعد commit/push.
+
+### تم التنفيذ
+
+- إضافة `DocumentSecurityScanStatus` كـDomain Contract موحد لنتائج الفحص:
+  - `clean`
+  - `infected`
+  - `scan_failed`
+- إضافة `DocumentSecurityService` كطبقة مستقلة تعزل تفاصيل ClamAV عن بقية التطبيق.
+- تشغيل `clamscan` عبر Symfony Process باستخدام argument array دون Shell command.
+- تفسير Exit Codes داخل الخدمة فقط:
+  - `0` → `clean`
+  - `1` → `infected`
+  - أي نتيجة أخرى → `scan_failed`
+- تطبيق Fail-closed بحيث لا يتحول أي فشل أو Timeout أو Exception إلى نتيجة آمنة.
+- استخدام `LocalHeavyResourceLock` الموجود من C1 دون إنشاء Lock جديد.
+- ضمان محاولة تحرير الـLock داخل `finally` مع حماية فشل عملية release.
+- تسجيل ClamAV scan summary وExit Code وstderr داخل Laravel logs.
+- استخدام مستويات Log مناسبة للحالات `clean`, `infected`, `scan_failed`.
+- إخفاء المسار الكامل للوثيقة ومسار ClamAV signatures من معلومات الـlog.
+- إبقاء Temporary Upload Flow وانتقالات حالات الوثيقة وFastAPI/Qdrant/RAG خارج نطاق C2.
+
+### الملفات المنشأة أو المعدلة
+
+- `PROJECT_RAG_EXECUTION_PROGRESS.md`
+- `laravel-app/app/Enums/DocumentSecurityScanStatus.php`
+- `laravel-app/app/Services/Documents/DocumentSecurityService.php`
+
+### التحقق
+
+- PASS — PHP syntax check للـEnum والخدمة.
+- PASS — Laravel Pint.
+- PASS — `git diff --check`.
+- PASS — clean-file smoke scan → `clean`.
+- PASS — EICAR test file → `infected`.
+- PASS — ClamAV Exit Code `1` فسّر إلى `infected`.
+- PASS — missing signatures → Exit Code `2` → `scan_failed`.
+- PASS — Fail-closed: فشل ClamAV لم يتحول إلى `clean`.
+- PASS — ClamAV `SCAN SUMMARY` يظهر في Laravel log.
+- PASS — EICAR signature تظهر في log عند الإصابة.
+- PASS — document path وsignature directory يتم sanitization لهما في log.
+- لم تتم إضافة Test Suite جديدة لأن التحقق التشغيلي المباشر غطّى Contract الخاص بـC2.
+
+Review Result:
+IMPLEMENTED AND LOCALLY VERIFIED — pending commit/PR.
+
+Open Issues:
+
+- لا توجد عوائق تخص C2.
+- ربط الخدمة بمسار الرفع المؤقت وSecurity Pipeline يبدأ في C3.
+- Clean/Infected orchestration الكامل يبقى للمهام C4/C5.
+
+Next Task:
+C3 — Temporary upload flow
+
+---
 
 ## 2026-08-22 — C1 On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract
 
@@ -1828,46 +1896,37 @@ A2 — إعداد Authentication
 # 25. المهمة الحالية
 
 ```text
-C2 — DocumentSecurityService
+C3 — Temporary upload flow
 Status: TODO
 ```
 
 ## الهدف
 
-إنشاء `DocumentSecurityService` كطبقة مستقلة مسؤولة عن تشغيل فحص ClamAV للوثيقة وتفسير النتيجة إلى Contract موحد يمكن لباقي Security Pipeline الاعتماد عليه، مع التمييز بين:
+إنشاء مسار رفع مؤقت وآمن للوثيقة قبل اعتمادها في التخزين الدائم، بحيث تنتقل الوثيقة بعد نجاح الـValidation إلى Private Quarantine وتصبح جاهزة للفحص عبر Security Pipeline.
 
-- `clean`
-- `infected`
-- `scan_failed`
-
-يجب أن تبقى تفاصيل `clamscan` وExit Codes وTimeout وstdout/stderr معزولة داخل الخدمة، وألا تتسرب إلى Controller أو الطبقات الأعلى.
-
-يجب الحفاظ على سياسة Fail-closed، بحيث لا يعتبر فشل ClamAV أو تعطل عملية الفحص نتيجة آمنة تسمح باستمرار الوثيقة إلى المراحل التالية.
+يجب أن يبقى الملف المعزول خارج مسار المعالجة بالذكاء الاصطناعي إلى أن يجتاز `DocumentSecurityService` بنجاح في المهام اللاحقة.
 
 ## ملاحظة البدء
 
-تراجع أولاً البنية المنفذة في C1، وخصوصاً:
+تراجع أولاً البنية المنفذة في:
 
-- `config/security.php`
-- `LocalHeavyResourceLock`
-- Queue `security-scan`
-- `security-worker`
-- ClamAV CLI runtime
-- Persistent signatures
-- سياسة Fail-closed في القسم `174.20` من `PROJECT_RAG_MASTER_PLAN.md`
+- `B6` — Upload validation.
+- `B7` — Private storage/download authorization.
+- `B8` — SHA-256 وسياسة duplicate.
+- `C1` — Security worker و`LocalHeavyResourceLock`.
+- `C2` — `DocumentSecurityService`.
 
-يجب أن يستخدم `DocumentSecurityService` البنية الموجودة في C1 بدلاً من إنشاء آلية فحص أو Lock جديدة.
+يجب أن يبنى Temporary Upload Flow فوق هذه المكونات الموجودة دون تكرار مسؤولياتها.
 
-لا يتم ضمن C2 تنفيذ:
+لا يتم ضمن `C3` تنفيذ:
 
-- Temporary Upload Flow.
-- انتقالات حالات الوثيقة الكاملة.
-- Clean/Infected orchestration الكامل.
+- Clean path الكامل.
+- Infected/fail-closed orchestration الكامل.
 - FastAPI.
 - Qdrant.
 - RAG.
 
-تبقى هذه المسؤوليات للمهام اللاحقة ابتداءً من C3.
+تبقى نتائج الفحص النهائية وانتقالات الحالات اللاحقة ضمن `C4` و`C5` وما بعدها.
 
 ---
 
