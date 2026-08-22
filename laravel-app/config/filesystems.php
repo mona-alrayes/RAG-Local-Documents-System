@@ -61,7 +61,14 @@ return [
         ],
         'documents' => [
             'driver' => 'local',
-            'root' => storage_path('app/private/documents'),
+            'root' => storage_path('app/private/documents'), // Files already scanned and safe to use
+            'serve' => false,
+            'throw' => true,
+            'report' => false,
+        ],
+        'document_quarantine' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/quarantine/documents'), // files not scanned yet
             'serve' => false,
             'throw' => true,
             'report' => false,

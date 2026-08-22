@@ -14,8 +14,35 @@ use Throwable;
 
 class DocumentStorageService
 {
+    private const DOCUMENTS_DISK = 'documents';
+
+    private const QUARANTINE_DISK = 'document_quarantine';
+
     public function store(User $user, UploadedFile $file): Document
     {
+        return $this->storeOnDisk(
+            $user,
+            $file,
+            self::DOCUMENTS_DISK,
+        );
+    }
+
+    public function storeQuarantined(
+        User $user,
+        UploadedFile $file,
+    ): Document {
+        return $this->storeOnDisk(
+            $user,
+            $file,
+            self::QUARANTINE_DISK,
+        );
+    }
+
+    private function storeOnDisk(
+        User $user,
+        UploadedFile $file,
+        string $diskName,
+    ): Document {
         $fileType = FileType::from(
             strtolower($file->getClientOriginalExtension()),
         );
@@ -29,7 +56,7 @@ class DocumentStorageService
             );
         }
 
-        $disk = Storage::disk('documents');
+        $disk = Storage::disk($diskName);
 
         do {
             $storedName = Str::ulid().'.'.$fileType->value;
