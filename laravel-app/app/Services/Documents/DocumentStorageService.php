@@ -113,4 +113,67 @@ class DocumentStorageService
             throw $exception;
         }
     }
+
+    public function promoteQuarantined(Document $document): void
+    {
+        $source = Storage::disk(self::QUARANTINE_DISK);
+        $destination = Storage::disk(self::DOCUMENTS_DISK);
+        $path = $document->file_path;
+
+        if (! $source->exists($path)) {
+            throw new RuntimeException(
+                'Quarantined document file does not exist.',
+            );
+        }
+
+        if ($destination->exists($path)) {
+            throw new RuntimeException(
+                'Permanent document file already exists.',
+            );
+        }
+
+        $stream = $source->readStream($path);
+
+        if (! is_resource($stream)) {
+            throw new RuntimeException(
+                'Unable to read quarantined document.',
+            );
+        }
+
+        try {
+            $written = $destination->writeStream($path, $stream);
+        } finally {
+            fclose($stream);
+        }
+
+        if ($written !== true) {
+            try {
+                $destination->delete($path);
+            } catch (Throwable) {
+                // Best-effort cleanup only; the quarantine source is still intact.
+            }
+
+            throw new RuntimeException(
+                'Unable to promote quarantined document.',
+            );
+        }
+
+        try {
+            $deleted = $source->delete($path);
+
+            if ($deleted !== true) {
+                throw new RuntimeException(
+                    'Unable to remove quarantined document after promotion.',
+                );
+            }
+        } catch (Throwable $exception) {
+            try {
+                $destination->delete($path);
+            } catch (Throwable) {
+                // Preserve the original exception.
+            }
+
+            throw $exception;
+        }
+    }
 }
