@@ -3,6 +3,7 @@
 namespace App\Services\Documents;
 
 use App\Enums\DocumentSecurityScanStatus;
+use App\Enums\DocumentStatus;
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -35,5 +36,20 @@ class DocumentUploadService
         }
 
         $this->storage->promoteQuarantined($document);
+    }
+
+    public function rejectAfterUnsafeScan(
+        Document $document,
+        DocumentSecurityScanStatus $scanStatus,
+    ): void {
+        $document->status = match ($scanStatus) {
+            DocumentSecurityScanStatus::Infected => DocumentStatus::Infected,
+            DocumentSecurityScanStatus::ScanFailed => DocumentStatus::Failed,
+            DocumentSecurityScanStatus::Clean => throw new LogicException(
+                'Clean document cannot enter the rejected security scan path.',
+            ),
+        };
+
+        $document->save();
     }
 }

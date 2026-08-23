@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 6addaf1e50863543d02a29423ac04a5b3303f72b
-Last Merged PR: #30 — feat(C4): add clean document promotion path
+Verified Main Commit: 88e29d512a6cb06ade2afa433850490b7abaacca
+Last Merged PR: #31 — docs: add configurable security scan routing
 Latest Task PR: #30 — feat(C4): add clean document promotion path
 
 C4 Implementation Commit: de8f36f906aa713770d3c44188bdce438a7f21f1
-Last Completed Task: C4 — Clean path
-Current Task: C5 — Infected/fail-closed path
+Last Completed Task: C5 — Infected/fail-closed path
+Current Task: C6 — Configurable security-scan routing
 Current Task Status: TODO
-Expected Task Branch: task/C5-infected-fail-closed-path
-Next Task After Completion: C6 — Configurable security-scan routing
+Expected Task Branch: task/C6-configurable-security-scan-routing
+Next Task After Completion: C7 — Aggregate status transitions
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -134,7 +134,7 @@ Open Blockers: لا يوجد
 | C2 DocumentSecurityService | DONE |
 | C3 Temporary upload flow | DONE |
 | C4 Clean path | DONE |
-| C5 Infected/fail-closed path | TODO |
+| C5 Infected/fail-closed path | DONE |
 | C6 Configurable security-scan routing | TODO |
 | C7 Aggregate status transitions | TODO |
 | C8 Security tests | TODO |
@@ -490,7 +490,7 @@ DocumentSecurityScanStatus
 LocalHeavyResourceLock
 ```
 
-## 22.3 مسار الرفع والـClean path بعد C4
+## 22.3 مسار الرفع ومسارات نتائج الفحص بعد C5
 
 ```text
 Upload
@@ -520,15 +520,17 @@ Permanent Private Storage (`documents`)
 
 - الملف الجديد يخزن أولاً في `document_quarantine` وليس `documents`.
 - SHA-256 وسياسة duplicate تبقيان داخل `DocumentStorageService` أثناء initial storage فقط.
-- حالة الوثيقة تبدأ `pending`، ولم تضف C4 انتقالات Aggregate جديدة؛ هذه مؤجلة إلى C6.
-- `DocumentSecurityScanStatus::Clean` هو الشرط الوحيد الذي يسمح بالـpromotion في المسار المنفذ حالياً.
+- حالة الوثيقة تبدأ `pending`؛ انتقالات Aggregate الكاملة للمسارين ما زالت مؤجلة إلى C7.
+- `DocumentSecurityScanStatus::Clean` هو الشرط الوحيد الذي يسمح بالـpromotion.
 - الـpromotion يحافظ على نفس `Document` record ونفس `file_path` ولا يعيد إنشاء السجل أو حساب SHA-256 أو metadata من جديد.
 - النقل يستخدم أسلوب copy-first ثم حذف نسخة quarantine بعد نجاح الكتابة إلى `documents`.
 - عند فشل الكتابة لا تحذف نسخة quarantine الأصلية؛ وعند فشل حذف المصدر بعد النسخ تجري محاولة rollback للنسخة الدائمة ثم يرمي الخطأ.
 - بعد نجاح الـpromotion لا تبقى نسخة الملف في `document_quarantine`.
 - التنزيل الرسمي يقرأ من `documents` فقط، لذلك الملف المعزول لا يعامل كوثيقة موثوقة.
-- `infected` و`scan_failed` لا يدخلان Clean path ويعالجان في C5 وفق Fail-Closed.
-- لا يصل الملف إلى FastAPI أو Qdrant أو AI Pipeline ضمن C4.
+- `infected` يعالج صراحةً عبر `DocumentUploadService::rejectAfterUnsafeScan()` ويحوّل نفس `Document` إلى `DocumentStatus::Infected`.
+- `scan_failed` يعالج عبر نفس المسار Fail-Closed ويحوّل نفس `Document` إلى `DocumentStatus::Failed`.
+- في الحالتين يبقى الملف في `document_quarantine` ولا ينقل إلى `documents`، ولا ينشأ `Document` بديل.
+- لا يصل أي من مساري الرفض إلى FastAPI أو Qdrant أو AI Pipeline.
 
 ## 22.4 Security Runtime المنفذ
 
@@ -547,7 +549,7 @@ Permanent Private Storage (`documents`)
 
 ## 22.5 قرار معماري مخطط للتنفيذ في C6 — Configurable security-scan routing
 
-لم ينفذ هذا القرار بعد؛ التنفيذ الحالي بعد C4 ما زال يرسل كل Upload إلى `document_quarantine`.
+لم ينفذ هذا القرار بعد؛ التنفيذ الحالي بعد C5 ما زال يرسل كل Upload إلى `document_quarantine`، مع Clean promotion وFail-Closed للحالتين `infected` و`scan_failed`.
 
 العقد المطلوب في C6:
 
@@ -626,6 +628,7 @@ Validation
 | C2 — DocumentSecurityService | #26 | clean/infected/scan_failed contract + fail-closed + sanitized logging |
 | C3 — Temporary upload flow | #28 | quarantine + `DocumentUploadService`; 9 tests / 60 assertions; Pint/diff-check PASS |
 | C4 — Clean path | #30 | ترقية آمنة من quarantine إلى `documents` مع clean-only gate والحفاظ على نفس `Document`؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
+| C5 — Infected/fail-closed path | — | `infected` → `infected` و`scan_failed` → `failed` مع إبقاء الملف في quarantine ومنع promotion؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -639,150 +642,81 @@ Validation
 # 25. المهمة الحالية
 
 ```text
-C5 — Infected/fail-closed path
+C6 — Configurable security-scan routing
 Status: TODO
-Expected Branch: task/C5-infected-fail-closed-path
-Next: C6 — Configurable security-scan routing
+Expected Branch: task/C6-configurable-security-scan-routing
+Next: C7 — Aggregate status transitions
 ```
 
 ## الهدف
 
-تنفيذ المسار الآمن للوثيقة عندما تكون نتيجة `DocumentSecurityService` واحدة من:
+تنفيذ اختيار مسار الرفع بناءً على إعداد صريح، مع بقاء الفحص الأمني مفعّلاً افتراضياً ومنع أي fallback تلقائي عند فشل ClamAV.
+
+العقد المطلوب:
 
 ```text
-infected
-scan_failed
+DOCUMENT_SECURITY_SCAN_ENABLED=true   # default
+
+Enabled:
+Validation
+  → storeQuarantined()
+  → ClamAV
+  → clean
+  → promoteQuarantined()
+  → documents
+
+Disabled explicitly:
+Validation
+  → storePermanent()
+  → documents
 ```
-
-بحيث يطبق النظام مبدأ **Fail-Closed** ولا يسمح لأي ملف مصاب أو غير موثوق بالانتقال من الـPrivate Quarantine إلى التخزين الخاص الدائم `documents` أو الوصول إلى أي مرحلة AI لاحقة.
-
-المسار المستهدف:
-
-```text
-Private Quarantine
-  ↓
-DocumentSecurityService
-  ↓
-Security Scan Result
-  ├── infected    → Reject / Fail-Closed
-  └── scan_failed → Reject / Fail-Closed
-                      ↓
-              No promotion to `documents`
-                      ↓
-              No FastAPI / AI processing
-```
-
-يجب أن يضمن المسار أن:
-
-- `infected` لا يمكن أن يؤدي إلى promotion.
-- `scan_failed` يعامل كحالة غير موثوقة ولا يتحول إلى `clean` بأي شكل.
-- الملف لا يصبح متاحاً من disk `documents`.
-- لا يصل الملف إلى FastAPI أو Processing/AI pipeline.
-- يبقى التعامل مع نفس `Document` record ولا ينشأ سجل بديل.
-- يطبق الاحتفاظ بالملف في quarantine أو حذفه فقط وفق سياسة الاحتفاظ الآمنة المعتمدة، مع عدم تعريضه كوثيقة موثوقة.
-- يسجل سبب الرفض/الفشل بالقدر الذي تسمح به الـDomain الحالية، من دون بناء state machine كاملة داخل C5.
-- هذا المسار يطبق عندما يكون Security Scan مفعّلاً؛ خيار تعطيل ClamAV بالكامل لا ينفذ في C5 بل في C6.
 
 ## ملاحظة البدء
 
-ابدأ من التنفيذ الموجود بعد C4 ولا تكرر مسؤولياته. راجع أولاً:
+ابدأ من التنفيذ الموجود بعد C5 ولا تعيد تصميم Clean أو Fail-Closed paths.
 
-- `DocumentSecurityService`
-- `DocumentSecurityScanStatus`
+راجع خصوصاً:
+
 - `DocumentUploadService`
 - `DocumentStorageService`
-- `Document`
-- `DocumentStatus`
-- disk `document_quarantine`
-- disk `documents`
-- أي Queue/Job قائم فعلياً مرتبط بالـSecurity قبل إضافة Orchestration جديد
+- `DocumentSecurityService`
+- `DocumentSecurityScanStatus`
+- `config/security.php`
+- `.env.example`
+- جميع callers الحاليين لـ`DocumentStorageService::store()`
 
-المسار المنجز في C4 هو:
+القواعد المعتمدة:
 
-```text
-clean
-  ↓
-DocumentUploadService::promoteAfterCleanScan()
-  ↓
-DocumentStorageService::promoteQuarantined()
-  ↓
-Permanent Private Storage (`documents`)
-```
-
-وثبت في C4 أن:
-
-- الـpromotion مسموح فقط عند `DocumentSecurityScanStatus::Clean`.
-- الملف ينقل من `document_quarantine` إلى `documents` مع الحفاظ على نفس `Document` ونفس `file_path`.
-- لا يعاد إنشاء `Document` ولا يعاد حساب SHA-256 أو duplicate metadata أثناء الـpromotion.
-- النسخ إلى `documents` يسبق حذف نسخة quarantine.
-- فشل النقل لا يعتبر نجاحاً، وتحافظ آلية النقل قدر الإمكان على نسخة quarantine الأصلية.
-- لا يتم إرسال الملف إلى FastAPI أو أي AI pipeline ضمن هذا المسار.
-
-حدود المسؤوليات المعتمدة تبقى:
-
-```text
-Controller              → HTTP فقط
-DocumentUploadService   → Upload/Security orchestration
-DocumentSecurityService → Scan contract وإرجاع clean/infected/scan_failed
-DocumentStorageService  → Storage/SHA-256/Duplicate/Cleanup primitives فقط
-```
-
-قيود مهمة عند التنفيذ:
-
-- لا تضع منطق `infected` أو `scan_failed` داخل `DocumentStorageService::promoteQuarantined()`؛ فالـStorage Service لا يقرر نتيجة الفحص.
-- لا تستخدم `DocumentStorageService::store()` لمعالجة الوثيقة الموجودة، لأنه ينشئ `Document` جديداً أثناء initial storage.
-- لا تعيد بناء Clean path المنجز في C4.
-- لا تعتبر `scan_failed` حالة قابلة للتجاوز أو retry إلى AI؛ تبقى Fail-Closed حتى تتم معالجة الفشل بشكل صريح.
-- لا تنفذ Configurable scan routing داخل C5؛ هذه مسؤولية C6، ولا تنفذ Aggregate lifecycle transitions الكاملة؛ أصبحت مسؤولية C7.
-- اختر أبسط Orchestration نظيف باستخدام الخدمات الحالية، ولا تضف abstraction جديدة بلا حاجة فعلية.
-
-## نطاق C5
-
-- التعامل الصريح مع `DocumentSecurityScanStatus::Infected`.
-- التعامل الصريح مع `DocumentSecurityScanStatus::ScanFailed`.
-- تطبيق Fail-Closed في الحالتين.
-- منع promotion إلى disk `documents`.
-- الحفاظ على quarantine/permanent-storage boundary.
-- إبقاء الملف في quarantine أو حذفه وفق سياسة الاحتفاظ الآمنة المعتمدة، من دون نقله إلى permanent storage.
-- تسجيل سبب الرفض أو الفشل بالقدر المطلوب لهذه المهمة ووفق الحقول الحالية.
-- التأكد من عدم إطلاق FastAPI أو أي Processing/AI pipeline من هذين المسارين.
-- إعادة استخدام الخدمات الحالية وعدم إنشاء `Document` جديد.
-
-## خارج النطاق
-
-- Clean path؛ منجز في C4.
-- Configurable security-scan routing / direct-storage bypass → C6.
-- Aggregate status transitions الكامل → C7.
-- Security test matrix الكامل → C8.
-- FastAPI.
-- Parsing.
-- Embeddings.
-- Qdrant.
-- Reranking.
-- RAG.
-- Processing Runs orchestration غير الضروري لهذه المهمة.
+- الفحص الأمني `enabled` افتراضياً.
+- التعطيل مسموح فقط بقيمة إعداد صريحة.
+- عند `enabled` يبقى المسار الحالي: quarantine → scan → clean promotion أو Fail-Closed.
+- `infected` و`scan_failed` لا يتحولان أبداً إلى direct-storage fallback.
+- عند `disabled` صراحةً يخزن الملف مباشرة في `documents` بعد Validation، من دون quarantine أو scan.
+- اختيار المسار مسؤولية `DocumentUploadService`.
+- `DocumentStorageService` يبقى مسؤولاً عن Storage primitives فقط.
+- يعاد تسمية API التخزين المباشر من `store()` إلى `storePermanent()` فقط بعد التأكد من جميع callers.
+- لا تنفذ Aggregate status transitions الكاملة؛ هذه مسؤولية C7.
+- لا توسع Security test matrix؛ هذه مسؤولية C8.
 
 ## الاختبارات المطلوبة
 
-اختبارات مركزة فقط، وبأقل عدد ممكن:
+أقل عدد ممكن لإثبات:
 
-- نتيجة `infected` لا تنقل الملف إلى `documents` ولا تدخل Clean path.
-- نتيجة `scan_failed` تطبق Fail-Closed ولا تنقل الملف إلى `documents`.
-- يبقى التعامل مع نفس `Document` دون إنشاء سجل إضافي إذا كان ذلك جزءاً مباشراً من التنفيذ.
-- لا تضف regression suite كبيرة إلا إذا ظهر سبب مباشر من التغيير.
+- الوضع الافتراضي/المفعّل يستخدم quarantine ولا يعمل direct permanent storage.
+- التعطيل الصريح يستخدم permanent storage مباشرة.
+- لا يوجد fallback تلقائي إلى permanent storage عند فشل الفحص.
 
 ## Definition of Done
 
-- `infected` لا يمكن أن يصل إلى permanent private storage.
-- `scan_failed` يعامل كحالة غير موثوقة ويطبق Fail-Closed.
-- لا يصل أي من المسارين إلى FastAPI أو AI processing.
-- quarantine/permanent storage boundaries محفوظة.
-- لا يتكرر منطق C4 أو SHA-256/duplicate/storage.
-- لا ينشأ `Document` جديد لمعالجة الوثيقة الحالية.
+- `DOCUMENT_SECURITY_SCAN_ENABLED=true` هو الافتراضي.
+- routing بين quarantine وpermanent storage واضح ومركزي.
+- Fail-Closed الخاص بـC5 محفوظ عند تفعيل الفحص.
+- لا fallback تلقائي عند فشل ClamAV.
+- لا Aggregate lifecycle transitions كاملة داخل C6.
 - الاختبارات المركزة الضرورية تمر.
-- Pint و`git diff --check` ناجحان.
-- يتغير C5 في جدول المرحلة إلى `DONE` ويضاف سطر مختصر لسجل الإنجاز عند إغلاق المهمة.
-- يحدّث `CURRENT HANDOFF` إلى C6 — Configurable security-scan routing عند إغلاق المهمة.
+- Pint على الملفات المعدلة و`git diff --check` ناجحان.
+- يتغير C6 في جدول المرحلة إلى `DONE` عند الإغلاق.
+- يحدّث `CURRENT HANDOFF` إلى C7 — Aggregate status transitions.
 
 ---
 
