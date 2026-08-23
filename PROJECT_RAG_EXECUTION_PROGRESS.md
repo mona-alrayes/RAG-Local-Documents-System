@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 7ec3892b8cc27c0f31ed9eb1383a8f11d717fc90
-Last Merged PR: #29 — docs(C3): finalize execution progress
-Latest Task PR: #28 — feat(C3): add temporary document quarantine flow
+Verified Main Commit: 6addaf1e50863543d02a29423ac04a5b3303f72b
+Last Merged PR: #30 — feat(C4): add clean document promotion path
+Latest Task PR: #30 — feat(C4): add clean document promotion path
 
-C3 Implementation Commit: f4ec89e
+C4 Implementation Commit: de8f36f906aa713770d3c44188bdce438a7f21f1
 Last Completed Task: C4 — Clean path
 Current Task: C5 — Infected/fail-closed path
 Current Task Status: TODO
 Expected Task Branch: task/C5-infected-fail-closed-path
-Next Task After Completion: C6 — Aggregate status transitions
+Next Task After Completion: C6 — Configurable security-scan routing
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -135,10 +135,11 @@ Open Blockers: لا يوجد
 | C3 Temporary upload flow | DONE |
 | C4 Clean path | DONE |
 | C5 Infected/fail-closed path | TODO |
-| C6 Aggregate status transitions | TODO |
-| C7 Security tests | TODO |
+| C6 Configurable security-scan routing | TODO |
+| C7 Aggregate status transitions | TODO |
+| C8 Security tests | TODO |
 
-**معيار انتهاء المرحلة:** لا يصل ملف غير نظيف إلى AI Queue أو FastAPI، ويعمل الفحص وتحديث التواقيع على Queue `security-scan` متسلسلة كعمليات قصيرة العمر تنتهي وتحرر RAM، من دون `clamd` دائم أو Docker socket داخل التطبيق. في Local Demo يشترك Scan/Signature Update و`ai-local` في قفل Redis عالمي يمنع تداخلهما مع أي Model Stage حتى عبر وثيقتين مختلفتين؛ يعطّل القفل في Oracle Cloud-only.
+**معيار انتهاء المرحلة:** يطبق Validation دائماً. يكون فحص ClamAV مفعّلاً افتراضياً؛ عند تفعيله يمر الملف عبر `document_quarantine` و`security-scan` ويطبق Fail-Closed قبل أي AI. يمكن تعطيله فقط بإعداد صريح، وعندها يخزن الملف مباشرة في `documents` بعد Validation من دون Quarantine أو Scan. تعطل ClamAV لا يحوّل المسار تلقائياً إلى bypass. عند تفعيل الفحص يعمل Scan/Signature Update متسلسلاً، وفي Local Demo يشترك مع `ai-local` في القفل العالمي.
 
 ---
 
@@ -543,6 +544,43 @@ Permanent Private Storage (`documents`)
 
 ---
 
+
+## 22.5 قرار معماري مخطط للتنفيذ في C6 — Configurable security-scan routing
+
+لم ينفذ هذا القرار بعد؛ التنفيذ الحالي بعد C4 ما زال يرسل كل Upload إلى `document_quarantine`.
+
+العقد المطلوب في C6:
+
+```text
+DOCUMENT_SECURITY_SCAN_ENABLED=true   # default
+
+Enabled:
+Validation
+  → storeQuarantined()
+  → ClamAV
+  → clean
+  → promoteQuarantined()
+  → documents
+
+Disabled explicitly:
+Validation
+  → storePermanent()
+  → documents
+```
+
+القواعد:
+
+- `true` هو الوضع الافتراضي والموصى به، خصوصاً للنشر Online.
+- `false` قرار تشغيلي صريح، وليس fallback عند فشل ClamAV.
+- إذا كان الفحص مفعلاً وأعاد `infected` أو `scan_failed` يبقى المسار Fail-Closed.
+- Validation تبقى إلزامية في المسارين، لكنها لا تعتبر بديلاً عن Antivirus.
+- اختيار المسار مسؤولية `DocumentUploadService`؛ `DocumentStorageService` ينفذ Storage primitives فقط.
+- يعاد تسمية API التخزين المباشر الغامض من `store()` إلى `storePermanent()` إذا أكد فحص callers أن ذلك آمن.
+- لا تضيف C6 Aggregate status transitions؛ تنتقل هذه المسؤولية إلى C7.
+- Security test matrix الكاملة تنتقل إلى C8.
+
+---
+
 # 23. Baseline معماري تنفيذي
 
 > التفاصيل الكاملة موجودة في `PROJECT_RAG_MASTER_PLAN.md`. هذه القائمة فقط لمنع فقدان القرارات التي تؤثر مباشرة على التنفيذ القادم.
@@ -551,7 +589,7 @@ Permanent Private Storage (`documents`)
 - Oracle Online = Cloud-only بلا Local AI weights/dependencies.
 - Local Demo = Docker للبنية الأساسية وFastAPI/Ollama على Host.
 - Local heavy work = concurrency `1` + global Redis lock + single-active-model + release-after-stage.
-- ClamAV = on-demand + fail-closed، بلا `clamd` دائم وبلا Docker socket.
+- Security scan = ClamAV on-demand افتراضياً (`DOCUMENT_SECURITY_SCAN_ENABLED=true`) مع Fail-Closed؛ التعطيل مسموح فقط بإعداد صريح ويؤدي إلى direct permanent storage بعد Validation، بلا fallback تلقائي عند فشل الفاحص.
 - Qdrant = Collection منفصلة لكل Processing Profile مع mandatory user/document/run filters.
 - Persistent Qdrant يحتفظ بالـselected winner فقط بعد التحقق.
 - Laravel/MySQL هو مصدر الحقيقة للتطبيق؛ لا توجد DB علائقية مستقلة لـFastAPI في v1.
@@ -587,7 +625,7 @@ Permanent Private Storage (`documents`)
 | C1 — ClamAV runtime | #25 | on-demand scan worker + persistent signatures + shared heavy-resource lock |
 | C2 — DocumentSecurityService | #26 | clean/infected/scan_failed contract + fail-closed + sanitized logging |
 | C3 — Temporary upload flow | #28 | quarantine + `DocumentUploadService`; 9 tests / 60 assertions; Pint/diff-check PASS |
-| C4 — Clean path | — | ترقية آمنة من quarantine إلى `documents` مع clean-only gate والحفاظ على نفس `Document`؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
+| C4 — Clean path | #30 | ترقية آمنة من quarantine إلى `documents` مع clean-only gate والحفاظ على نفس `Document`؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -604,7 +642,7 @@ Permanent Private Storage (`documents`)
 C5 — Infected/fail-closed path
 Status: TODO
 Expected Branch: task/C5-infected-fail-closed-path
-Next: C6 — Aggregate status transitions
+Next: C6 — Configurable security-scan routing
 ```
 
 ## الهدف
@@ -643,6 +681,7 @@ Security Scan Result
 - يبقى التعامل مع نفس `Document` record ولا ينشأ سجل بديل.
 - يطبق الاحتفاظ بالملف في quarantine أو حذفه فقط وفق سياسة الاحتفاظ الآمنة المعتمدة، مع عدم تعريضه كوثيقة موثوقة.
 - يسجل سبب الرفض/الفشل بالقدر الذي تسمح به الـDomain الحالية، من دون بناء state machine كاملة داخل C5.
+- هذا المسار يطبق عندما يكون Security Scan مفعّلاً؛ خيار تعطيل ClamAV بالكامل لا ينفذ في C5 بل في C6.
 
 ## ملاحظة البدء
 
@@ -694,7 +733,7 @@ DocumentStorageService  → Storage/SHA-256/Duplicate/Cleanup primitives فقط
 - لا تستخدم `DocumentStorageService::store()` لمعالجة الوثيقة الموجودة، لأنه ينشئ `Document` جديداً أثناء initial storage.
 - لا تعيد بناء Clean path المنجز في C4.
 - لا تعتبر `scan_failed` حالة قابلة للتجاوز أو retry إلى AI؛ تبقى Fail-Closed حتى تتم معالجة الفشل بشكل صريح.
-- لا تنفذ Aggregate lifecycle transitions الكاملة داخل C5؛ هذه مسؤولية C6.
+- لا تنفذ Configurable scan routing داخل C5؛ هذه مسؤولية C6، ولا تنفذ Aggregate lifecycle transitions الكاملة؛ أصبحت مسؤولية C7.
 - اختر أبسط Orchestration نظيف باستخدام الخدمات الحالية، ولا تضف abstraction جديدة بلا حاجة فعلية.
 
 ## نطاق C5
@@ -712,8 +751,9 @@ DocumentStorageService  → Storage/SHA-256/Duplicate/Cleanup primitives فقط
 ## خارج النطاق
 
 - Clean path؛ منجز في C4.
-- Aggregate status transitions الكامل → C6.
-- Security test matrix الكامل → C7.
+- Configurable security-scan routing / direct-storage bypass → C6.
+- Aggregate status transitions الكامل → C7.
+- Security test matrix الكامل → C8.
 - FastAPI.
 - Parsing.
 - Embeddings.
@@ -742,7 +782,7 @@ DocumentStorageService  → Storage/SHA-256/Duplicate/Cleanup primitives فقط
 - الاختبارات المركزة الضرورية تمر.
 - Pint و`git diff --check` ناجحان.
 - يتغير C5 في جدول المرحلة إلى `DONE` ويضاف سطر مختصر لسجل الإنجاز عند إغلاق المهمة.
-- يحدّث `CURRENT HANDOFF` إلى C6 عند إغلاق المهمة.
+- يحدّث `CURRENT HANDOFF` إلى C6 — Configurable security-scan routing عند إغلاق المهمة.
 
 ---
 

@@ -14,8 +14,8 @@
 > **إستراتيجية المعالجة:** Cloud أو Hybrid Local أو Compare في البيئة المحلية، وCloud فقط في النشر Online
 > **إستراتيجية LLM:** `Qwen/Qwen3.5-9B` عبر Hugging Face Router في Cloud، و`qwen3.5:4b` عبر Ollama محلياً
 > **خطة النشر المرجعية:** Oracle Cloud Always Free + Docker Compose لمسار `cloud` فقط؛ الـLocal/Compare Demo يعمل منفصلاً على أجهزة المشروع
-> **آخر تحديث للخطة:** 2026-08-21
-> **مرجع المطابقة التنفيذية:** `main@f23d8f6ef9a641826888cc08dd99dcc8fb72e8bb` + Laravel migrations + MySQL schema الفعلي بتاريخ 2026-08-21
+> **آخر تحديث للخطة:** 2026-08-24
+> **مرجع المطابقة التنفيذية:** `main@6addaf1e50863543d02a29423ac04a5b3303f72b` + Laravel migrations + MySQL schema الفعلي؛ آخر مطابقة تنفيذية لمسار Documents/Security بتاريخ 2026-08-24
 
 > [!IMPORTANT]
 > القسم **174 — التعديل المعماري المعتمد** هو المرجع الأحدث والملزم لكل ما يخص مسارات المعالجة، قواعد البيانات، Qdrant، المحادثة، صفحات Blade، Filament والنشر. داخل القسم 174 تكون الأولوية للقسم **174.20 — قرار التبسيط النهائي** عند أي تعارض مع 174.19 أو ما قبله. أبقينا الأقسام السابقة لحفظ سياق القرارات وعدم فقدان أي معلومة تاريخية.
@@ -28,7 +28,7 @@
 Oracle Online        = cloud profile فقط، بلا Local AI dependencies أو weights
 Mac/ASUS Local Demo  = cloud | hybrid_local | compare
 Provider routing     = trusted processing profile + capabilities، بلا global LLM_PROVIDER switch
-Security scan        = on-demand clamscan، fail-closed، بلا clamd أو Docker socket
+Security scan        = configurable؛ enabled افتراضياً → on-demand clamscan + fail-closed، disabled صراحةً → direct permanent storage بعد Validation
 Local heavy work     = global Redis lock + single_active model + release after every stage
 Conversation context = آخر تبادلين مكتملين فقط، بلا ذاكرة مستخرجة
 Answer delivery      = polling + جاري التفكير + completed-answer visual reveal، بلا Streaming backend
@@ -113,7 +113,7 @@ Current Handoff → ما المهمة التي يجب تنفيذها الآن؟
    - PDF
    - DOCX
    - TXT
-3. فحص الملفات أمنياً باستخدام ClamAV قبل معالجتها.
+3. فحص الملفات أمنياً باستخدام ClamAV قبل معالجتها افتراضياً، مع إمكانية تعطيل الفحص بإعداد تشغيلي صريح يمرر الملف بعد Validation مباشرة إلى Private Storage الدائم.
 4. متابعة حالة معالجة كل وثيقة.
 5. إنشاء محادثة جديدة.
 6. اختيار وثيقة واحدة أو مجموعة وثائق للمحادثة.
@@ -141,7 +141,7 @@ Current Handoff → ما المهمة التي يجب تنفيذها الآن؟
 - Email verification.
 - إدارة المستخدمين.
 - رفع الملفات.
-- فحص الملفات عبر ClamAV.
+- فحص الملفات عبر ClamAV افتراضياً، مع configurable explicit bypass موثق للبيئات التي تعطل Security Scan عمداً.
 - تخزين الملفات بشكل خاص.
 - دعم PDF / DOCX / TXT.
 - معالجة الملفات عبر Laravel Queue.
@@ -275,27 +275,49 @@ TXT
 
 يجب بناء `DocumentLoaderService` يختار الـLoader المناسب بناءً على نوع الملف.
 
-## 4.2 إضافة ClamAV
+## 4.2 إضافة ClamAV مع Security Scan قابل للضبط
 
-أي ملف يرفعه المستخدم يجب ألا يصل إلى FastAPI قبل اجتياز الفحص الأمني.
-
-المسار:
+الوضع الافتراضي الآمن:
 
 ```text
+DOCUMENT_SECURITY_SCAN_ENABLED=true
+
 Upload
   ↓
 Laravel Validation
   ↓
-Temporary Private Storage
+Private Quarantine
   ↓
 security-scan queue (concurrency=1)
   ↓
 short-lived clamscan Process
   ↓
 Clean?
-  ├── Yes → تثبيت Clean ثم خروج Process ثم متابعة
+  ├── Yes → تثبيت Clean ثم Promotion إلى Private Storage الدائم
   └── No/Failure/Timeout → Fail-closed وعدم تشغيل AI
 ```
+
+المسار الاختياري عند التعطيل الصريح:
+
+```text
+DOCUMENT_SECURITY_SCAN_ENABLED=false
+
+Upload
+  ↓
+Laravel Validation
+  ↓
+Permanent Private Storage
+  ↓
+متابعة المعالجة اللاحقة
+```
+
+قواعد القرار:
+
+- `true` هو الـDefault والمرجع الموصى به للنشر Online.
+- `false` قرار تشغيلي صريح، وليس fallback تلقائياً إذا تعطل ClamAV.
+- إذا كان الفحص مفعلاً وفشل الفاحص أو غابت/تقادمَت التواقيع أو حدث Timeout يبقى Fail-Closed.
+- Validation تبقى إلزامية في الحالتين، لكنها لا تعد Antivirus ولا تعادل فحص malware.
+- لا يقرر `DocumentStorageService` هل الفحص مفعل؛ القرار في Upload/Security orchestration.
 
 ## 4.3 استخدام Qdrant Local
 
@@ -889,7 +911,7 @@ Message
 5. الحجم.
 6. اسم الملف.
 7. SHA-256.
-8. ClamAV.
+8. Security Scan policy: ClamAV عند تفعيله، أو explicit configured bypass عند تعطيله.
 
 الحالة الحالية حتى B10 تنفذ البنود 1–7؛ بند ClamAV يبدأ في المرحلة C. لذلك `POST /documents` الحالي يخزن مباشرة على الـdisk الخاص بحالة `pending` ولا يدعي أن الفحص الأمني منفذ بعد.
 
@@ -923,9 +945,15 @@ storage/app/private/documents/{user_id}/
 
 ---
 
-# 18. ClamAV Security Flow
+# 18. Configurable Document Security Flow
 
-المسار الكامل:
+الفحص الأمني مفعّل افتراضياً:
+
+```text
+DOCUMENT_SECURITY_SCAN_ENABLED=true
+```
+
+عند التفعيل:
 
 ```text
 User
@@ -934,63 +962,67 @@ Upload
   ↓
 Laravel request validation
   ↓
-Temporary private file
+Private Quarantine
   ↓
 security-scan queue
   ↓
 short-lived clamscan
   ↓
-┌───────────────────────┐
-│ Is file clean?        │
-└──────────┬────────────┘
-           │
-       ┌───┴────┐
-       │        │
-      Yes      No
-       │        │
-       ▼        ▼
-Permanent     Keep quarantined or remove
-Private       according to retention policy
-Storage         │
-       │        ▼
-       │     infected
-       │
-       ▼
-Process exits / RAM released
-       │
-       ▼
-Update Document
-       │
-       ▼
-Dispatch Queue
+Clean?
+  ├── Yes → Permanent Private Storage
+  └── No/Failure/Timeout → infected/fail-closed
 ```
 
-قاعدة مهمة:
+عند التعطيل الصريح:
 
-> FastAPI يجب ألا يستقبل أي ملف لم يجتز ClamAV.
+```text
+DOCUMENT_SECURITY_SCAN_ENABLED=false
 
-لا يوجد `clamd` دائم. يملك Security Scan Worker ClamAV CLI وQuarantine/signature volumes، ولا يملك Docker socket. كل نتيجة غير Clean، بما فيها missing/stale signatures أو Timeout، تمنع المعالجة.
+User
+  ↓
+Upload
+  ↓
+Laravel request validation
+  ↓
+Permanent Private Storage
+```
+
+قواعد مهمة:
+
+- لا يوجد `clamd` دائم. عند تفعيل الفحص يملك Security Scan Worker ClamAV CLI وQuarantine/signature volumes ولا يملك Docker socket.
+- عند تفعيل الفحص، كل نتيجة غير Clean، بما فيها missing/stale signatures أو Timeout، تمنع المعالجة.
+- عند تعطيل الفحص لا يحاول النظام تشغيل ClamAV ولا يستخدم Quarantine كمرحلة إلزامية.
+- لا يجوز تحويل failure في ClamAV إلى مسار التعطيل تلقائياً؛ bypass لا يحدث إلا من Configuration موثوقة محمّلة من الخادم.
+- Validation إلزامية في المسارين، لكنها لا تعد بديلاً عن malware scanning.
+- FastAPI يستقبل فقط ملفاً أصبح مسموحاً للمعالجة وفق Policy الحالية: Clean موثق عندما يكون الفحص مفعلاً، أو ملفاً Validation-success مخزناً دائماً عندما يكون الفحص معطلاً صراحةً.
 
 ---
 
 # 19. خدمات رفع وتخزين الوثيقة
 
-## الحالة المنفذة حتى B10 — `DocumentStorageService`
+## الحالة المنفذة بعد C4 — `DocumentStorageService` و`DocumentUploadService`
 
-- يستقبل `UploadedFile` بعد نجاح `UploadDocumentRequest` و`SecureDocumentUpload`.
-- يخزن الملف على disk خاص باسم `documents` تحت `{user_id}/{ULID}.{extension}`.
-- يحسب SHA-256 من النسخة المخزنة نفسها.
-- يمنع duplicate داخل نطاق المستخدم على مستوى التطبيق بواسطة `(user_id, sha256)`، من دون Unique constraint.
-- ينشئ `Document` بحالة `pending` ويحذف الملف الجديد إذا فشل إنشاء السجل أو ثبت أنه duplicate.
+- Initial upload ينشئ `Document` ويحسِب SHA-256 ويطبق duplicate policy عبر `DocumentStorageService`.
+- المسار المنفذ حالياً يخزن Initial Upload في `document_quarantine`.
+- C4 أضافت `promoteQuarantined()` لنقل نفس الملف ونفس `Document` إلى `documents` بعد Clean.
+- الـAPI التاريخي `store()` يستطيع التخزين المباشر في `documents` لكنه لا يمثل اسماً واضحاً للعقد الجديد.
 
-## الهدف المخطط للمرحلة C — `DocumentUploadService`
+## الهدف المخطط لـC6 — Configurable security-scan routing
 
-- ينقل orchestration الرفع إلى Private Quarantine.
-- ينشئ/يحدّث Document بحالة ما قبل الفحص.
-- يطلق Security Scan Job فقط.
-- بعد نجاح Job الأمنية ينقل الملف إلى Private Storage الدائم ويطلق `ProcessDocumentJob`.
+- إضافة إعداد موثوق مثل:
 
-لا يطلق Upload request معالجة AI مباشرة، ولا تقوم أي من خدمتي الرفع/التخزين بـParsing أو Embedding.
+```text
+DOCUMENT_SECURITY_SCAN_ENABLED=true
+```
+
+- `DocumentUploadService` وحده يقرر المسار:
+  - Enabled → `storeQuarantined()` ثم Security Scan ثم Clean promotion.
+  - Disabled explicitly → تخزين مباشر دائم.
+- يفضل إعادة تسمية `DocumentStorageService::store()` إلى `storePermanent()` بعد التحقق من callers، حتى لا يوجد API مبهم يسمح بتجاوز Security Pipeline بطريق الخطأ.
+- `DocumentStorageService` يبقى مسؤولاً عن Storage/SHA-256/Duplicate/Cleanup primitives ولا يقرأ Feature flag لاتخاذ قرار orchestration.
+- لا يتحول Scan failure إلى direct storage تلقائياً.
+- C6 لا تنفذ Aggregate status transitions؛ هذه تنتقل إلى C7.
+- Upload request لا يطلق Parsing أو Embedding مباشرة.
 
 ---
 
@@ -2506,7 +2538,7 @@ X-Request-ID
 - MIME validation.
 - Extension validation.
 - File-size limits.
-- ClamAV.
+- ClamAV عند تفعيل Security Scan، مع explicit server-side configuration عند تعطيله وعدم وجود fallback تلقائي.
 - SHA-256.
 - Random stored filenames.
 - FastAPI internal authentication.
@@ -2609,6 +2641,7 @@ AI_SERVICE_TIMEOUT=600
 
 QUEUE_CONNECTION=redis
 
+DOCUMENT_SECURITY_SCAN_ENABLED=true
 CLAMAV_SCAN_MODE=on_demand_cli
 CLAMAV_SCAN_QUEUE=security-scan
 CLAMAV_SCAN_CONCURRENCY=1
@@ -2805,9 +2838,9 @@ UnexpectedAiServiceResponseException
 
 ---
 
-# 79. ClamAV Tests
+# 79. ClamAV / Security Routing Tests
 
-يجب اختبار:
+عند `DOCUMENT_SECURITY_SCAN_ENABLED=true` يجب اختبار:
 
 1. Clean file.
 2. Infected test file.
@@ -2815,9 +2848,15 @@ UnexpectedAiServiceResponseException
 4. Timeout.
 5. Invalid response.
 
-في حالة ClamAV unavailable:
+في حالة ClamAV unavailable مع الفحص مفعلاً:
 
-> لا نرسل الملف إلى FastAPI.
+> لا نرسل الملف إلى FastAPI ولا ننتقل تلقائياً إلى direct storage.
+
+ويجب اختبار المسار القابل للضبط أيضاً:
+
+6. الـDefault هو Security Scan enabled.
+7. عند `DOCUMENT_SECURITY_SCAN_ENABLED=false` يمر الملف بعد Validation إلى permanent private storage من دون إنشاء Scan/Quarantine requirement.
+8. تعطيل الفحص لا يعطل Validation أو ownership/duplicate safeguards.
 
 ---
 
@@ -3466,7 +3505,7 @@ FastAPI يعيد Answer + Sources بشكل ثابت ومنظم.
 
 - يملكها المستخدم الصحيح.
 - اجتازت validation.
-- اجتازت ClamAV.
+- استوفت Security policy: اجتازت ClamAV عندما يكون الفحص مفعلاً، أو كان الفحص معطلاً صراحةً من Configuration موثوقة.
 - موجودة في Private Storage.
 - FastAPI استطاع قراءتها.
 - تم استخراج محتواها.
@@ -3505,7 +3544,7 @@ FastAPI يعيد Answer + Sources بشكل ثابت ومنظم.
 
 ## قاعدة 1
 
-لا يصل ملف إلى FastAPI قبل ClamAV.
+لا يصل ملف إلى FastAPI إلا بعد استيفاء Security policy الحالية: Clean موثق إذا كان `DOCUMENT_SECURITY_SCAN_ENABLED=true`، أو Validation ناجحة + permanent private storage إذا كان الفحص معطلاً صراحةً. لا يوجد bypass تلقائي بسبب فشل ClamAV.
 
 ## قاعدة 2
 
@@ -3554,67 +3593,75 @@ DOCX/TXT لا يعطى لهما رقم صفحة وهمي.
              Laravel Validation
                      │
                      ▼
-             Private Quarantine
+          Trusted Security Routing
                      │
-                     ▼
-          security-scan queue (1)
-                     │
-                     ▼
-            short-lived clamscan
-                     │
-            ┌────────┴────────┐
-            │                 │
-          Clean        Infected/Failure
-            │                 │
-            ▼                 ▼
-      Process exits         Fail closed
-            │
-            ▼
-     Private Storage
-            │
-            ▼
-       Document Record
-            │
-            ▼
-        Laravel Queue
-            │
-            ▼
-           FastAPI
-            │
-            ▼
-    DocumentLoaderService
-            │
-     ┌──────┼───────┐
-     ▼      ▼       ▼
-    PDF    DOCX     TXT
-     │      │       │
-     └──────┼───────┘
-            ▼
-      Normalized Docs
-            │
-            ▼
-        Chunking
-            │
-            ▼
-    Trusted Processing Profile
-       ┌────┼───────────────┐
-       ▼    ▼               ▼
-    cloud hybrid_local    compare
-       │    │            both sequentially
-       └────┴───────────────┘
-            │
-            ▼
- Embeddings + Sparse + Reranking
-            │
-            ▼
- Promote selected run only to Qdrant
-            │
-            ▼
+          ┌──────────┴──────────┐
+          │                     │
+          ▼                     ▼
+ Scan enabled (default)   Scan disabled explicitly
+          │                     │
+          ▼                     │
+ Private Quarantine             │
+          │                     │
+ security-scan queue (1)        │
+          │                     │
+ short-lived clamscan           │
+     ┌────┴────┐                │
+     ▼         ▼                │
+   Clean   Infected/Failure     │
+     │         │                │
+     ▼         ▼                │
+ Promotion  Fail closed         │
+     │                          │
+     └──────────────┬───────────┘
+                    ▼
+          Permanent Private Storage
+                    │
+                    ▼
+              Document Record
+                    │
+                    ▼
+               Laravel Queue
+                    │
+                    ▼
+                  FastAPI
+                    │
+                    ▼
+          DocumentLoaderService
+                    │
+             ┌──────┼───────┐
+             ▼      ▼       ▼
+            PDF    DOCX     TXT
+             │      │       │
+             └──────┼───────┘
+                    ▼
+              Normalized Docs
+                    │
+                    ▼
+                Chunking
+                    │
+                    ▼
+        Trusted Processing Profile
+           ┌────────┼───────────────┐
+           ▼        ▼               ▼
+        cloud   hybrid_local      compare
+           │        │          both sequentially
+           └────────┴───────────────┘
+                    │
+                    ▼
+     Embeddings + Sparse + Reranking
+                    │
+                    ▼
+       Promote selected run only to Qdrant
+                    │
+                    ▼
           Ready / Awaiting Selection
-            │
-            ▼
-          Laravel
+                    │
+                    ▼
+                  Laravel
 ```
+
+`DOCUMENT_SECURITY_SCAN_ENABLED=true` هو Default. المسار الأيمن لا يستخدم تلقائياً عند تعطل ClamAV؛ لا يعمل إلا إذا عطّل المشغّل الفحص صراحةً.
 
 ---
 
@@ -3780,8 +3827,11 @@ PDF + DOCX + TXT
 والفحص الأمني:
 
 ```text
-ClamAV قبل FastAPI
+Default: Validation → Quarantine → ClamAV → Clean → Permanent Storage → FastAPI
+Explicit disabled mode: Validation → Permanent Storage → FastAPI
 ```
+
+تعطيل ClamAV ليس fallback تلقائياً عند الفشل.
 
 ---
 
@@ -3849,7 +3899,7 @@ Laravel
 Authentication
 Authorization
 PDF/DOCX/TXT
-ClamAV
+Configurable ClamAV security gate
 Private Storage
 Queue
 Conversations
@@ -4512,7 +4562,9 @@ document_id IN selected_documents
 
 # 127. ClamAV في Deployment
 
-لا يعمل `clamd` كخدمة دائمة. يملك `security-scan-worker` ClamAV CLI ويشغّل Process قصيرة العمر:
+في الـReference deployment يبقى `DOCUMENT_SECURITY_SCAN_ENABLED=true` افتراضياً. يمكن تعطيله فقط بقرار تشغيلي صريح؛ عند التعطيل لا يبدأ Security Scan Worker لمسار الملفات الجديدة ولا يعتبر ذلك استجابة لفشل الفاحص.
+
+عند التفعيل لا يعمل `clamd` كخدمة دائمة. يملك `security-scan-worker` ClamAV CLI ويشغّل Process قصيرة العمر:
 
 ```text
 Private quarantine
@@ -4539,6 +4591,8 @@ clamav_db
 ---
 
 # 128. Failure Policy لـClamAV
+
+تنطبق هذه السياسة عندما يكون `DOCUMENT_SECURITY_SCAN_ENABLED=true`.
 
 إذا كان ClamAV:
 
@@ -5754,6 +5808,7 @@ AI_SERVICE_BASE_URL=http://fastapi:8000
 AI_SERVICE_API_KEY=...
 AI_SERVICE_TIMEOUT=600
 QUEUE_CONNECTION=redis
+DOCUMENT_SECURITY_SCAN_ENABLED=true
 CLAMAV_SCAN_MODE=on_demand_cli
 CLAMAV_SCAN_QUEUE=security-scan
 CLAMAV_SCAN_CONCURRENCY=1
@@ -5826,11 +5881,44 @@ OLLAMA_KEEP_ALIVE=0
 
 - يرفع المستخدم ملفاً واحداً في كل عملية Upload.
 - الأنواع: PDF وDOCX وTXT.
-- يمر الملف دائماً بـValidation ثم Private Quarantine Storage ثم عملية `clamscan` قصيرة العمر على Queue أمنية متسلسلة.
-- لا يصل ملف غير نظيف إلى FastAPI.
-- لا يبدأ أي عمل AI قبل انتهاء عملية الفحص وخروجها وتحرير ذاكرتها؛ فشل تشغيل الفاحص أو تقادم/غياب التواقيع يفشل Fail-closed.
-- بعد نجاح الفحص يختار المستخدم مسار المعالجة من القدرات المتاحة في البيئة.
-- لا يرتبط اختيار مسار المعالجة باختيار وثائق المحادثة لاحقاً.
+- Validation وAuthorization وSHA-256/duplicate safeguards إلزامية دائماً.
+- Security Scan مفعّل افتراضياً عبر:
+
+```text
+DOCUMENT_SECURITY_SCAN_ENABLED=true
+```
+
+### عند تفعيل Security Scan
+
+```text
+Validation
+  → Private Quarantine
+  → security-scan queue
+  → short-lived clamscan
+  → clean
+  → Permanent Private Storage
+```
+
+- لا يصل ملف غير Clean إلى FastAPI.
+- فشل تشغيل الفاحص أو تقادم/غياب التواقيع أو Timeout يطبق Fail-Closed.
+- لا يبدأ أي عمل AI قبل انتهاء Process الفحص ونجاح Promotion.
+
+### عند تعطيل Security Scan صراحةً
+
+```text
+DOCUMENT_SECURITY_SCAN_ENABLED=false
+
+Validation
+  → Permanent Private Storage
+  → متابعة Processing orchestration
+```
+
+- لا يستخدم Quarantine/ClamAV كمرحلة إلزامية لهذا Upload.
+- Validation لا تعتبر Antivirus؛ هذا Trade-off أمني يتحمله المشغّل ويجب أن يكون واضحاً في Configuration/diagnostics.
+- لا يسمح النظام بالانتقال إلى هذا المسار تلقائياً عند فشل ClamAV.
+- قرار المسار يصدر من Laravel server-side configuration، لا من Browser request.
+- بعد اكتمال Security routing يختار المستخدم مسار المعالجة من القدرات المتاحة في البيئة.
+- لا يرتبط اختيار Cloud/Hybrid/Compare بتفعيل ClamAV أو تعطيله.
 
 ### Cloud فقط أو Hybrid Local فقط
 
@@ -6509,10 +6597,12 @@ Widgets:
 
 ### Security scan lifecycle
 
-- يبقى الملف في Quarantine حتى نجاح `clamscan` بخروج Clean موثق.
+- الـDefault هو `DOCUMENT_SECURITY_SCAN_ENABLED=true`.
+- عند التفعيل يبقى الملف في Quarantine حتى نجاح `clamscan` بخروج Clean موثق.
 - يعمل Scan واحد فقط في الوقت نفسه. في Local Demo يشترك `security-scan` و`ai-local` في قفل Redis عالمي، لذلك لا يتداخل فحص أي ملف مع أي Local AI Stage حتى لو كانا لوثيقتين مختلفتين.
-- غياب التواقيع أو فشل تشغيل Process أو Timeout أو خروج غير معروف يعامل Fail-closed.
+- غياب التواقيع أو فشل تشغيل Process أو Timeout أو خروج غير معروف يعامل Fail-Closed ولا يفعّل bypass.
 - تنتهي Process الفحص بعد كل ملف وتتحرر ذاكرتها؛ تبقى التواقيع المحدثة على Volume دائم.
+- عند `DOCUMENT_SECURITY_SCAN_ENABLED=false` يخزن Upload الصالح مباشرة في permanent private storage ولا ينشأ Scan requirement؛ يجب إثبات أن القرار جاء من Configuration موثوقة لا من Request المستخدم.
 - لا يملك Laravel أو أي Container تطبيق وصولاً إلى Docker socket.
 
 ### Qdrant
@@ -6576,9 +6666,10 @@ Widgets:
 - `C2` DocumentSecurityService.
 - `C3` Temporary upload flow.
 - `C4` clean path.
-- `C5` infected/fail-closed path.
-- `C6` aggregate status transitions.
-- `C7` security tests.
+- `C5` infected/fail-closed path عندما يكون Security Scan مفعّلاً.
+- `C6` configurable security-scan routing: `DOCUMENT_SECURITY_SCAN_ENABLED=true` افتراضياً، direct permanent storage عند التعطيل الصريح، وإعادة تسمية storage API المباشر إلى `storePermanent()` بعد التحقق من callers.
+- `C7` aggregate status transitions للمسارين: enabled (`pending → scanning → ...`) وdisabled (`pending → queued` عند dispatch الفعلي).
+- `C8` security tests لكلا المسارين مع إثبات عدم وجود fallback تلقائي عند فشل ClamAV.
 
 ### المرحلة D — FastAPI Foundation and Capabilities
 
@@ -6758,7 +6849,7 @@ Widgets:
 
 ### Document ready
 
-- الملف مملوك للمستخدم واجتاز Validation وClamAV.
+- الملف مملوك للمستخدم واجتاز Validation، واستوفى Security policy: Clean موثق إذا كان الفحص مفعلاً، أو explicit trusted configuration عطّل الفحص.
 - يوجد selected processing run واحد.
 - Run حالته `indexed`.
 - Qdrant count مطابق وpayload كامل.
@@ -6799,11 +6890,11 @@ Widgets:
 13. Cloud generation model هو `Qwen/Qwen3.5-9B` عبر Hugging Face Router.
 14. B1 يبقى ضيقاً وينشئ جدول documents فقط وفق 174.7.1.
 15. توجد سياسة موارد محلية واحدة لجميع الأجهزة المدعومة؛ Backend العتاد تفصيل Runtime وليس Processing Profile ولا خطة مستقلة لكل جهاز.
-16. في Local topology تعمل FastAPI وOllama على Host OS، وتبقى Laravel وQueue وMySQL وRedis وQdrant داخل Docker؛ يعمل ClamAV كعملية `clamscan` قصيرة العمر عند الطلب داخل Security Scan Worker مخصص.
+16. في Local topology تعمل FastAPI وOllama على Host OS، وتبقى Laravel وQueue وMySQL وRedis وQdrant داخل Docker؛ عند تفعيل Security Scan يعمل ClamAV كعملية `clamscan` قصيرة العمر داخل Security Scan Worker مخصص.
 17. يعمل FastAPI بعملية واحدة، وتنفذ عملية Local AI ثقيلة واحدة فقط في الوقت نفسه عبر Queue وSemaphore دفاعية.
 18. نماذج BGE تُحمّل Lazy، ولا يوجد أكثر من نموذج AI ثقيل فعال في الوقت نفسه؛ يحرر كل نموذج بعد انتهاء مرحلته قبل تحميل النموذج التالي.
 19. لا يوجد Fallback صامت بين الأجهزة أو الدقة أو Providers؛ الفشل يعاد كخطأ منظم وقابل للتشخيص.
-20. تبقى Qdrant وMySQL وRedis وLaravel عاملة، بينما ينفذ ClamAV عند الطلب مع بقاء التواقيع على Disk؛ لا يبدأ AI إلا بعد فحص ناجح وانتهاء Process الفحص.
+20. `DOCUMENT_SECURITY_SCAN_ENABLED=true` هو Default. عند التفعيل لا يبدأ AI إلا بعد Clean موثق وانتهاء Process الفحص؛ عند التعطيل الصريح يمكن المتابعة بعد Validation والتخزين الدائم. فشل ClamAV لا يغيّر القيمة ولا يفعّل bypass.
 21. NPU/OpenVINO وQuantization لنماذج BGE ليسا Baseline للنسخة الأولى، ولا يضافان إلا بقرار لاحق مدعوم بقياسات Q8.
 
 ## 174.19 إدارة الموارد المحلية الموحّدة
@@ -7090,19 +7181,27 @@ scan_process_peak_rss_bytes
 
 ### 174.20.1 السلطة والغاية
 
-هذا القسم قرار نهائي معتمد بتاريخ 2026-08-21، وهو المرجع الأعلى عند أي تعارض مع 174.19 أو الأقسام الأقدم. غايته إبقاء المشروع قابلاً للتنفيذ والفهم على جهازي 16 GB من دون حذف الأمان أو مكونات RAG التي تؤثر في جودة الاسترجاع والإجابة.
+هذا القسم قرار نهائي معتمد ومحدّث بتاريخ 2026-08-24، وهو المرجع الأعلى عند أي تعارض مع 174.19 أو الأقسام الأقدم. غايته إبقاء المشروع قابلاً للتنفيذ والفهم على جهازي 16 GB مع جعل Security Scan قابلاً للضبط من دون تحويل أعطال الفاحص إلى تجاوز أمني صامت.
 
 القرارات الأساسية:
 
-1. يبقى ClamAV بوابة أمنية إلزامية، لكنه لا يبقى محملاً في RAM كخدمة `clamd` دائمة.
-2. لا يوجد أكثر من Process أو Model ثقيل فعال في الوقت نفسه.
-3. لا نبني ذاكرة محادثة مستخرجة أو طويلة الأمد في v1.
-4. لا ننفذ Streaming حقيقياً ولا NDJSON ولا Redis Stream ولا Replay في v1.
-5. نحافظ على الشكل الجمالي بواسطة حالة `جاري التفكير` النابضة ثم Progressive reveal محلي لإجابة مكتملة ومحفوظة.
+1. يبقى ClamAV جزءاً رسمياً من المشروع ويكون Security Scan مفعّلاً افتراضياً، لكنه يمكن تعطيله فقط بإعداد تشغيلي صريح وموثوق.
+2. عند تفعيل الفحص يبقى Fail-Closed ولا يوجد fallback تلقائي إلى direct storage إذا فشل ClamAV أو التواقيع أو Timeout.
+3. عند تعطيل الفحص صراحةً تبقى Validation/Authorization/SHA-256/duplicate safeguards إلزامية، ويخزن الملف مباشرة في permanent private storage.
+4. لا يوجد أكثر من Process أو Model ثقيل فعال في الوقت نفسه عندما تكون المراحل المحلية الثقيلة مستخدمة.
+5. لا نبني ذاكرة محادثة مستخرجة أو طويلة الأمد في v1.
+6. لا ننفذ Streaming حقيقياً ولا NDJSON ولا Redis Stream ولا Replay في v1.
+7. نحافظ على الشكل الجمالي بواسطة حالة `جاري التفكير` النابضة ثم Progressive reveal محلي لإجابة مكتملة ومحفوظة.
 
-### 174.20.2 مسار ClamAV عند الطلب
+### 174.20.2 Security routing والفحص عند الطلب
 
-مسار الملف:
+الإعداد المرجعي:
+
+```text
+DOCUMENT_SECURITY_SCAN_ENABLED=true
+```
+
+#### المسار الافتراضي — Enabled
 
 ```text
 Upload
@@ -7115,19 +7214,39 @@ Upload
   → AI processing may start only after clean result
 ```
 
-التنفيذ المعتمد:
+التنفيذ المعتمد عند التفعيل:
 
 - يوجد Security Scan Worker مخصص يملك ClamAV CLI ويستطيع قراءة Quarantine path المصرح فقط.
 - يستدعي العامل `clamscan` بوسائط Array آمنة عبر Process API؛ يمنع Shell interpolation وبناء command string من اسم الملف.
 - Process الفحص قصيرة العمر وتنتهي بعد كل ملف. لا يوجد `clamd` دائم ولا TCP port 3310 في Baseline.
-- تبقى قاعدة التواقيع في Volume دائم وتحدثها `UpdateClamAvSignaturesJob` مجدولة على Queue `security-scan` نفسها؛ لا تتزامن مع Scan وتتحقق من نجاح `freshclam` قبل اعتماد جاهزية الفاحص.
-- لا يحتاج Laravel إلى Docker socket ولا يسمح بتركيبه داخل أي Application container.
-- Exit code للملف النظيف فقط يسمح بالانتقال. Infected أو Timeout أو Process failure أو missing/stale signatures كلها Fail-closed بأكواد أخطاء منظمة.
-- لا يبدأ `ProcessDocumentJob` قبل تثبيت نتيجة Clean وانتهاء Process الفحص.
-- إذا وصلت ملفات متعددة، تعالجها Queue بالتسلسل؛ هذا يزيد زمن الانتظار لكنه يمنع ذروة RAM ويطابق نطاق Demo منخفض التوازي.
-- في Local Demo يكتسب Scan أو Signature Update القفل العالمي `rag:local:heavy-resource` المشترك مع `ai-local`، لذلك لا يتزامنان مع أي Model Stage لوثيقة أخرى. في Oracle Cloud-only لا حاجة لهذا القفل لأن AI خارجي ولا توجد أوزان محلية، مع بقاء Scan وUpdate متسلسلين على Queue واحدة.
+- تبقى قاعدة التواقيع في Volume دائم وتحدثها `UpdateClamAvSignaturesJob` مجدولة على Queue `security-scan` نفسها.
+- Exit code للملف النظيف فقط يسمح بالـpromotion. Infected أو Timeout أو Process failure أو missing/stale signatures كلها Fail-Closed.
+- لا يبدأ Processing/AI قبل تثبيت نتيجة Clean وانتهاء Process الفحص.
+- إذا وصلت ملفات متعددة، تعالجها Queue بالتسلسل.
+- في Local Demo يكتسب Scan أو Signature Update القفل العالمي `rag:local:heavy-resource` المشترك مع `ai-local`.
 
-الإعداد المرجعي:
+#### المسار الاختياري — Disabled explicitly
+
+```text
+DOCUMENT_SECURITY_SCAN_ENABLED=false
+
+Upload
+  → Validation
+  → permanent private storage
+  → subsequent processing orchestration
+```
+
+القواعد:
+
+- تعطيل الفحص قرار Operator/Deployment موثوق فقط، وليس اختياراً يرسله Browser لكل Upload.
+- لا يستخدم النظام Quarantine أو Security Scan Job كمرحلة لازمة للملف الجديد في هذا المسار.
+- Validation تبقى إلزامية، لكنها لا تعتبر Antivirus ولا تزعم كشف malware.
+- لا يُسمح لفشل `clamscan` أو غياب التواقيع أو Timeout بتغيير المسار إلى Disabled؛ إذا كانت القيمة `true` يبقى Fail-Closed.
+- `DocumentUploadService` يملك قرار routing، بينما `DocumentStorageService` يوفر primitives مثل `storeQuarantined()`, `storePermanent()`, `promoteQuarantined()` ولا يقرأ Feature flag ليقرر السياسة.
+- الاسم `storePermanent()` هو العقد المفضل للتخزين المباشر بدلاً من `store()` الغامض بعد التحقق من جميع callers في C6.
+- Oracle/reference deployment يبقى Security Scan فيه مفعلاً افتراضياً، ويمكن تعطيله فقط إذا اختار المشغّل ذلك صراحةً مع قبول الـTrade-off الأمني.
+
+إعدادات ClamAV عند التفعيل:
 
 ```text
 CLAMAV_SCAN_MODE=on_demand_cli
@@ -7259,7 +7378,10 @@ partial assistant message persistence
 |---|---|
 | `C1` | Security Scan Worker + ClamAV CLI + signature volume، بلا `clamd` دائم |
 | `C2` | DocumentSecurityService يشغّل Process آمنة ويفسر exit codes بشكل Fail-closed |
-| `C3–C7` | Quarantine/clean/infected/status/tests مع Scan متسلسل وتحرير RAM بعد الخروج |
+| `C3–C5` | Quarantine/clean/infected paths عند تفعيل Security Scan |
+| `C6` | Configurable security routing: default enabled، direct permanent storage عند disabled الصريح، بلا fallback تلقائي، و`storePermanent()` API واضح |
+| `C7` | Aggregate status transitions للمسارين enabled/disabled |
+| `C8` | Security tests لكلا المسارين وتحقق default/fail-closed/no-auto-bypass |
 | `D8–D10` | Capabilities/validation/dependency split: Oracle يسجل Cloud فقط وCloud image بلا Local AI packages أو weights |
 | `D11` | Device resolver وmemory probes من دون Model load عند Startup |
 | `G11` | Single-active-model coordinator بدلاً من LRU/TTL registry متعددة entries |
@@ -7283,8 +7405,10 @@ partial assistant message persistence
 
 #### Security
 
-- لا يصل ملف إلى FastAPI قبل Clean result.
-- عند فشل ClamAV أو التواقيع لا يبدأ AI.
+- `DOCUMENT_SECURITY_SCAN_ENABLED=true` هو Default.
+- عند التفعيل لا يصل ملف إلى FastAPI قبل Clean result، وأي فشل ClamAV/تواقيع/Timeout يبقى Fail-Closed.
+- عند التعطيل الصريح يصل الملف إلى المعالجة فقط بعد Validation والتخزين الدائم، ولا ينشأ bypass من Request المستخدم أو من failure تلقائي.
+- Validation لا توصف بأنها بديل عن Antivirus.
 - بعد انتهاء `clamscan` لا تبقى Process فحص أو محرك تواقيع مقيم في RAM.
 - لا Docker socket داخل Laravel أو Queue container.
 
@@ -7330,15 +7454,17 @@ partial assistant message persistence
 
 ### 174.20.10 قرارات غير قابلة للتفاوض
 
-1. ClamAV لا يُحذف من المشروع، لكنه يعمل On-demand بعملية قصيرة العمر وتتحرر RAM بعد كل فحص.
-2. نتيجة الفحص Fail-closed، ولا يبدأ AI قبل Clean موثق.
-3. لا Docker socket داخل التطبيق.
-4. عملية AI ثقيلة واحدة فقط، ونموذج ثقيل واحد فقط في الذاكرة.
-5. كل Model محلي يحمل Lazy ويحرر بعد مرحلته؛ Ollama يستخدم `keep_alive=0`.
-6. لا ذاكرة محادثة مستخرجة أو طويلة الأمد في v1.
-7. آخر تبادلين مكتملين حد أقصى للسياق الحواري البسيط.
-8. وثائق RAG المسترجعة هي مصدر الحقائق الوحيد.
-9. لا Streaming حقيقي أو NDJSON أو Redis Stream أو Replay في v1.
-10. `جاري التفكير` وProgressive reveal تأثيران بصريان فقط ولا يغيران عقد FastAPI المتزامن أو محتوى الرسالة المحفوظ.
-11. Oracle Online يشغّل `cloud` فقط ولا يحتوي أي Local AI dependencies أو weights؛ Local/Compare يعملان على Mac/ASUS فقط.
-12. في Local Demo يمنع قفل Redis عالمي تداخل `clamscan` مع أي BGE/Reranker/Qwen Stage، وليس فقط للوثيقة نفسها.
+1. ClamAV لا يُحذف من المشروع، وSecurity Scan يكون مفعلاً افتراضياً ويعمل On-demand؛ يمكن تعطيله فقط بإعداد تشغيلي صريح.
+2. عندما يكون الفحص مفعلاً تبقى النتيجة Fail-Closed ولا يبدأ AI قبل Clean موثق؛ فشل الفاحص أو التواقيع أو Timeout لا يفعّل direct-storage bypass.
+3. عندما يكون الفحص معطلاً صراحةً تبقى Validation/Authorization/SHA-256/duplicate safeguards إلزامية ويستخدم permanent private storage مباشرة.
+4. قرار Enabled/Disabled يأتي من Server-side trusted configuration وليس من Browser لكل Upload.
+5. لا Docker socket داخل التطبيق.
+6. عملية AI ثقيلة واحدة فقط، ونموذج ثقيل واحد فقط في الذاكرة.
+7. كل Model محلي يحمل Lazy ويحرر بعد مرحلته؛ Ollama يستخدم `keep_alive=0`.
+8. لا ذاكرة محادثة مستخرجة أو طويلة الأمد في v1.
+9. آخر تبادلين مكتملين حد أقصى للسياق الحواري البسيط.
+10. وثائق RAG المسترجعة هي مصدر الحقائق الوحيد.
+11. لا Streaming حقيقي أو NDJSON أو Redis Stream أو Replay في v1.
+12. `جاري التفكير` وProgressive reveal تأثيران بصريان فقط ولا يغيران عقد FastAPI المتزامن أو محتوى الرسالة المحفوظ.
+13. Oracle Online يشغّل `cloud` فقط ولا يحتوي أي Local AI dependencies أو weights؛ Local/Compare يعملان على Mac/ASUS فقط.
+14. في Local Demo، عندما يكون Security Scan مفعلاً، يمنع قفل Redis عالمي تداخل `clamscan` مع أي BGE/Reranker/Qwen Stage، وليس فقط للوثيقة نفسها.
