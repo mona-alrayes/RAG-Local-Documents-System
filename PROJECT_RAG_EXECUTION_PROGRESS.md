@@ -17,9 +17,9 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 5c5fea40d0e03a13bb5568cb92c5a7e4e8eb78ae
-Last Merged PR: #34 — feat(C7): add aggregate security status transitions
-Latest Task PR: pending — C8 PR not opened yet
+Verified Main Commit: 9809a52ff62e9b255a97b9be358b7f0f3e7c242f
+Last Merged PR: #35 — test(C8): complete security pipeline coverage
+Latest Task PR: #35 — test(C8): complete security pipeline coverage
 C8 Verification: 8 tests / 39 assertions; Pint/diff-check PASS
 Last Completed Task: C8 — Security tests
 Current Task: D1 — FastAPI project
@@ -711,7 +711,7 @@ pending
 | C5 — Infected/fail-closed path | #32 | `infected` → `infected` و`scan_failed` → `failed` مع إبقاء الملف في quarantine ومنع promotion؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
 | C6 — Configurable security-scan routing | #33 | enabled افتراضياً → quarantine؛ disabled صراحةً → permanent storage؛ 6 tests / 25 assertions؛ Pint/diff-check PASS |
 | C7 — Aggregate status transitions | #34 | Security Job orchestration + `pending → scanning → clean → pending`؛ disabled يبقى `pending`؛ 7 tests / 33 assertions؛ Pint/diff-check PASS |
-| C8 — Security tests | — | explicit bypass + scan_failed no-fallback coverage؛ 8 tests / 39 assertions؛ Pint/diff-check PASS |
+| C8 — Security tests | #35 | explicit bypass + scan_failed no-fallback coverage؛ 8 tests / 39 assertions؛ Pint/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
