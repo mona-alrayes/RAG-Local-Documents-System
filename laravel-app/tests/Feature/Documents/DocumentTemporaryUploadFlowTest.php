@@ -55,6 +55,8 @@ class DocumentTemporaryUploadFlowTest extends TestCase
 
     public function test_security_scan_can_be_explicitly_disabled_for_direct_permanent_storage(): void
     {
+        Queue::fake();
+
         Storage::fake('documents');
         Storage::fake('document_quarantine');
 
@@ -75,6 +77,13 @@ class DocumentTemporaryUploadFlowTest extends TestCase
             ->assertNoContent();
 
         $document = Document::query()->sole();
+
+        $this->assertSame(
+            DocumentStatus::Pending,
+            $document->status,
+        );
+
+        Queue::assertNotPushed(ScanDocumentSecurityJob::class);
 
         Storage::disk('documents')
             ->assertExists($document->file_path);

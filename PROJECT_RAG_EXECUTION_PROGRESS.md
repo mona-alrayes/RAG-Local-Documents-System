@@ -17,15 +17,15 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 10abae327b59dfb64c8ee310fa9b6719d1ad1c97
-Last Merged PR: #33 — feat(C6): add configurable security scan routing
-Latest Task PR: #34 — feat(C7): add aggregate security status transitions
-C7 Verification: 7 tests / 33 assertions; Pint/diff-check PASS
-Last Completed Task: C7 — Aggregate status transitions
-Current Task: C8 — Security tests
+Verified Main Commit: 5c5fea40d0e03a13bb5568cb92c5a7e4e8eb78ae
+Last Merged PR: #34 — feat(C7): add aggregate security status transitions
+Latest Task PR: pending — C8 PR not opened yet
+C8 Verification: 8 tests / 39 assertions; Pint/diff-check PASS
+Last Completed Task: C8 — Security tests
+Current Task: D1 — FastAPI project
 Current Task Status: TODO
-Expected Task Branch: task/C8-security-tests
-Next Task After Completion: D1 — FastAPI project
+Expected Task Branch: task/D1-fastapi-project
+Next Task After Completion: D2 — Typed config
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -136,7 +136,7 @@ Open Blockers: لا يوجد
 | C5 Infected/fail-closed path | DONE |
 | C6 Configurable security-scan routing | DONE |
 | C7 Aggregate status transitions | DONE |
-| C8 Security tests | TODO |
+| C8 Security tests | DONE |
 
 **معيار انتهاء المرحلة:** يطبق Validation دائماً. يكون فحص ClamAV مفعّلاً افتراضياً؛ عند تفعيله يمر الملف عبر `document_quarantine` و`security-scan` ويطبق Fail-Closed قبل أي AI. يمكن تعطيله فقط بإعداد صريح، وعندها يخزن الملف مباشرة في `documents` بعد Validation من دون Quarantine أو Scan. تعطل ClamAV لا يحوّل المسار تلقائياً إلى bypass. عند تفعيل الفحص يعمل Scan/Signature Update متسلسلاً، وفي Local Demo يشترك مع `ai-local` في القفل العالمي.
 
@@ -490,7 +490,7 @@ DocumentSecurityScanStatus
 LocalHeavyResourceLock
 ```
 
-## 22.3 مسار الرفع بعد C7
+## 22.3 مسار الرفع المثبت بعد C8
 
 ```text
 Upload
@@ -548,7 +548,7 @@ DocumentUploadService
       DocumentStatus::Pending
 ```
 
-الحالة المعتمدة بعد C7:
+الحالة المعتمدة والمثبتة بعد C8:
 
 - `DOCUMENT_SECURITY_SCAN_ENABLED=true` هو الوضع الافتراضي.
 - اختيار مسار التخزين بقي مركزياً داخل `DocumentUploadService`.
@@ -562,7 +562,7 @@ DocumentUploadService
 - عند التعطيل الصريح فقط (`false`) يخزن الملف مباشرة في `documents` بعد Validation ولا يرسل `ScanDocumentSecurityJob`؛ تبقى الحالة `pending`.
 - `queued` محجوز لوقت dispatch الفعلي لـProcessing Job المستقبلي (`I3 — ProcessDocumentJob`) ولا يستخدم لمجرد أن الملف أصبح آمناً أو مخزناً دائماً.
 - `DocumentStorageService` بقي مسؤولاً عن Storage/SHA-256/Duplicate/Cleanup primitives فقط ولا يقرر Security policy أو Aggregate status workflow.
-- لا يصل Upload إلى FastAPI أو Qdrant أو AI Pipeline ضمن C7.
+- لا يصل Upload إلى FastAPI أو Qdrant أو AI Pipeline ضمن مرحلة C.
 
 ## 22.4 Security Runtime المنفذ
 
@@ -607,8 +607,8 @@ Validation
 - أعيدت تسمية `DocumentStorageService::store()` إلى `storePermanent()` بعد التحقق من عدم وجود callers مباشرين للاسم القديم.
 - `DocumentStorageService` لم يكتسب أي Security policy logic.
 - مسارا C4/C5 بقيا دون تغيير وظيفي: Clean promotion محفوظ و`infected`/`scan_failed` يبقيان Fail-Closed.
-- التحقق المركز نجح: `6 tests / 25 assertions`، وPint على الملفات المعدلة و`git diff --check` ناجحان.
-- Security test matrix الكاملة تبقى مسؤولية C8.
+- التحقق المركز في C6 نجح: `6 tests / 25 assertions`، وPint على الملفات المعدلة و`git diff --check` ناجحان.
+- العقود النهائية لـdefault/fail-closed/no-auto-bypass أصبحت مثبتة ضمن C8.
 
 ## 22.6 Aggregate status transitions المنفذة في C7
 
@@ -639,8 +639,27 @@ pending
 - المسار disabled لا يرسل Security Job ويبقى `pending` بعد التخزين الدائم.
 - تم عزل اختبارات C4/C5 عن Queue الفعلية باستخدام `Queue::fake()` بعد أن أصبح `DocumentUploadService::store()` يرسل Job عند تفعيل الفحص.
 - أضيف اختبار مركز يثبت `pending → scanning → clean → pending` مع انتقال الملف من quarantine إلى permanent storage.
-- التحقق النهائي بعد Pint وتعديل production code نجح: `7 tests / 33 assertions`، و`git diff --check` ناجح.
-- Security matrix الأشمل، بما فيها default/fail-closed/no-auto-bypass لكلا المسارين، تبقى ضمن C8.
+- التحقق النهائي في C7 نجح: `7 tests / 33 assertions`، و`git diff --check` ناجح.
+- Security matrix الأشمل أغلقت في C8 من دون تغيير production semantics.
+
+## 22.7 Security tests المنفذة في C8
+
+أغلقت C8 بأقل توسع اختباري ممكن، مع إعادة استخدام اختبارات C3–C7 وعدم إنشاء Matrix مكررة:
+
+- عُدّل اختبار explicit bypass الموجود ليثبت أن `DOCUMENT_SECURITY_SCAN_ENABLED=false`:
+  - لا يرسل `ScanDocumentSecurityJob`.
+  - لا يستخدم quarantine.
+  - يخزن مباشرة في permanent storage.
+  - يبقي `DocumentStatus::Pending`.
+- أضيف اختبار Job مركّز لـ`scan_failed` يثبت:
+  - الحالة النهائية `failed`.
+  - بقاء الملف في `document_quarantine`.
+  - غياب الملف عن `documents`.
+  - عدم وجود automatic fallback إلى permanent storage.
+- بقيت عقود clean وinfected والتفعيل الافتراضي مغطاة بالاختبارات القائمة، لذلك لم تُكرر.
+- لم يتغير أي production code في C8.
+- مجموعة Security المركزة نجحت بعد Pint: `8 tests / 39 assertions`.
+- Pint على الملفين المعدلين نجح، و`git diff --check` نجح.
 
 ---
 
@@ -691,14 +710,15 @@ pending
 | C4 — Clean path | #30 | ترقية آمنة من quarantine إلى `documents` مع clean-only gate والحفاظ على نفس `Document`؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
 | C5 — Infected/fail-closed path | #32 | `infected` → `infected` و`scan_failed` → `failed` مع إبقاء الملف في quarantine ومنع promotion؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
 | C6 — Configurable security-scan routing | #33 | enabled افتراضياً → quarantine؛ disabled صراحةً → permanent storage؛ 6 tests / 25 assertions؛ Pint/diff-check PASS |
-| C7 — Aggregate status transitions | — | Security Job orchestration + `pending → scanning → clean → pending`؛ disabled يبقى `pending`؛ 7 tests / 33 assertions؛ Pint/diff-check PASS |
+| C7 — Aggregate status transitions | #34 | Security Job orchestration + `pending → scanning → clean → pending`؛ disabled يبقى `pending`؛ 7 tests / 33 assertions؛ Pint/diff-check PASS |
+| C8 — Security tests | — | explicit bypass + scan_failed no-fallback coverage؛ 8 tests / 39 assertions؛ Pint/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
 - B12 Schema تم التحقق منه فعلياً على MySQL 8.4.11 مع rollback وإعادة migration.
 - البيانات الخاصة بالمعالجة بقيت في Processing Runs وليست داخل `documents`.
 - 2026-08-22: أعيد تنظيم ملف التقدم نفسه ليبقى خفيفاً بين المحادثات: جداول المهام بقيت كاملة، بينما اختُصر سجل الإنجاز واعتمد Git/PRs للتاريخ التفصيلي.
-- C7 منفذة ومتحقق منها ومرفوعة على `task/C7-aggregate-status-transitions`، لكن لم يُفتح PR بعد وقت تحديث هذا الملف.
+- C8 أغلقت من دون تعديل production code؛ اقتصرت على سد فجوات الاختبارات الأمنية المتبقية.
 - لا توجد عوائق حالية.
 
 ---
@@ -706,64 +726,46 @@ pending
 # 25. المهمة الحالية
 
 ```text
-C8 — Security tests
+D1 — FastAPI project
 Status: TODO
-Expected Branch: task/C8-security-tests
-Next: D1 — FastAPI project
+Expected Branch: task/D1-fastapi-project
+Next: D2 — Typed config
 ```
 
 ## الهدف
 
-استكمال مرحلة Security Pipeline باختبارات مركزة تثبت العقد الأمني النهائي لكلا مساري الرفع:
+إنشاء الأساس الأولي لخدمة FastAPI المستقلة التي ستحتوي لاحقاً قدرات RAG، مع الالتزام بحدود المسؤوليات المعتمدة:
 
 ```text
-Security Scan enabled/default
-Security Scan disabled explicitly
+Laravel = application / users / authorization / orchestration
+FastAPI = AI / RAG capabilities
 ```
 
-وفق الـMaster Plan، يجب أن تثبت C8 خصوصاً:
-
-- أن Security Scan مفعّل افتراضياً ويستخدم quarantine + security-scan path.
-- أن `clean` فقط يسمح بالوصول إلى permanent storage عند تفعيل الفحص.
-- أن `infected` و`scan_failed` يبقيان Fail-Closed.
-- أنه لا يوجد fallback أو auto-bypass تلقائي إلى permanent storage عند فشل ClamAV.
-- أن التعطيل الصريح للفحص فقط يسمح بالمسار المباشر إلى permanent storage بعد Validation.
-- أن انتقالات C7 تبقى صحيحة أثناء الاختبارات ولا يُستخدم `queued` قبل Processing dispatch فعلي.
+تقتصر D1 على تأسيس مشروع FastAPI وبنية التشغيل الأساسية اللازمة للمهام اللاحقة، من دون تنفيذ AI أو Qdrant أو Parsing أو Providers.
 
 ## ملاحظة البدء
 
-ابدأ من C1–C7 كما هي منفذة حالياً ولا تعيد تصميمها:
+ابدأ من نهاية مرحلة C كما هي منجزة ومثبتة:
 
-- `DocumentUploadService` يقرر enabled/default مقابل disabled صراحةً.
-- `ScanDocumentSecurityJob` مسؤول عن orchestration وحالة `scanning` عند بدء التنفيذ الفعلي.
-- `DocumentSecurityService` يبقى scan primitive يعيد `clean | infected | scan_failed`.
-- C4 مسؤول عن clean promotion، وC5 عن unsafe/fail-closed terminal states.
-- لا تدخل FastAPI أو Qdrant أو AI أو Processing orchestration ضمن C8.
-- لا تضف اختبارات مكررة لا تثبت عقداً أمنياً جديداً؛ حافظ على أقل Matrix تغطي default/fail-closed/no-auto-bypass لكلا المسارين.
-
-## الاختبارات المطلوبة
-
-اختبارات Security مركزة فقط لسد الفجوات المتبقية بعد اختبارات C3–C7، مع إعادة استخدام الاختبارات القائمة وعدم تكرارها بلا حاجة.
-
-الحد الأدنى المطلوب هو إثبات:
-
-1. default enabled behavior.
-2. disabled explicit behavior.
-3. clean path.
-4. infected fail-closed.
-5. scan_failed fail-closed.
-6. no automatic bypass/fallback عند فشل ClamAV.
+- Security Pipeline انتهت عند C8 ولا تحتاج تعديلات ضمن D1.
+- لا تربط D1 حتى الآن بمسار Document processing في Laravel.
+- لا تدخل Typed Config قبل D2.
+- لا تدخل Structured Logging/Correlation IDs قبل D3.
+- لا تدخل Internal API Security قبل D4.
+- لا تدخل Health endpoint قبل D5.
+- لا تضف Cloud/Local dependency split قبل D10.
+- حافظ على فصل واضح بين Laravel application layer وخدمة FastAPI.
 
 ## Definition of Done
 
-- Security tests تغطي كلا المسارين enabled/default وdisabled explicitly.
-- default/fail-closed/no-auto-bypass مثبتة بوضوح.
-- لا يتغير routing أو status semantics المنفذة في C6/C7 إلا إذا كشف الاختبار Bug حقيقياً.
-- لا يدخل FastAPI أو AI أو Qdrant أو Processing orchestration ضمن C8.
-- الاختبارات المركزة اللازمة تمر.
-- Pint على الملفات المعدلة و`git diff --check` ناجحان.
-- يتغير C8 في جدول المرحلة إلى `DONE` عند الإغلاق.
-- يحدّث `CURRENT HANDOFF` إلى D1 — FastAPI project.
+- يوجد FastAPI project foundation منظم وقابل للتوسع.
+- يوجد entry point واضح للتطبيق.
+- بنية الملفات لا تخلط مسؤوليات المراحل اللاحقة داخل D1.
+- لا يدخل FastAPI بعد إلى Qdrant أو AI processing أو Laravel orchestration.
+- التحقق الأساسي المناسب للمشروع ينجح.
+- Pint/Laravel production code لا يتأثر بهذه المهمة ما لم يوجد سبب مباشر.
+- يتغير D1 في جدول المرحلة إلى `DONE` عند الإغلاق.
+- يحدّث `CURRENT HANDOFF` إلى D2 — Typed config.
 
 ---
 

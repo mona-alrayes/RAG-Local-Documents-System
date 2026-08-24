@@ -86,4 +86,50 @@ class ScanDocumentSecurityJobTest extends TestCase
         Storage::disk('document_quarantine')
             ->assertMissing($document->file_path);
     }
+
+    public function test_failed_scan_remains_quarantined_and_never_falls_back_to_permanent_storage(): void
+    {
+        Storage::fake('documents');
+        Storage::fake('document_quarantine');
+
+        $user = User::factory()->create();
+
+        $document = app(DocumentStorageService::class)
+            ->storeQuarantined(
+                $user,
+                UploadedFile::fake()->createWithContent(
+                    'notes.txt',
+                    "Untrusted document content.\n",
+                ),
+            );
+
+        $this->mock(
+            DocumentSecurityService::class,
+            function (MockInterface $mock): void {
+                $mock->shouldReceive('scan')
+                    ->once()
+                    ->andReturn(DocumentSecurityScanStatus::ScanFailed);
+            },
+        );
+
+        $job = new ScanDocumentSecurityJob($document);
+
+        $job->handle(
+            app(DocumentSecurityService::class),
+            app(DocumentUploadService::class),
+        );
+
+        $document->refresh();
+
+        $this->assertSame(
+            DocumentStatus::Failed,
+            $document->status,
+        );
+
+        Storage::disk('document_quarantine')
+            ->assertExists($document->file_path);
+
+        Storage::disk('documents')
+            ->assertMissing($document->file_path);
+    }
 }
