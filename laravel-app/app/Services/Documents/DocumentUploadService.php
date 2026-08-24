@@ -4,6 +4,7 @@ namespace App\Services\Documents;
 
 use App\Enums\DocumentSecurityScanStatus;
 use App\Enums\DocumentStatus;
+use App\Jobs\ScanDocumentSecurityJob;
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -15,21 +16,17 @@ class DocumentUploadService
         private readonly DocumentStorageService $storage,
     ) {}
 
-    public function store(
-        User $user,
-        UploadedFile $file,
-    ): Document {
+    public function store(User $user, UploadedFile $file): Document
+    {
         if (config('security.document_security_scan.enabled', true) === false) {
-            return $this->storage->storePermanent(
-                $user,
-                $file,
-            );
+            return $this->storage->storePermanent($user, $file);
         }
 
-        return $this->storage->storeQuarantined(
-            $user,
-            $file,
-        );
+        $document = $this->storage->storeQuarantined($user, $file);
+
+        ScanDocumentSecurityJob::dispatch($document);
+
+        return $document;
     }
 
     public function promoteAfterCleanScan(

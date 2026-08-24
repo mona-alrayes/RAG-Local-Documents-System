@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Documents\DocumentUploadService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -18,6 +19,8 @@ class DocumentUnsafeScanPathTest extends TestCase
 
     public function test_infected_document_is_not_promoted(): void
     {
+        Queue::fake();
+
         Storage::fake('documents');
         Storage::fake('document_quarantine');
 
@@ -52,6 +55,8 @@ class DocumentUnsafeScanPathTest extends TestCase
 
     public function test_scan_failed_document_remains_fail_closed(): void
     {
+        Queue::fake();
+
         Storage::fake('documents');
         Storage::fake('document_quarantine');
 
