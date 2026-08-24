@@ -17,16 +17,15 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 1b53a0893399fe813ffb6b78f45e61c0c55563be
-Last Merged PR: #32 — feat(C5): add infected fail-closed path
-Latest Task PR: #32 — feat(C5): add infected fail-closed path
-
-C6 Verification: 6 tests / 25 assertions; Pint/diff-check PASS
-Last Completed Task: C6 — Configurable security-scan routing
-Current Task: C7 — Aggregate status transitions
+Verified Main Commit: 10abae327b59dfb64c8ee310fa9b6719d1ad1c97
+Last Merged PR: #33 — feat(C6): add configurable security scan routing
+Latest Task PR: #34 — feat(C7): add aggregate security status transitions
+C7 Verification: 7 tests / 33 assertions; Pint/diff-check PASS
+Last Completed Task: C7 — Aggregate status transitions
+Current Task: C8 — Security tests
 Current Task Status: TODO
-Expected Task Branch: task/C7-aggregate-status-transitions
-Next Task After Completion: C8 — Security tests
+Expected Task Branch: task/C8-security-tests
+Next Task After Completion: D1 — FastAPI project
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -136,7 +135,7 @@ Open Blockers: لا يوجد
 | C4 Clean path | DONE |
 | C5 Infected/fail-closed path | DONE |
 | C6 Configurable security-scan routing | DONE |
-| C7 Aggregate status transitions | TODO |
+| C7 Aggregate status transitions | DONE |
 | C8 Security tests | TODO |
 
 **معيار انتهاء المرحلة:** يطبق Validation دائماً. يكون فحص ClamAV مفعّلاً افتراضياً؛ عند تفعيله يمر الملف عبر `document_quarantine` و`security-scan` ويطبق Fail-Closed قبل أي AI. يمكن تعطيله فقط بإعداد صريح، وعندها يخزن الملف مباشرة في `documents` بعد Validation من دون Quarantine أو Scan. تعطل ClamAV لا يحوّل المسار تلقائياً إلى bypass. عند تفعيل الفحص يعمل Scan/Signature Update متسلسلاً، وفي Local Demo يشترك مع `ai-local` في القفل العالمي.
@@ -485,12 +484,13 @@ UploadDocumentRequest
 SecureDocumentUpload
 DocumentStorageService
 DocumentUploadService
+ScanDocumentSecurityJob
 DocumentSecurityService
 DocumentSecurityScanStatus
 LocalHeavyResourceLock
 ```
 
-## 22.3 مسار الرفع بعد C6
+## 22.3 مسار الرفع بعد C7
 
 ```text
 Upload
@@ -504,9 +504,15 @@ DocumentUploadService
   │     ↓
   │   DocumentStorageService::storeQuarantined()
   │     ↓
-  │   Private Quarantine
+  │   DocumentStatus::Pending
   │     ↓
-  │   Security Scan
+  │   dispatch ScanDocumentSecurityJob
+  │     ↓
+  │   security-scan queue
+  │     ↓
+  │   Job starts → DocumentStatus::Scanning
+  │     ↓
+  │   DocumentSecurityService::scan()
   │     ├── clean
   │     │     ↓
   │     │   DocumentUploadService::promoteAfterCleanScan()
@@ -514,43 +520,49 @@ DocumentUploadService
   │     │   DocumentStorageService::promoteQuarantined()
   │     │     ↓
   │     │   Permanent Private Storage (`documents`)
+  │     │     ↓
+  │     │   DocumentStatus::Pending
   │     │
   │     ├── infected
   │     │     ↓
   │     │   DocumentUploadService::rejectAfterUnsafeScan()
   │     │     ↓
-  │     │   Fail-Closed + quarantine retained
+  │     │   DocumentStatus::Infected + quarantine retained
   │     │
   │     └── scan_failed
   │           ↓
   │         DocumentUploadService::rejectAfterUnsafeScan()
   │           ↓
-  │         Fail-Closed + quarantine retained
+  │         DocumentStatus::Failed + quarantine retained
+  │
+  │   unexpected exception after scan starts
+  │     ↓
+  │   DocumentStatus::Failed + exception rethrown
   │
   └── Security Scan disabled explicitly
         ↓
       DocumentStorageService::storePermanent()
         ↓
       Permanent Private Storage (`documents`)
+        ↓
+      DocumentStatus::Pending
 ```
 
-الحالة المعتمدة بعد C6:
+الحالة المعتمدة بعد C7:
 
 - `DOCUMENT_SECURITY_SCAN_ENABLED=true` هو الوضع الافتراضي.
-- اختيار مسار التخزين أصبح مركزياً داخل `DocumentUploadService`.
-- عند التفعيل/الوضع الافتراضي يبدأ الملف في `document_quarantine` ثم يمر بمسار الفحص الأمني الحالي.
-- `clean` وحدها تسمح بالـpromotion إلى `documents`.
-- `infected` يبقى Fail-Closed ويحوّل نفس `Document` إلى `DocumentStatus::Infected`.
-- `scan_failed` يبقى Fail-Closed ويحوّل نفس `Document` إلى `DocumentStatus::Failed`.
-- لا يوجد fallback تلقائي من `infected` أو `scan_failed` إلى التخزين الدائم.
-- عند التعطيل الصريح فقط (`false`) يخزن الملف مباشرة في `documents` بعد Validation، من دون Quarantine أو ClamAV.
-- `DocumentStorageService` يبقى مسؤولاً عن Storage/SHA-256/Duplicate/Cleanup primitives فقط ولا يقرر Security policy.
-- API التخزين الدائم المباشر أصبح اسمه الصريح `storePermanent()` بدلاً من `store()`.
-- SHA-256 وسياسة duplicate تبقيان داخل `DocumentStorageService` أثناء initial storage في كلا المسارين.
-- سلوك الـpromotion المنفذ في C4 بقي كما هو: نفس `Document` ونفس `file_path`، copy-first، ولا إعادة حساب metadata.
-- انتقالات Aggregate الكاملة للمسارين ما زالت مؤجلة إلى C7.
-- لا يصل Upload إلى FastAPI أو Qdrant أو AI Pipeline ضمن C6.
-
+- اختيار مسار التخزين بقي مركزياً داخل `DocumentUploadService`.
+- عند التفعيل/الوضع الافتراضي يخزن الملف أولاً في `document_quarantine` بحالة `pending`، ثم يرسل `ScanDocumentSecurityJob` إلى Queue `security-scan`.
+- لا تتحول الوثيقة إلى `scanning` عند مجرد التخزين أو الانتظار في Queue؛ تتحول عند بدء تنفيذ Job فعلياً.
+- `clean` وحدها تسمح بالـpromotion إلى `documents`، وبعد نجاح الـpromotion تعود الوثيقة إلى `pending` لأن Processing Job لم يُرسل بعد.
+- `infected` يبقى Fail-Closed ويحوّل نفس `Document` إلى `DocumentStatus::Infected` مع إبقاء الملف في quarantine.
+- `scan_failed` يبقى Fail-Closed ويحوّل نفس `Document` إلى `DocumentStatus::Failed` مع إبقاء الملف في quarantine.
+- أي Exception غير متوقع بعد دخول Job إلى `scanning` يحوّل الوثيقة إلى `failed` ثم يعاد رمي الاستثناء حتى تبقى Queue على علم بالفشل.
+- لا يوجد fallback تلقائي من `infected` أو `scan_failed` أو Exception إلى التخزين الدائم.
+- عند التعطيل الصريح فقط (`false`) يخزن الملف مباشرة في `documents` بعد Validation ولا يرسل `ScanDocumentSecurityJob`؛ تبقى الحالة `pending`.
+- `queued` محجوز لوقت dispatch الفعلي لـProcessing Job المستقبلي (`I3 — ProcessDocumentJob`) ولا يستخدم لمجرد أن الملف أصبح آمناً أو مخزناً دائماً.
+- `DocumentStorageService` بقي مسؤولاً عن Storage/SHA-256/Duplicate/Cleanup primitives فقط ولا يقرر Security policy أو Aggregate status workflow.
+- لا يصل Upload إلى FastAPI أو Qdrant أو AI Pipeline ضمن C7.
 
 ## 22.4 Security Runtime المنفذ
 
@@ -565,7 +577,6 @@ DocumentUploadService
 - `LocalHeavyResourceLock` موجود ويعاد استخدامه للأعمال الثقيلة المحلية؛ لا ينشأ Lock موازٍ.
 
 ---
-
 
 ## 22.5 Configurable security-scan routing المنفذ في C6
 
@@ -597,9 +608,39 @@ Validation
 - `DocumentStorageService` لم يكتسب أي Security policy logic.
 - مسارا C4/C5 بقيا دون تغيير وظيفي: Clean promotion محفوظ و`infected`/`scan_failed` يبقيان Fail-Closed.
 - التحقق المركز نجح: `6 tests / 25 assertions`، وPint على الملفات المعدلة و`git diff --check` ناجحان.
-- Aggregate status transitions للمسارين `enabled/disabled` تنتقل إلى C7.
 - Security test matrix الكاملة تبقى مسؤولية C8.
 
+## 22.6 Aggregate status transitions المنفذة في C7
+
+تم تنفيذ C7 من دون إدخال State Machine عامة أو توسيع نطاق Processing:
+
+```text
+Security enabled/default:
+pending
+  → dispatch security job
+  → scanning عند بدء Job فعلياً
+  → clean      → promotion → pending
+  → infected   → infected
+  → scan_failed / unexpected failure → failed
+
+Security disabled explicitly:
+pending
+  → permanent storage
+  → pending
+```
+
+تفاصيل التنفيذ:
+
+- أضيف `ScanDocumentSecurityJob` كطبقة orchestration للفحص الأمني، ويعمل على Queue المعرفة في `security.clamav.queue` مع default `security-scan`.
+- `DocumentUploadService` يرسل الـJob فقط للمسار enabled/default بعد نجاح التخزين في quarantine.
+- الـJob يثبت `scanning` عند بداية التنفيذ قبل استدعاء `DocumentSecurityService`.
+- Clean path يعيد استخدام C4 كما هو، وUnsafe path يعيد استخدام C5 كما هو.
+- بعد clean promotion تعود الحالة إلى `pending` انتظاراً لـProcessing dispatch الفعلي لاحقاً.
+- المسار disabled لا يرسل Security Job ويبقى `pending` بعد التخزين الدائم.
+- تم عزل اختبارات C4/C5 عن Queue الفعلية باستخدام `Queue::fake()` بعد أن أصبح `DocumentUploadService::store()` يرسل Job عند تفعيل الفحص.
+- أضيف اختبار مركز يثبت `pending → scanning → clean → pending` مع انتقال الملف من quarantine إلى permanent storage.
+- التحقق النهائي بعد Pint وتعديل production code نجح: `7 tests / 33 assertions`، و`git diff --check` ناجح.
+- Security matrix الأشمل، بما فيها default/fail-closed/no-auto-bypass لكلا المسارين، تبقى ضمن C8.
 
 ---
 
@@ -611,7 +652,7 @@ Validation
 - Oracle Online = Cloud-only بلا Local AI weights/dependencies.
 - Local Demo = Docker للبنية الأساسية وFastAPI/Ollama على Host.
 - Local heavy work = concurrency `1` + global Redis lock + single-active-model + release-after-stage.
-- Security scan = ClamAV on-demand افتراضياً (`DOCUMENT_SECURITY_SCAN_ENABLED=true`) مع Fail-Closed؛ التعطيل مسموح فقط بإعداد صريح ويؤدي إلى direct permanent storage بعد Validation، بلا fallback تلقائي عند فشل الفاحص.
+- Security scan = ClamAV on-demand افتراضياً (`DOCUMENT_SECURITY_SCAN_ENABLED=true`) مع Fail-Closed؛ التعطيل مسموح فقط بإعداد صريح ويؤدي إلى direct permanent storage بعد Validation، بلا fallback تلقائي عند فشل الفاحص. `scanning` يبدأ عند تشغيل Security Job فعلياً، و`queued` لا يستخدم قبل dispatch حقيقي لـProcessing Job.
 - Qdrant = Collection منفصلة لكل Processing Profile مع mandatory user/document/run filters.
 - Persistent Qdrant يحتفظ بالـselected winner فقط بعد التحقق.
 - Laravel/MySQL هو مصدر الحقيقة للتطبيق؛ لا توجد DB علائقية مستقلة لـFastAPI في v1.
@@ -649,13 +690,15 @@ Validation
 | C3 — Temporary upload flow | #28 | quarantine + `DocumentUploadService`; 9 tests / 60 assertions; Pint/diff-check PASS |
 | C4 — Clean path | #30 | ترقية آمنة من quarantine إلى `documents` مع clean-only gate والحفاظ على نفس `Document`؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
 | C5 — Infected/fail-closed path | #32 | `infected` → `infected` و`scan_failed` → `failed` مع إبقاء الملف في quarantine ومنع promotion؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
-| C6 — Configurable security-scan routing | — | enabled افتراضياً → quarantine؛ disabled صراحةً → permanent storage؛ 6 tests / 25 assertions؛ Pint/diff-check PASS |
+| C6 — Configurable security-scan routing | #33 | enabled افتراضياً → quarantine؛ disabled صراحةً → permanent storage؛ 6 tests / 25 assertions؛ Pint/diff-check PASS |
+| C7 — Aggregate status transitions | — | Security Job orchestration + `pending → scanning → clean → pending`؛ disabled يبقى `pending`؛ 7 tests / 33 assertions؛ Pint/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
 - B12 Schema تم التحقق منه فعلياً على MySQL 8.4.11 مع rollback وإعادة migration.
 - البيانات الخاصة بالمعالجة بقيت في Processing Runs وليست داخل `documents`.
 - 2026-08-22: أعيد تنظيم ملف التقدم نفسه ليبقى خفيفاً بين المحادثات: جداول المهام بقيت كاملة، بينما اختُصر سجل الإنجاز واعتمد Git/PRs للتاريخ التفصيلي.
+- C7 منفذة ومتحقق منها ومرفوعة على `task/C7-aggregate-status-transitions`، لكن لم يُفتح PR بعد وقت تحديث هذا الملف.
 - لا توجد عوائق حالية.
 
 ---
@@ -663,54 +706,64 @@ Validation
 # 25. المهمة الحالية
 
 ```text
-C7 — Aggregate status transitions
+C8 — Security tests
 Status: TODO
-Expected Branch: task/C7-aggregate-status-transitions
-Next: C8 — Security tests
+Expected Branch: task/C8-security-tests
+Next: D1 — FastAPI project
 ```
 
 ## الهدف
 
-تنفيذ Aggregate status transitions لمساري رفع الوثيقة اللذين أصبحا قائمين فعلياً بعد C6:
+استكمال مرحلة Security Pipeline باختبارات مركزة تثبت العقد الأمني النهائي لكلا مساري الرفع:
 
 ```text
 Security Scan enabled/default
 Security Scan disabled explicitly
 ```
 
-بحيث تعكس `DocumentStatus` الحالة التجميعية الصحيحة للوثيقة عبر مسار Security/Storage من دون إعادة تصميم routing أو Clean/Fail-Closed behavior المنجز في C4–C6.
+وفق الـMaster Plan، يجب أن تثبت C8 خصوصاً:
+
+- أن Security Scan مفعّل افتراضياً ويستخدم quarantine + security-scan path.
+- أن `clean` فقط يسمح بالوصول إلى permanent storage عند تفعيل الفحص.
+- أن `infected` و`scan_failed` يبقيان Fail-Closed.
+- أنه لا يوجد fallback أو auto-bypass تلقائي إلى permanent storage عند فشل ClamAV.
+- أن التعطيل الصريح للفحص فقط يسمح بالمسار المباشر إلى permanent storage بعد Validation.
+- أن انتقالات C7 تبقى صحيحة أثناء الاختبارات ولا يُستخدم `queued` قبل Processing dispatch فعلي.
 
 ## ملاحظة البدء
 
-ابدأ من C6 كما هو منفذ حالياً:
+ابدأ من C1–C7 كما هي منفذة حالياً ولا تعيد تصميمها:
 
-- `DocumentUploadService` يقرر بين `storeQuarantined()` و`storePermanent()`.
-- الوضع الافتراضي/المفعّل يمر عبر Quarantine وSecurity Scan.
-- التعطيل الصريح فقط يخزن مباشرة في `documents`.
-- `clean` يسمح بالـpromotion.
-- `infected` و`scan_failed` يبقيان Fail-Closed.
-- لا تغيّر Storage routing المنجز في C6.
-- لا توسع Security test matrix؛ هذه مسؤولية C8.
-- لا تدخل FastAPI أو AI أو Qdrant أو Processing orchestration ضمن C7.
-
-قبل التنفيذ راجع `DocumentStatus` الحالية وجميع نقاط تغيير `Document.status` في مسار الرفع/الفحص، ثم ثبت الانتقالات التجميعية للمسارين وفق الـMaster Plan من دون إضافة state machine أوسع من المطلوب.
+- `DocumentUploadService` يقرر enabled/default مقابل disabled صراحةً.
+- `ScanDocumentSecurityJob` مسؤول عن orchestration وحالة `scanning` عند بدء التنفيذ الفعلي.
+- `DocumentSecurityService` يبقى scan primitive يعيد `clean | infected | scan_failed`.
+- C4 مسؤول عن clean promotion، وC5 عن unsafe/fail-closed terminal states.
+- لا تدخل FastAPI أو Qdrant أو AI أو Processing orchestration ضمن C8.
+- لا تضف اختبارات مكررة لا تثبت عقداً أمنياً جديداً؛ حافظ على أقل Matrix تغطي default/fail-closed/no-auto-bypass لكلا المسارين.
 
 ## الاختبارات المطلوبة
 
-أقل عدد ممكن لإثبات انتقالات الحالة التي تضيفها C7 مباشرة، مع Regression فقط للمسارات المتأثرة.
+اختبارات Security مركزة فقط لسد الفجوات المتبقية بعد اختبارات C3–C7، مع إعادة استخدام الاختبارات القائمة وعدم تكرارها بلا حاجة.
 
-لا تنفذ Security matrix الكاملة؛ هذه مؤجلة إلى C8.
+الحد الأدنى المطلوب هو إثبات:
+
+1. default enabled behavior.
+2. disabled explicit behavior.
+3. clean path.
+4. infected fail-closed.
+5. scan_failed fail-closed.
+6. no automatic bypass/fallback عند فشل ClamAV.
 
 ## Definition of Done
 
-- Aggregate status transitions للمسارين `enabled/disabled` واضحة ومركزية.
-- routing المنفذ في C6 يبقى دون تغيير.
-- Clean/Fail-Closed invariants المنفذة في C4/C5 محفوظة.
-- لا يدخل AI/Processing orchestration ضمن C7.
-- الاختبارات المركزة الضرورية تمر.
+- Security tests تغطي كلا المسارين enabled/default وdisabled explicitly.
+- default/fail-closed/no-auto-bypass مثبتة بوضوح.
+- لا يتغير routing أو status semantics المنفذة في C6/C7 إلا إذا كشف الاختبار Bug حقيقياً.
+- لا يدخل FastAPI أو AI أو Qdrant أو Processing orchestration ضمن C8.
+- الاختبارات المركزة اللازمة تمر.
 - Pint على الملفات المعدلة و`git diff --check` ناجحان.
-- يتغير C7 في جدول المرحلة إلى `DONE` عند الإغلاق.
-- يحدّث `CURRENT HANDOFF` إلى C8 — Security tests.
+- يتغير C8 في جدول المرحلة إلى `DONE` عند الإغلاق.
+- يحدّث `CURRENT HANDOFF` إلى D1 — FastAPI project.
 
 ---
 

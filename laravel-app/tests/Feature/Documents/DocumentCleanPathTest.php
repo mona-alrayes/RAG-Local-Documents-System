@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Documents\DocumentUploadService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use LogicException;
 use Tests\TestCase;
@@ -18,6 +19,8 @@ class DocumentCleanPathTest extends TestCase
 
     public function test_clean_document_is_promoted_from_quarantine_without_creating_another_document(): void
     {
+        Queue::fake();
+
         Storage::fake('documents');
         Storage::fake('document_quarantine');
 
@@ -63,6 +66,8 @@ class DocumentCleanPathTest extends TestCase
 
     public function test_document_is_not_promoted_without_clean_scan_result(): void
     {
+        Queue::fake();
+
         Storage::fake('documents');
         Storage::fake('document_quarantine');
 

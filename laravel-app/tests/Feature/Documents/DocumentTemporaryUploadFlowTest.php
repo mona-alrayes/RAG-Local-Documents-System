@@ -3,10 +3,12 @@
 namespace Tests\Feature\Documents;
 
 use App\Enums\DocumentStatus;
+use App\Jobs\ScanDocumentSecurityJob;
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -16,6 +18,8 @@ class DocumentTemporaryUploadFlowTest extends TestCase
 
     public function test_valid_upload_is_stored_in_private_quarantine_only(): void
     {
+        Queue::fake();
+
         Storage::fake('documents');
         Storage::fake('document_quarantine');
 
@@ -35,6 +39,11 @@ class DocumentTemporaryUploadFlowTest extends TestCase
         $this->assertSame(
             DocumentStatus::Pending,
             $document->status,
+        );
+
+        Queue::assertPushed(
+            ScanDocumentSecurityJob::class,
+            fn (ScanDocumentSecurityJob $job) => $job->document->is($document),
         );
 
         Storage::disk('document_quarantine')
