@@ -2,6 +2,10 @@
 
 return [
 
+    'document_security_scan' => [
+        'enabled' => (bool) env('DOCUMENT_SECURITY_SCAN_ENABLED', true),
+    ],
+
     'clamav' => [
         'mode' => env('CLAMAV_SCAN_MODE', 'on_demand_cli'),
         'queue' => env('CLAMAV_SCAN_QUEUE', 'security-scan'),

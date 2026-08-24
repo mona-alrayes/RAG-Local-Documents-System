@@ -43,4 +43,34 @@ class DocumentTemporaryUploadFlowTest extends TestCase
         Storage::disk('documents')
             ->assertMissing($document->file_path);
     }
+
+    public function test_security_scan_can_be_explicitly_disabled_for_direct_permanent_storage(): void
+    {
+        Storage::fake('documents');
+        Storage::fake('document_quarantine');
+
+        config()->set(
+            'security.document_security_scan.enabled',
+            false,
+        );
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post('/documents', [
+                'document' => UploadedFile::fake()->createWithContent(
+                    'notes.txt',
+                    "Direct permanent document content.\n",
+                ),
+            ])
+            ->assertNoContent();
+
+        $document = Document::query()->sole();
+
+        Storage::disk('documents')
+            ->assertExists($document->file_path);
+
+        Storage::disk('document_quarantine')
+            ->assertMissing($document->file_path);
+    }
 }

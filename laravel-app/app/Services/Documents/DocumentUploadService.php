@@ -19,6 +19,13 @@ class DocumentUploadService
         User $user,
         UploadedFile $file,
     ): Document {
+        if (config('security.document_security_scan.enabled', true) === false) {
+            return $this->storage->storePermanent(
+                $user,
+                $file,
+            );
+        }
+
         return $this->storage->storeQuarantined(
             $user,
             $file,

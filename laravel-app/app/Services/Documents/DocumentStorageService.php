@@ -18,7 +18,7 @@ class DocumentStorageService
 
     private const QUARANTINE_DISK = 'document_quarantine';
 
-    public function store(User $user, UploadedFile $file): Document
+    public function storePermanent(User $user, UploadedFile $file): Document
     {
         return $this->storeOnDisk(
             $user,
