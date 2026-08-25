@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: d47c30b6b98143a1e87ef6ef60b2bd62f901ac4d
-Last Merged PR: #39 — feat(D2): add typed FastAPI configuration
-Latest Task PR: #40 — feat(D3): add structured logging and correlation IDs
-D3 Implementation Commit: 5ace97b
-D3 Verification: Python 3.12.14 (.venv); pip check + compileall + diff-check PASS; provided correlation ID preserved; missing correlation ID generates UUID; response header and structured JSON log carry the same correlation ID
-Last Completed Task: D3 — Structured logging/correlation IDs
-Current Task: D4 — Internal API security
+Verified Main Commit: 2f176ebcd5ac343c9f2b39d052d1462bc0746ea1
+Last Merged PR: #40 — feat(D3): add structured logging and correlation IDs
+Latest Task PR: #41 — feat(D4): secure internal FastAPI access
+D4 Implementation Commit: cd45099809fa3b6e403378bb9fb82c3c1daf09c3
+D4 Verification: Python 3.12.14 (.venv); compileall + 3 focused auth tests + pip check + diff-check PASS; missing/invalid key rejected with 401; valid key reaches FastAPI; Correlation ID remains active around auth middleware; secret is not logged or returned
+Last Completed Task: D4 — Internal API security
+Current Task: D5 — Health endpoint
 Current Task Status: TODO
-Expected Task Branch: task/D4-internal-api-security
-Next Task After Completion: D5 — Health endpoint
+Expected Task Branch: task/D5-health-endpoint
+Next Task After Completion: D6 — Versioned DTO schemas
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -150,7 +150,7 @@ Open Blockers: لا يوجد
 | D1 FastAPI project | DONE |
 | D2 Typed config | DONE |
 | D3 Structured logging/correlation IDs | DONE |
-| D4 Internal API security | TODO |
+| D4 Internal API security | DONE |
 | D5 Health endpoint | TODO |
 | D6 Versioned DTO schemas | TODO |
 | D7 Structured exceptions | TODO |
@@ -713,6 +713,30 @@ pending
 - بيئة التحقق الحالية لـFastAPI هي `fastapi-app/.venv` مع Python `3.12.14`.
 - لم تدخل Internal API Security أو Health أو DTOs أو Structured Exceptions الكامل أو AI/Qdrant/Parsing/Providers ضمن D3.
 
+## 22.10 Internal API Security المنفذة في D4
+
+تم تنفيذ D4 كطبقة مصادقة داخلية مركزية وصغيرة تحمي FastAPI من الوصول المباشر، مع الحفاظ على D3 وعدم إدخال مسؤوليات D5 وما بعدها:
+
+- أضيف `internal_api_key` إلى `Settings` كـ`SecretStr | None` ويقرأ من Environment Variable باسم `INTERNAL_API_KEY` دون hardcoding للقيمة.
+- بقيت القيمة `None` مسموحة على مستوى typed configuration لأن Startup Configuration Validation الكامل مؤجل إلى D9؛ عند عدم وجود المفتاح يطبق Middleware سلوك Fail-Closed ويرفض الطلب.
+- أضيف `app/middleware/internal_api_auth.py` كـPure ASGI middleware مركزي:
+  - يطبق فقط على HTTP requests.
+  - يقرأ `X-Internal-API-Key` من request headers.
+  - missing/empty key يرفض بـ`401 Unauthorized`.
+  - invalid key يرفض بـ`401 Unauthorized`.
+  - valid key يسمح للطلب بالمرور إلى FastAPI.
+  - يقارن المفتاح باستخدام `secrets.compare_digest` على bytes بدلاً من مقارنة عادية للقيم السرية.
+  - لا يسجل قيمة المفتاح ولا يعيدها في response body.
+- رُبط `InternalApiAuthMiddleware` داخل `create_app()`، ثم بقي `CorrelationIdMiddleware` هو الغلاف الخارجي للطلبات، لذلك الطلبات المرفوضة أمنياً تستمر بالحصول على Correlation ID وتبقى Structured Application Logging من D3 فعالة.
+- لم يُضف أي استثناء عام لمسارات HTTP؛ FastAPI بقيت Internal API وليست Browser-facing API.
+- أضيف أقل اختبار مطلوب فقط في `tests/test_internal_api_security.py`:
+  - missing key → `401`.
+  - invalid key → `401`.
+  - valid key → يصل إلى FastAPI؛ استخدم `/` وأثبت الوصول عبر `404` الطبيعي لعدم وجود endpoint في هذه المرحلة، من دون إنشاء Health endpoint قبل D5.
+- أضيفت test dependencies كـoptional dependencies فقط في `pyproject.toml`: `pytest==9.1.1` و`httpx2==2.12.0`، ولم تضاف إلى Runtime dependencies.
+- التحقق النهائي تم داخل `fastapi-app/.venv` باستخدام Python `3.12.14`: `compileall` نجح، واختبارات D4 الثلاثة أعادت `3 passed`، و`pip check` أعاد `No broken requirements found.`، و`git diff --cached --check` نجح.
+- لم تدخل Health endpoint أو Versioned DTO schemas أو Structured Exceptions framework الكامل أو Deployment capabilities أو AI/Qdrant/Parsing/Providers أو أي تعديل Laravel ضمن D4.
+
 ---
 
 # 23. Baseline معماري تنفيذي
@@ -731,7 +755,7 @@ pending
 - لا يوجد True Streaming/NDJSON/Redis Stream في v1؛ `جاري التفكير` وProgressive Reveal تأثيران Frontend-only.
 - LLM Provider يحدد من Processing Profile موثوقة/Capabilities عبر Registry، بلا global `LLM_PROVIDER` switch وبلا Fallback صامت.
 - تشغيل أوامر FastAPI محلياً يعتمد `fastapi-app/.venv` وPython 3.12.x، وليس Python العام على النظام إذا كان خارج النطاق `>=3.12,<3.13`.
-- FastAPI ليس API عاماً للمستخدم النهائي؛ المسار المعتمد هو `Browser → Laravel → FastAPI`. تأمين الاتصال الداخلي في D4 يعتمد `X-Internal-API-Key` وقيمته من Environment Variables فقط.
+- FastAPI ليس API عاماً للمستخدم النهائي؛ المسار المعتمد هو `Browser → Laravel → FastAPI`. المصادقة الداخلية المنفذة في D4 تستخدم `X-Internal-API-Key`، وقيمته من `INTERNAL_API_KEY` في Environment Variables فقط؛ missing/invalid/unconfigured يرفض Fail-Closed، بينما Correlation ID يبقى فعالاً حول طبقة المصادقة.
 
 ---
 
@@ -769,6 +793,7 @@ pending
 | D1 — FastAPI project | #37 | FastAPI foundation + Python 3.12 baseline + application factory؛ runtime verification PASS |
 | D2 — Typed config | #39 | `pydantic-settings` + typed deployment mode + centralized app settings؛ env/validation/import/pip/diff checks PASS |
 | D3 — Structured logging/correlation IDs | #40 | Central JSON logging + async-safe ContextVar correlation IDs + request/response propagation; supplied/generated ID verification + compileall/diff-check PASS |
+| D4 — Internal API security | #41 | `X-Internal-API-Key` + `SecretStr` + centralized ASGI auth; missing/invalid/valid coverage؛ 3 tests + compileall/pip/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -779,7 +804,8 @@ pending
 - D1 أنشأت FastAPI foundation مستقلاً داخل `fastapi-app` مع Python 3.12 baseline وApplication Factory.
 - D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
 - D3 أضافت Structured JSON logging مركزية وCorrelation IDs عبر Pure ASGI middleware وContextVar، مع الحفاظ على Security وHealth خارج النطاق.
-- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، والبيئة الحالية المستخدمة في D3 هي `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
+- D4 أضافت Internal API authentication مركزية باستخدام `X-Internal-API-Key` و`SecretStr` و`compare_digest`، مع Fail-Closed للمفتاح المفقود/غير الصالح والحفاظ على Correlation ID حول طبقة المصادقة.
+- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3/D4 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
 - لا توجد عوائق حالية.
 
 ---
@@ -787,73 +813,49 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D4 — Internal API security
+D5 — Health endpoint
 Status: TODO
-Expected Branch: task/D4-internal-api-security
-Next: D5 — Health endpoint
+Expected Branch: task/D5-health-endpoint
+Next: D6 — Versioned DTO schemas
 ```
 
 ## الهدف
 
-حماية الاتصال الداخلي بين Laravel وFastAPI بحيث لا تكون FastAPI API عامة للمستخدم النهائي، ويقتصر الوصول إلى الـinternal API على الطلبات التي تحمل المفتاح الداخلي الصحيح.
+إضافة Health endpoint رسمي وبسيط داخل FastAPI على المسار المعتمد:
 
-العقد المعماري المرجعي:
-
-```text
-Browser
-  ↓
-Laravel
-  ↓
-FastAPI
+```http
+GET /api/v1/health
 ```
 
-وليس:
-
-```text
-Browser → FastAPI
-```
-
-ويستخدم الاتصال الداخلي Header:
-
-```text
-X-Internal-API-Key
-```
-
-على أن تبقى قيمة المفتاح داخل Environment Variables فقط، وألا تظهر في logs أو responses.
+بحيث يمكن للطبقات الداخلية وعمليات النشر اللاحقة التحقق أن خدمة FastAPI نفسها تعمل، من دون إدخال Capabilities أو فحوص AI/Qdrant/Providers قبل مهامها المخصصة.
 
 ## ملاحظة البدء
 
-ابدأ من FastAPI foundation الحالية بعد D1–D3:
+ابدأ من FastAPI foundation الحالية بعد D1–D4:
 
 - المشروع داخل `fastapi-app` ويستخدم `app.main:app` مع `create_app()`.
-- الإعدادات typed والمركزية موجودة في `app/core/config.py` عبر `Settings` و`get_settings()`.
-- Structured Application Logging موجود في `app/core/logging.py`.
-- Correlation ID middleware موجود في `app/middleware/correlation_id.py`.
-- بيئة التنفيذ المحلية الحالية هي `fastapi-app/.venv` مع Python `3.12.14`.
-- المرجع المعماري ينص على أن FastAPI ليست API عامة وأن المسار الصحيح هو `Browser → Laravel → FastAPI`.
-- المرجع المعماري يحدد `X-Internal-API-Key` كمفتاح داخلي وتبقى قيمته في Environment Variables فقط.
-- لا تسجل قيمة المفتاح أو أي Secret ضمن Structured logs.
-- لا تنفذ Health endpoint قبل D5.
-- لا تدخل Versioned DTO schemas قبل D6.
-- لا تبنِ Structured Exceptions الكامل قبل D7؛ يكفي سلوك رفض واضح ومحدود يخدم D4.
-- لا تدخل Deployment capabilities قبل D8 أو Startup validation الكامل قبل D9.
-- لا تدخل AI أو Qdrant أو Parsing أو Providers ضمن D4.
-- لا تضف Cloud/Local dependency split قبل D10.
-- الاختبارات تقتصر على أقل عدد يثبت عقد المصادقة الداخلية مباشرة.
+- Typed configuration موجودة في `app/core/config.py`.
+- Structured Application Logging وCorrelation IDs منفذان من D3.
+- Internal API Security منفذة من D4 عبر `InternalApiAuthMiddleware` و`X-Internal-API-Key`، ويجب ألا يكسر D5 هذه الطبقة أو يتجاوزها بصمت.
+- المسار المعماري المطلوب للـHealth هو `GET /api/v1/health`.
+- D5 يثبت صحة FastAPI نفسها فقط في هذه المرحلة؛ Qdrant لم يُنفذ بعد، وDeployment capabilities لها D8، وStartup Configuration Validation الكامل لها D9، وLocal runtime/device probe له D11.
+- لا تدخل Versioned DTO schemas العامة قبل D6؛ يكفي Response صغير ومحدد خاص بالـHealth يخدم D5 فقط.
+- لا تبنِ Structured Exceptions framework الكامل قبل D7.
+- لا تدخل AI أو Qdrant أو Parsing أو Providers.
+- لا تعدّل Laravel ضمن D5.
+- الاختبارات تقتصر على أقل تحقق مباشر يثبت أن endpoint موجود ويعيد حالة صحية صحيحة عند المرور بالمصادقة الداخلية.
 
 ## Definition of Done
 
-- يوجد إعداد typed ومركزي للمفتاح الداخلي ويقرأ من Environment Variables، دون hardcoding للقيمة داخل الكود.
-- توجد آلية مركزية للتحقق من `X-Internal-API-Key` بدلاً من تكرار منطق المصادقة داخل كل endpoint.
-- الطلب الذي لا يحمل المفتاح يرفض.
-- الطلب الذي يحمل مفتاحاً غير صحيح يرفض.
-- الطلب الذي يحمل المفتاح الصحيح يسمح له بالمرور إلى المسار المحمي.
-- قيمة المفتاح لا تظهر في logs أو error bodies أو responses.
-- Correlation ID وStructured logging المنفذان في D3 يبقيان عاملين دون كسر.
-- لا يتم إنشاء Health endpoint أو DTO layer أو Structured Exceptions framework أو AI/Qdrant ضمن D4.
-- ينجح تحقق صغير ومباشر يغطي الحالات الثلاث الضرورية: missing / invalid / valid key.
-- يتغير D4 في جدول المرحلة إلى `DONE` عند الإغلاق.
-- يحدّث `CURRENT HANDOFF` إلى D5 — Health endpoint.
+- يوجد `GET /api/v1/health` داخل FastAPI.
+- يعيد endpoint استجابة صغيرة وثابتة تدل على أن خدمة FastAPI تعمل، من دون Secrets أو معلومات حساسة.
+- يبقى endpoint خلف Internal API Security المنفذة في D4 ولا يضاف bypass عام غير موثق.
+- Correlation ID وStructured logging يبقيان عاملين دون كسر.
+- لا يتم فحص Qdrant أو Providers أو Local AI runtime قبل مهامها المخصصة.
+- لا يتم إدخال DTO layer العامة أو Structured Exceptions framework الكامل أو Capabilities ضمن D5.
+- ينجح أقل اختبار ضروري لإثبات Health endpoint وسلامة تكامله مع الطبقات الحالية.
+- يتغير D5 في جدول المرحلة إلى `DONE` عند الإغلاق.
+- يحدّث `CURRENT HANDOFF` إلى D6 — Versioned DTO schemas.
 
 ---
 
