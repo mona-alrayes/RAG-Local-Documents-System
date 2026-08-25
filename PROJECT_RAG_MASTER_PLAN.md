@@ -10,7 +10,7 @@
 > **الواجهة الأمامية:** Blade + Livewire + Flux + Tailwind CSS + JavaScript  
 > **لوحة الإدارة:** Filament  
 > **المعالجة الخلفية:** Laravel Queue + Redis  
-> **المراجع التقنية لمساري RAG:** الملفان `cloud_first_rag_colab_fixed_interactive.ipynb` و`hybrid_cloud_parse_local_rag_simple_colab(5).ipynb`
+> **المراجع التقنية لمساري RAG:** الملفان `cloud_first_rag_colab_fixed_interactive.ipynb` و`hybrid_cloud_parse_local_rag_simple_colab.ipynb`
 > **إستراتيجية المعالجة:** Cloud أو Hybrid Local أو Compare في البيئة المحلية، وCloud فقط في النشر Online
 > **إستراتيجية LLM:** `Qwen/Qwen3.5-9B` عبر Hugging Face Router في Cloud، و`qwen3.5:4b` عبر Ollama محلياً
 > **خطة النشر المرجعية:** Oracle Cloud Always Free + Docker Compose لمسار `cloud` فقط؛ الـLocal/Compare Demo يعمل منفصلاً على أجهزة المشروع
