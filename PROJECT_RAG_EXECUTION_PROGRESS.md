@@ -17,15 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 89d1c6417cabda72c648f0a522c1e9f758eca5d6
-Last Merged PR: #36 — docs(C8): finalize execution progress
-Latest Task PR: #37 — feat(D1): establish FastAPI project foundation
-D1 Verification: Python 3.12.13; FastAPI 0.141.1; Uvicorn 0.52.4; import/runtime PASS
-Last Completed Task: D1 — FastAPI project
-Current Task: D2 — Typed config
+Verified Main Commit: 9ad885f4818d6b7d17d6777f34b3a4a9676f4707
+Last Merged PR: #38 — docs: add hybrid local RAG reference notebook
+Latest Task PR: #39 — feat(D2): add typed FastAPI configuration (open/draft)
+D2 Implementation Commit: 30709531ffa2bb78e822d4222b9e8b7613766428
+D2 Verification: Python 3.12.13 (.venv); FastAPI 0.141.1; Pydantic 2.13.4; pydantic-settings 2.12.0; typed/env validation + app import + pip check + diff-check PASS
+Last Completed Task: D2 — Typed config
+Current Task: D3 — Structured logging/correlation IDs
 Current Task Status: TODO
-Expected Task Branch: task/D2-typed-config
-Next Task After Completion: D3 — Structured logging/correlation IDs
+Expected Task Branch: task/D3-structured-logging
+Next Task After Completion: D4 — Internal API security
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -147,7 +148,7 @@ Open Blockers: لا يوجد
 | المهمة | الحالة |
 |---|---|
 | D1 FastAPI project | DONE |
-| D2 Typed config | TODO |
+| D2 Typed config | DONE |
 | D3 Structured logging/correlation IDs | TODO |
 | D4 Internal API security | TODO |
 | D5 Health endpoint | TODO |
@@ -661,6 +662,24 @@ pending
 - مجموعة Security المركزة نجحت بعد Pint: `8 tests / 39 assertions`.
 - Pint على الملفين المعدلين نجح، و`git diff --check` نجح.
 
+## 22.8 FastAPI Typed Configuration المنفذة في D2
+
+تم تنفيذ D2 كطبقة إعدادات مركزية صغيرة ومنفصلة دون إدخال مسؤوليات D3 وما بعدها:
+
+- أضيف `app/core/config.py` مع `Settings` مبنية على `pydantic-settings`.
+- أضيف `DeploymentMode` كـ`StrEnum` بقيمتي `cloud` و`local`.
+- أضيف دعم القراءة من Environment Variables وملف `.env` مع تجاهل المفاتيح الإضافية غير المعروفة في هذه المرحلة.
+- `app_name` و`app_version` أصبحا مصدرهما `Settings` بدلاً من hardcoding داخل `app/main.py`.
+- أضيف `get_settings()` مع `lru_cache` لتوفير instance مركزية للإعدادات.
+- أضيف الاعتماد `pydantic-settings==2.12.0` إلى `pyproject.toml`.
+- لم تدخل Structured Logging أو Correlation IDs أو Internal API Security أو Health أو AI/Qdrant/Parsing/Providers ضمن D2.
+- التحقق من القيمة الافتراضية أعاد `RAG_DEPLOYMENT_MODE=local` بنجاح.
+- override عبر `RAG_DEPLOYMENT_MODE=cloud` نجح.
+- القيمة غير الصالحة `banana` رُفضت بـPydantic `ValidationError` مع exit code `1`.
+- FastAPI app import أعاد `RAG AI Service 0.1.0` بنجاح.
+- `pip check` أعاد `No broken requirements found.` و`git diff --check` نجح.
+- بيئة المشروع المعتمدة هي `fastapi-app/.venv` باستخدام Python `3.12.13`؛ أمر `python` العام على الجهاز يشير إلى Miniconda Python `3.13.13` ولا يجب استخدامه لتنفيذ مهام FastAPI لهذا المشروع.
+
 ---
 
 # 23. Baseline معماري تنفيذي
@@ -678,6 +697,7 @@ pending
 - المحادثة تستخدم آخر تبادلين مكتملين فقط لفهم الإحالات؛ لا توجد ذاكرة مستخرجة في v1.
 - لا يوجد True Streaming/NDJSON/Redis Stream في v1؛ `جاري التفكير` وProgressive Reveal تأثيران Frontend-only.
 - LLM Provider يحدد من Processing Profile موثوقة/Capabilities عبر Registry، بلا global `LLM_PROVIDER` switch وبلا Fallback صامت.
+- تشغيل أوامر FastAPI محلياً يعتمد `fastapi-app/.venv` وPython 3.12.x، وليس Python العام على النظام إذا كان خارج النطاق `>=3.12,<3.13`.
 
 ---
 
@@ -713,6 +733,7 @@ pending
 | C7 — Aggregate status transitions | #34 | Security Job orchestration + `pending → scanning → clean → pending`؛ disabled يبقى `pending`؛ 7 tests / 33 assertions؛ Pint/diff-check PASS |
 | C8 — Security tests | #35 | explicit bypass + scan_failed no-fallback coverage؛ 8 tests / 39 assertions؛ Pint/diff-check PASS |
 | D1 — FastAPI project | #37 | FastAPI foundation + Python 3.12 baseline + application factory؛ runtime verification PASS |
+| D2 — Typed config | #39 | `pydantic-settings` + typed deployment mode + centralized app settings؛ env/validation/import/pip/diff checks PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -720,7 +741,9 @@ pending
 - البيانات الخاصة بالمعالجة بقيت في Processing Runs وليست داخل `documents`.
 - 2026-08-22: أعيد تنظيم ملف التقدم نفسه ليبقى خفيفاً بين المحادثات: جداول المهام بقيت كاملة، بينما اختُصر سجل الإنجاز واعتمد Git/PRs للتاريخ التفصيلي.
 - C8 أغلقت من دون تعديل production code؛ اقتصرت على سد فجوات الاختبارات الأمنية المتبقية.
-- D1 أنشأت FastAPI foundation مستقلاً داخل `fastapi-app` مع Python 3.12 baseline وApplication Factory؛ لا يوجد بعد Config أو Logging أو Security أو Health أو AI/Qdrant.
+- D1 أنشأت FastAPI foundation مستقلاً داخل `fastapi-app` مع Python 3.12 baseline وApplication Factory.
+- D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
+- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv`؛ تم اكتشاف أن `python` العام يشير إلى Miniconda Python 3.13.13 غير المتوافق مع قيد المشروع، لذلك تستخدم `.venv` Python 3.12.13 في التحقق والتنفيذ.
 - لا توجد عوائق حالية.
 
 ---
@@ -728,39 +751,41 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D2 — Typed config
+D3 — Structured logging/correlation IDs
 Status: TODO
-Expected Branch: task/D2-typed-config
-Next: D3 — Structured logging/correlation IDs
+Expected Branch: task/D3-structured-logging
+Next: D4 — Internal API security
 ```
 
 ## الهدف
 
-إضافة طبقة Configuration typed ومنظمة لخدمة FastAPI، بحيث تصبح إعدادات التشغيل والبيئة مركزية وقابلة للتحقق والتوسع، مع الحفاظ على فصل المسؤوليات وعدم إدخال مسؤوليات المراحل اللاحقة.
+إضافة Structured Logging منظم لخدمة FastAPI مع Correlation ID واضح لتتبع الطلب عبر السجلات، مع الحفاظ على فصل المسؤوليات وعدم إدخال Internal API Security أو Health أو DTOs أو AI ضمن هذه المهمة.
 
 ## ملاحظة البدء
 
-ابدأ من FastAPI foundation المنفذة في D1:
+ابدأ من FastAPI foundation وTyped Configuration المنفذتين في D1/D2:
 
-- المشروع موجود داخل `fastapi-app`.
-- Python baseline المعتمد هو `3.12.x`، وتم التحقق باستخدام Python `3.12.13`.
-- الاعتماديات الحالية في D1 هي FastAPI `0.141.1` وUvicorn `0.52.4`.
-- entry point الحالي هو `app.main:app` مع Application Factory باسم `create_app()`.
-- لا تدخل Structured Logging/Correlation IDs قبل D3.
+- المشروع داخل `fastapi-app` ويستخدم `app.main:app` مع `create_app()`.
+- إعدادات FastAPI المركزية موجودة في `app/core/config.py` عبر `Settings` و`get_settings()`.
+- بيئة التنفيذ المحلية المعتمدة هي `.venv` مع Python `3.12.13`.
+- لا تستخدم Python العام من Miniconda لأنه `3.13.13` وخارج قيد المشروع `>=3.12,<3.13`.
+- المرجع المعماري يطلب Structured Logging وrequest correlation id ضمن FastAPI logging.
 - لا تدخل Internal API Security قبل D4.
 - لا تدخل Health endpoint قبل D5.
-- لا تدخل AI أو Qdrant أو Parsing أو Providers ضمن D2.
+- لا تدخل Versioned DTO schemas قبل D6.
+- لا تدخل Structured Exceptions قبل D7 إلا بالحد الضروري الذي يخدم logging نفسه دون بناء نظام الاستثناءات الكامل.
+- لا تدخل AI أو Qdrant أو Parsing أو Providers ضمن D3.
 - لا تضف Cloud/Local dependency split قبل D10.
 
 ## Definition of Done
 
-- توجد طبقة Typed Configuration مركزية وواضحة لخدمة FastAPI.
-- الإعدادات لا تبقى Hardcoded داخل مكونات التطبيق التي ستعتمد عليها لاحقاً.
-- يتم تحميل الإعدادات بطريقة قابلة للتحقق والتوسع دون خلط Logging أو Security أو Health داخل D2.
-- ينجح تحقق صغير ومباشر يثبت أن الإعدادات typed وتحمل بالقيم المتوقعة.
-- لا تدخل AI أو Qdrant أو Laravel orchestration ضمن هذه المهمة.
-- يتغير D2 في جدول المرحلة إلى `DONE` عند الإغلاق.
-- يحدّث `CURRENT HANDOFF` إلى D3 — Structured logging/correlation IDs.
+- توجد آلية Structured Logging مركزية وواضحة لخدمة FastAPI.
+- يوجد request correlation id يمكن استخدامه لتتبع طلب واحد عبر السجلات.
+- لا يتسرب Logging setup إلى مكونات التطبيق بصورة عشوائية أو مكررة.
+- ينجح تحقق صغير ومباشر يثبت أن logging/correlation يعملان كما هو متوقع.
+- تبقى Security وHealth وDTOs وAI/Qdrant خارج نطاق المهمة.
+- يتغير D3 في جدول المرحلة إلى `DONE` عند الإغلاق.
+- يحدّث `CURRENT HANDOFF` إلى D4 — Internal API security.
 
 ---
 
@@ -768,6 +793,7 @@ Next: D3 — Structured logging/correlation IDs
 
 - لا توجد عوائق حالية.
 - توجد ملاحظة تنسيق Pint قديمة في `laravel-app/bootstrap/providers.php` خارج نطاق المهام الحالية؛ غير حاجبة.
+- عند تنفيذ مهام FastAPI استخدم `.venv` الرسمية لتجنب التقاط Miniconda Python 3.13 من PATH.
 
 ---
 
