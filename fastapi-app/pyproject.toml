@@ -1,0 +1,13 @@
+[project]
+name = "rag-ai-service"
+version = "0.1.0"
+description = "FastAPI service for AI and RAG capabilities."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn==0.52.4",
+]
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
