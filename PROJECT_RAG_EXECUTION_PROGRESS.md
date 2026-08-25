@@ -2,7 +2,7 @@
 
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات، دون تكرار التفاصيل الموجودة في الـMaster Plan أو Git/PRs.
-> **آخر تحديث:** 2026-08-25
+> **آخر تحديث:** 2026-08-26
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 197c641bfcb7d4c7b6bb9400d3fa02d406159a23
-Last Merged PR: #41 — feat(D4): secure internal FastAPI access
-Latest Task PR: #41 — feat(D4): secure internal FastAPI access
-D4 Implementation Commit: cd45099809fa3b6e403378bb9fb82c3c1daf09c3
-D4 Verification: Python 3.12.14 (.venv); compileall + 3 focused auth tests + pip check + diff-check PASS; missing/invalid key rejected with 401; valid key reaches FastAPI; Correlation ID remains active around auth middleware; secret is not logged or returned
-Last Completed Task: D4 — Internal API security
-Current Task: D5 — Health endpoint
+Verified Main Commit: 594f24635e11143da66293ebf08a73f02265604a
+Last Merged PR: #42 — feat(D5): add FastAPI health endpoint
+Latest Task PR: #42 — feat(D5): add FastAPI health endpoint
+D5 Implementation Commit: bcf4f304c80f82dfae33b190305d0a04d85b1e88
+D5 Verification: Python 3.12.14 (.venv); authenticated GET /api/v1/health returned 200 + {"status":"ok"} + Correlation ID; focused D5 test 1 passed; D4+D5 regression 4 passed; compileall + pip check + diff-check PASS
+Last Completed Task: D5 — Health endpoint
+Current Task: D6 — Versioned DTO schemas
 Current Task Status: TODO
-Expected Task Branch: task/D5-health-endpoint
-Next Task After Completion: D6 — Versioned DTO schemas
+Expected Task Branch: task/D6-versioned-dto-schemas
+Next Task After Completion: D7 — Structured exceptions
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -151,7 +151,7 @@ Open Blockers: لا يوجد
 | D2 Typed config | DONE |
 | D3 Structured logging/correlation IDs | DONE |
 | D4 Internal API security | DONE |
-| D5 Health endpoint | TODO |
+| D5 Health endpoint | DONE |
 | D6 Versioned DTO schemas | TODO |
 | D7 Structured exceptions | TODO |
 | D8 Deployment capabilities endpoint | TODO |
@@ -794,6 +794,7 @@ pending
 | D2 — Typed config | #39 | `pydantic-settings` + typed deployment mode + centralized app settings؛ env/validation/import/pip/diff checks PASS |
 | D3 — Structured logging/correlation IDs | #40 | Central JSON logging + async-safe ContextVar correlation IDs + request/response propagation; supplied/generated ID verification + compileall/diff-check PASS |
 | D4 — Internal API security | #41 | `X-Internal-API-Key` + `SecretStr` + centralized ASGI auth; missing/invalid/valid coverage؛ 3 tests + compileall/pip/diff-check PASS |
+| D5 — Health endpoint | #42 | `GET /api/v1/health` + internal auth + Correlation ID preserved؛ 1 focused test + D4/D5 regression + compileall/pip/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -805,7 +806,7 @@ pending
 - D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
 - D3 أضافت Structured JSON logging مركزية وCorrelation IDs عبر Pure ASGI middleware وContextVar، مع الحفاظ على Security وHealth خارج النطاق.
 - D4 أضافت Internal API authentication مركزية باستخدام `X-Internal-API-Key` و`SecretStr` و`compare_digest`، مع Fail-Closed للمفتاح المفقود/غير الصالح والحفاظ على Correlation ID حول طبقة المصادقة.
-- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3/D4 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
+- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D5 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
 - لا توجد عوائق حالية.
 
 ---
@@ -813,49 +814,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D5 — Health endpoint
+D6 — Versioned DTO schemas
 Status: TODO
-Expected Branch: task/D5-health-endpoint
-Next: D6 — Versioned DTO schemas
+Expected Branch: task/D6-versioned-dto-schemas
+Next: D7 — Structured exceptions
 ```
 
-## الهدف
-
-إضافة Health endpoint رسمي وبسيط داخل FastAPI على المسار المعتمد:
-
-```http
-GET /api/v1/health
-```
-
-بحيث يمكن للطبقات الداخلية وعمليات النشر اللاحقة التحقق أن خدمة FastAPI نفسها تعمل، من دون إدخال Capabilities أو فحوص AI/Qdrant/Providers قبل مهامها المخصصة.
-
-## ملاحظة البدء
-
-ابدأ من FastAPI foundation الحالية بعد D1–D4:
-
-- المشروع داخل `fastapi-app` ويستخدم `app.main:app` مع `create_app()`.
-- Typed configuration موجودة في `app/core/config.py`.
-- Structured Application Logging وCorrelation IDs منفذان من D3.
-- Internal API Security منفذة من D4 عبر `InternalApiAuthMiddleware` و`X-Internal-API-Key`، ويجب ألا يكسر D5 هذه الطبقة أو يتجاوزها بصمت.
-- المسار المعماري المطلوب للـHealth هو `GET /api/v1/health`.
-- D5 يثبت صحة FastAPI نفسها فقط في هذه المرحلة؛ Qdrant لم يُنفذ بعد، وDeployment capabilities لها D8، وStartup Configuration Validation الكامل لها D9، وLocal runtime/device probe له D11.
-- لا تدخل Versioned DTO schemas العامة قبل D6؛ يكفي Response صغير ومحدد خاص بالـHealth يخدم D5 فقط.
-- لا تبنِ Structured Exceptions framework الكامل قبل D7.
-- لا تدخل AI أو Qdrant أو Parsing أو Providers.
-- لا تعدّل Laravel ضمن D5.
-- الاختبارات تقتصر على أقل تحقق مباشر يثبت أن endpoint موجود ويعيد حالة صحية صحيحة عند المرور بالمصادقة الداخلية.
-
-## Definition of Done
-
-- يوجد `GET /api/v1/health` داخل FastAPI.
-- يعيد endpoint استجابة صغيرة وثابتة تدل على أن خدمة FastAPI تعمل، من دون Secrets أو معلومات حساسة.
-- يبقى endpoint خلف Internal API Security المنفذة في D4 ولا يضاف bypass عام غير موثق.
-- Correlation ID وStructured logging يبقيان عاملين دون كسر.
-- لا يتم فحص Qdrant أو Providers أو Local AI runtime قبل مهامها المخصصة.
-- لا يتم إدخال DTO layer العامة أو Structured Exceptions framework الكامل أو Capabilities ضمن D5.
-- ينجح أقل اختبار ضروري لإثبات Health endpoint وسلامة تكامله مع الطبقات الحالية.
-- يتغير D5 في جدول المرحلة إلى `DONE` عند الإغلاق.
-- يحدّث `CURRENT HANDOFF` إلى D6 — Versioned DTO schemas.
+> تفاصيل نطاق D6 وعقودها تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` عند بدء المهمة، دون توسيعها إلى D7 وما بعدها.
 
 ---
 
