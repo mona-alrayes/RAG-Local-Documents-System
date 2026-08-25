@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 9ad885f4818d6b7d17d6777f34b3a4a9676f4707
-Last Merged PR: #38 — docs: add hybrid local RAG reference notebook
-Latest Task PR: #39 — feat(D2): add typed FastAPI configuration
-D2 Implementation Commit: 30709531ffa2bb78e822d4222b9e8b7613766428
-D2 Verification: Python 3.12.13 (.venv); FastAPI 0.141.1; Pydantic 2.13.4; pydantic-settings 2.12.0; typed/env validation + app import + pip check + diff-check PASS
-Last Completed Task: D2 — Typed config
-Current Task: D3 — Structured logging/correlation IDs
+Verified Main Commit: d47c30b6b98143a1e87ef6ef60b2bd62f901ac4d
+Last Merged PR: #39 — feat(D2): add typed FastAPI configuration
+Latest Task PR: Pending — D3 Structured logging/correlation IDs
+D3 Implementation Commit: 5ace97b
+D3 Verification: Python 3.12.14 (.venv); pip check + compileall + diff-check PASS; provided correlation ID preserved; missing correlation ID generates UUID; response header and structured JSON log carry the same correlation ID
+Last Completed Task: D3 — Structured logging/correlation IDs
+Current Task: D4 — Internal API security
 Current Task Status: TODO
-Expected Task Branch: task/D3-structured-logging
-Next Task After Completion: D4 — Internal API security
+Expected Task Branch: task/D4-internal-api-security
+Next Task After Completion: D5 — Health endpoint
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -149,7 +149,7 @@ Open Blockers: لا يوجد
 |---|---|
 | D1 FastAPI project | DONE |
 | D2 Typed config | DONE |
-| D3 Structured logging/correlation IDs | TODO |
+| D3 Structured logging/correlation IDs | DONE |
 | D4 Internal API security | TODO |
 | D5 Health endpoint | TODO |
 | D6 Versioned DTO schemas | TODO |
@@ -734,6 +734,7 @@ pending
 | C8 — Security tests | #35 | explicit bypass + scan_failed no-fallback coverage؛ 8 tests / 39 assertions؛ Pint/diff-check PASS |
 | D1 — FastAPI project | #37 | FastAPI foundation + Python 3.12 baseline + application factory؛ runtime verification PASS |
 | D2 — Typed config | #39 | `pydantic-settings` + typed deployment mode + centralized app settings؛ env/validation/import/pip/diff checks PASS |
+| D3 — Structured logging/correlation IDs | Pending | Central JSON logging + async-safe ContextVar correlation IDs + request/response propagation; supplied/generated ID verification + compileall/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
