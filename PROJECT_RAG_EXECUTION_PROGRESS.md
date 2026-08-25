@@ -17,8 +17,8 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 2f176ebcd5ac343c9f2b39d052d1462bc0746ea1
-Last Merged PR: #40 — feat(D3): add structured logging and correlation IDs
+Verified Main Commit: 197c641bfcb7d4c7b6bb9400d3fa02d406159a23
+Last Merged PR: #41 — feat(D4): secure internal FastAPI access
 Latest Task PR: #41 — feat(D4): secure internal FastAPI access
 D4 Implementation Commit: cd45099809fa3b6e403378bb9fb82c3c1daf09c3
 D4 Verification: Python 3.12.14 (.venv); compileall + 3 focused auth tests + pip check + diff-check PASS; missing/invalid key rejected with 401; valid key reaches FastAPI; Correlation ID remains active around auth middleware; secret is not logged or returned
