@@ -19,7 +19,7 @@ Repository Status: Active Development
 
 Verified Main Commit: 9ad885f4818d6b7d17d6777f34b3a4a9676f4707
 Last Merged PR: #38 — docs: add hybrid local RAG reference notebook
-Latest Task PR: #39 — feat(D2): add typed FastAPI configuration (open/draft)
+Latest Task PR: #39 — feat(D2): add typed FastAPI configuration
 D2 Implementation Commit: 30709531ffa2bb78e822d4222b9e8b7613766428
 D2 Verification: Python 3.12.13 (.venv); FastAPI 0.141.1; Pydantic 2.13.4; pydantic-settings 2.12.0; typed/env validation + app import + pip check + diff-check PASS
 Last Completed Task: D2 — Typed config
