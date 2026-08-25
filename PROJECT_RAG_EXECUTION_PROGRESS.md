@@ -2,7 +2,7 @@
 
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات، دون تكرار التفاصيل الموجودة في الـMaster Plan أو Git/PRs.
-> **آخر تحديث:** 2026-08-24
+> **آخر تحديث:** 2026-08-25
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -17,15 +17,15 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 9809a52ff62e9b255a97b9be358b7f0f3e7c242f
-Last Merged PR: #35 — test(C8): complete security pipeline coverage
-Latest Task PR: #35 — test(C8): complete security pipeline coverage
-C8 Verification: 8 tests / 39 assertions; Pint/diff-check PASS
-Last Completed Task: C8 — Security tests
-Current Task: D1 — FastAPI project
+Verified Main Commit: 89d1c6417cabda72c648f0a522c1e9f758eca5d6
+Last Merged PR: #36 — docs(C8): finalize execution progress
+Latest Task PR: #37 — feat(D1): establish FastAPI project foundation
+D1 Verification: Python 3.12.13; FastAPI 0.141.1; Uvicorn 0.52.4; import/runtime PASS
+Last Completed Task: D1 — FastAPI project
+Current Task: D2 — Typed config
 Current Task Status: TODO
-Expected Task Branch: task/D1-fastapi-project
-Next Task After Completion: D2 — Typed config
+Expected Task Branch: task/D2-typed-config
+Next Task After Completion: D3 — Structured logging/correlation IDs
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -146,7 +146,7 @@ Open Blockers: لا يوجد
 
 | المهمة | الحالة |
 |---|---|
-| D1 FastAPI project | TODO |
+| D1 FastAPI project | DONE |
 | D2 Typed config | TODO |
 | D3 Structured logging/correlation IDs | TODO |
 | D4 Internal API security | TODO |
@@ -712,6 +712,7 @@ pending
 | C6 — Configurable security-scan routing | #33 | enabled افتراضياً → quarantine؛ disabled صراحةً → permanent storage؛ 6 tests / 25 assertions؛ Pint/diff-check PASS |
 | C7 — Aggregate status transitions | #34 | Security Job orchestration + `pending → scanning → clean → pending`؛ disabled يبقى `pending`؛ 7 tests / 33 assertions؛ Pint/diff-check PASS |
 | C8 — Security tests | #35 | explicit bypass + scan_failed no-fallback coverage؛ 8 tests / 39 assertions؛ Pint/diff-check PASS |
+| D1 — FastAPI project | #37 | FastAPI foundation + Python 3.12 baseline + application factory؛ runtime verification PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -719,6 +720,7 @@ pending
 - البيانات الخاصة بالمعالجة بقيت في Processing Runs وليست داخل `documents`.
 - 2026-08-22: أعيد تنظيم ملف التقدم نفسه ليبقى خفيفاً بين المحادثات: جداول المهام بقيت كاملة، بينما اختُصر سجل الإنجاز واعتمد Git/PRs للتاريخ التفصيلي.
 - C8 أغلقت من دون تعديل production code؛ اقتصرت على سد فجوات الاختبارات الأمنية المتبقية.
+- D1 أنشأت FastAPI foundation مستقلاً داخل `fastapi-app` مع Python 3.12 baseline وApplication Factory؛ لا يوجد بعد Config أو Logging أو Security أو Health أو AI/Qdrant.
 - لا توجد عوائق حالية.
 
 ---
@@ -726,46 +728,39 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D1 — FastAPI project
+D2 — Typed config
 Status: TODO
-Expected Branch: task/D1-fastapi-project
-Next: D2 — Typed config
+Expected Branch: task/D2-typed-config
+Next: D3 — Structured logging/correlation IDs
 ```
 
 ## الهدف
 
-إنشاء الأساس الأولي لخدمة FastAPI المستقلة التي ستحتوي لاحقاً قدرات RAG، مع الالتزام بحدود المسؤوليات المعتمدة:
-
-```text
-Laravel = application / users / authorization / orchestration
-FastAPI = AI / RAG capabilities
-```
-
-تقتصر D1 على تأسيس مشروع FastAPI وبنية التشغيل الأساسية اللازمة للمهام اللاحقة، من دون تنفيذ AI أو Qdrant أو Parsing أو Providers.
+إضافة طبقة Configuration typed ومنظمة لخدمة FastAPI، بحيث تصبح إعدادات التشغيل والبيئة مركزية وقابلة للتحقق والتوسع، مع الحفاظ على فصل المسؤوليات وعدم إدخال مسؤوليات المراحل اللاحقة.
 
 ## ملاحظة البدء
 
-ابدأ من نهاية مرحلة C كما هي منجزة ومثبتة:
+ابدأ من FastAPI foundation المنفذة في D1:
 
-- Security Pipeline انتهت عند C8 ولا تحتاج تعديلات ضمن D1.
-- لا تربط D1 حتى الآن بمسار Document processing في Laravel.
-- لا تدخل Typed Config قبل D2.
+- المشروع موجود داخل `fastapi-app`.
+- Python baseline المعتمد هو `3.12.x`، وتم التحقق باستخدام Python `3.12.13`.
+- الاعتماديات الحالية في D1 هي FastAPI `0.141.1` وUvicorn `0.52.4`.
+- entry point الحالي هو `app.main:app` مع Application Factory باسم `create_app()`.
 - لا تدخل Structured Logging/Correlation IDs قبل D3.
 - لا تدخل Internal API Security قبل D4.
 - لا تدخل Health endpoint قبل D5.
+- لا تدخل AI أو Qdrant أو Parsing أو Providers ضمن D2.
 - لا تضف Cloud/Local dependency split قبل D10.
-- حافظ على فصل واضح بين Laravel application layer وخدمة FastAPI.
 
 ## Definition of Done
 
-- يوجد FastAPI project foundation منظم وقابل للتوسع.
-- يوجد entry point واضح للتطبيق.
-- بنية الملفات لا تخلط مسؤوليات المراحل اللاحقة داخل D1.
-- لا يدخل FastAPI بعد إلى Qdrant أو AI processing أو Laravel orchestration.
-- التحقق الأساسي المناسب للمشروع ينجح.
-- Pint/Laravel production code لا يتأثر بهذه المهمة ما لم يوجد سبب مباشر.
-- يتغير D1 في جدول المرحلة إلى `DONE` عند الإغلاق.
-- يحدّث `CURRENT HANDOFF` إلى D2 — Typed config.
+- توجد طبقة Typed Configuration مركزية وواضحة لخدمة FastAPI.
+- الإعدادات لا تبقى Hardcoded داخل مكونات التطبيق التي ستعتمد عليها لاحقاً.
+- يتم تحميل الإعدادات بطريقة قابلة للتحقق والتوسع دون خلط Logging أو Security أو Health داخل D2.
+- ينجح تحقق صغير ومباشر يثبت أن الإعدادات typed وتحمل بالقيم المتوقعة.
+- لا تدخل AI أو Qdrant أو Laravel orchestration ضمن هذه المهمة.
+- يتغير D2 في جدول المرحلة إلى `DONE` عند الإغلاق.
+- يحدّث `CURRENT HANDOFF` إلى D3 — Structured logging/correlation IDs.
 
 ---
 
