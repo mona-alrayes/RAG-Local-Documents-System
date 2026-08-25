@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 9ad885f4818d6b7d17d6777f34b3a4a9676f4707
-Last Merged PR: #38 — docs: add hybrid local RAG reference notebook
-Latest Task PR: #39 — feat(D2): add typed FastAPI configuration
-D2 Implementation Commit: 30709531ffa2bb78e822d4222b9e8b7613766428
-D2 Verification: Python 3.12.13 (.venv); FastAPI 0.141.1; Pydantic 2.13.4; pydantic-settings 2.12.0; typed/env validation + app import + pip check + diff-check PASS
-Last Completed Task: D2 — Typed config
-Current Task: D3 — Structured logging/correlation IDs
+Verified Main Commit: d47c30b6b98143a1e87ef6ef60b2bd62f901ac4d
+Last Merged PR: #39 — feat(D2): add typed FastAPI configuration
+Latest Task PR: #40 — feat(D3): add structured logging and correlation IDs
+D3 Implementation Commit: 5ace97b
+D3 Verification: Python 3.12.14 (.venv); pip check + compileall + diff-check PASS; provided correlation ID preserved; missing correlation ID generates UUID; response header and structured JSON log carry the same correlation ID
+Last Completed Task: D3 — Structured logging/correlation IDs
+Current Task: D4 — Internal API security
 Current Task Status: TODO
-Expected Task Branch: task/D3-structured-logging
-Next Task After Completion: D4 — Internal API security
+Expected Task Branch: task/D4-internal-api-security
+Next Task After Completion: D5 — Health endpoint
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -149,7 +149,7 @@ Open Blockers: لا يوجد
 |---|---|
 | D1 FastAPI project | DONE |
 | D2 Typed config | DONE |
-| D3 Structured logging/correlation IDs | TODO |
+| D3 Structured logging/correlation IDs | DONE |
 | D4 Internal API security | TODO |
 | D5 Health endpoint | TODO |
 | D6 Versioned DTO schemas | TODO |
@@ -647,7 +647,7 @@ pending
 
 أغلقت C8 بأقل توسع اختباري ممكن، مع إعادة استخدام اختبارات C3–C7 وعدم إنشاء Matrix مكررة:
 
-- عُدّل اختبار explicit bypass الموجود ليثبت أن `DOCUMENT_SECURITY_SCAN_ENABLED=false`:
+- عُدل اختبار explicit bypass الموجود ليثبت أن `DOCUMENT_SECURITY_SCAN_ENABLED=false`:
   - لا يرسل `ScanDocumentSecurityJob`.
   - لا يستخدم quarantine.
   - يخزن مباشرة في permanent storage.
@@ -678,7 +678,40 @@ pending
 - القيمة غير الصالحة `banana` رُفضت بـPydantic `ValidationError` مع exit code `1`.
 - FastAPI app import أعاد `RAG AI Service 0.1.0` بنجاح.
 - `pip check` أعاد `No broken requirements found.` و`git diff --check` نجح.
-- بيئة المشروع المعتمدة هي `fastapi-app/.venv` باستخدام Python `3.12.13`؛ أمر `python` العام على الجهاز يشير إلى Miniconda Python `3.13.13` ولا يجب استخدامه لتنفيذ مهام FastAPI لهذا المشروع.
+- D2 تم التحقق منها باستخدام Python `3.12.13` داخل `fastapi-app/.venv`؛ بعد إعداد بيئة D3 أصبحت `.venv` الحالية Python `3.12.14`. يبقى القيد المعتمد للمشروع `>=3.12,<3.13`، ولا يستخدم Python العام من Miniconda `3.13.13`.
+
+## 22.9 Structured Logging/Correlation IDs المنفذة في D3
+
+تم تنفيذ D3 كطبقة Logging مركزية ومستقلة، دون إدخال Security أو Health أو DTOs أو AI:
+
+- أضيف `app/core/logging.py` ويحتوي:
+  - `ContextVar` لحفظ `correlation_id` ضمن سياق الطلب بصورة async-safe.
+  - دوال `get_correlation_id()` و`set_correlation_id()` و`reset_correlation_id()`.
+  - `JsonFormatter` لإخراج Application logs بصيغة JSON.
+  - `configure_logging()` لتجهيز Root logger بصورة مركزية.
+- الحقول الأساسية في Structured JSON log هي:
+  - `timestamp`
+  - `level`
+  - `logger`
+  - `message`
+  - `correlation_id`
+  - `exception` عند وجود Exception info.
+- أضيف `app/middleware/correlation_id.py` كـPure ASGI middleware:
+  - يطبق فقط على HTTP requests.
+  - يعيد استخدام `X-Correlation-ID` القادم إذا كان ASCII صالحاً وغير فارغ وطوله لا يتجاوز 128 حرفاً.
+  - يولد UUID4 جديداً عند غياب المعرّف أو عدم صلاحيته.
+  - يضع نفس المعرّف في ContextVar أثناء تنفيذ الطلب.
+  - يضيف نفس `x-correlation-id` إلى response headers.
+  - يعيد ContextVar إلى حالته السابقة داخل `finally`.
+- أضيف logger باسم `app.request` ويسجل `Request completed` بينما correlation context ما زال فعالاً.
+- تم ربط `configure_logging()` و`CorrelationIdMiddleware` داخل `create_app()` في `app/main.py`.
+- Uvicorn startup/access logs بقيت ضمن logging الخاص بـUvicorn؛ Structured JSON المضاف في D3 يخص Application logs ولم يتم توسيع المهمة لإعادة تصميم Uvicorn logging.
+- تم التحقق Runtime عبر `/docs` دون إنشاء Health endpoint قبل D5:
+  - correlation ID المرسل من العميل ظهر نفسه في response header وStructured JSON log.
+  - عند غياب header تم توليد UUID وظهر نفسه في response header وStructured JSON log.
+- `pip check` و`compileall` و`git diff --check` نجحت.
+- بيئة التحقق الحالية لـFastAPI هي `fastapi-app/.venv` مع Python `3.12.14`.
+- لم تدخل Internal API Security أو Health أو DTOs أو Structured Exceptions الكامل أو AI/Qdrant/Parsing/Providers ضمن D3.
 
 ---
 
@@ -698,6 +731,7 @@ pending
 - لا يوجد True Streaming/NDJSON/Redis Stream في v1؛ `جاري التفكير` وProgressive Reveal تأثيران Frontend-only.
 - LLM Provider يحدد من Processing Profile موثوقة/Capabilities عبر Registry، بلا global `LLM_PROVIDER` switch وبلا Fallback صامت.
 - تشغيل أوامر FastAPI محلياً يعتمد `fastapi-app/.venv` وPython 3.12.x، وليس Python العام على النظام إذا كان خارج النطاق `>=3.12,<3.13`.
+- FastAPI ليس API عاماً للمستخدم النهائي؛ المسار المعتمد هو `Browser → Laravel → FastAPI`. تأمين الاتصال الداخلي في D4 يعتمد `X-Internal-API-Key` وقيمته من Environment Variables فقط.
 
 ---
 
@@ -734,6 +768,7 @@ pending
 | C8 — Security tests | #35 | explicit bypass + scan_failed no-fallback coverage؛ 8 tests / 39 assertions؛ Pint/diff-check PASS |
 | D1 — FastAPI project | #37 | FastAPI foundation + Python 3.12 baseline + application factory؛ runtime verification PASS |
 | D2 — Typed config | #39 | `pydantic-settings` + typed deployment mode + centralized app settings؛ env/validation/import/pip/diff checks PASS |
+| D3 — Structured logging/correlation IDs | #40 | Central JSON logging + async-safe ContextVar correlation IDs + request/response propagation; supplied/generated ID verification + compileall/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -743,7 +778,8 @@ pending
 - C8 أغلقت من دون تعديل production code؛ اقتصرت على سد فجوات الاختبارات الأمنية المتبقية.
 - D1 أنشأت FastAPI foundation مستقلاً داخل `fastapi-app` مع Python 3.12 baseline وApplication Factory.
 - D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
-- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv`؛ تم اكتشاف أن `python` العام يشير إلى Miniconda Python 3.13.13 غير المتوافق مع قيد المشروع، لذلك تستخدم `.venv` Python 3.12.13 في التحقق والتنفيذ.
+- D3 أضافت Structured JSON logging مركزية وCorrelation IDs عبر Pure ASGI middleware وContextVar، مع الحفاظ على Security وHealth خارج النطاق.
+- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، والبيئة الحالية المستخدمة في D3 هي `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
 - لا توجد عوائق حالية.
 
 ---
@@ -751,41 +787,73 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D3 — Structured logging/correlation IDs
+D4 — Internal API security
 Status: TODO
-Expected Branch: task/D3-structured-logging
-Next: D4 — Internal API security
+Expected Branch: task/D4-internal-api-security
+Next: D5 — Health endpoint
 ```
 
 ## الهدف
 
-إضافة Structured Logging منظم لخدمة FastAPI مع Correlation ID واضح لتتبع الطلب عبر السجلات، مع الحفاظ على فصل المسؤوليات وعدم إدخال Internal API Security أو Health أو DTOs أو AI ضمن هذه المهمة.
+حماية الاتصال الداخلي بين Laravel وFastAPI بحيث لا تكون FastAPI API عامة للمستخدم النهائي، ويقتصر الوصول إلى الـinternal API على الطلبات التي تحمل المفتاح الداخلي الصحيح.
+
+العقد المعماري المرجعي:
+
+```text
+Browser
+  ↓
+Laravel
+  ↓
+FastAPI
+```
+
+وليس:
+
+```text
+Browser → FastAPI
+```
+
+ويستخدم الاتصال الداخلي Header:
+
+```text
+X-Internal-API-Key
+```
+
+على أن تبقى قيمة المفتاح داخل Environment Variables فقط، وألا تظهر في logs أو responses.
 
 ## ملاحظة البدء
 
-ابدأ من FastAPI foundation وTyped Configuration المنفذتين في D1/D2:
+ابدأ من FastAPI foundation الحالية بعد D1–D3:
 
 - المشروع داخل `fastapi-app` ويستخدم `app.main:app` مع `create_app()`.
-- إعدادات FastAPI المركزية موجودة في `app/core/config.py` عبر `Settings` و`get_settings()`.
-- بيئة التنفيذ المحلية المعتمدة هي `.venv` مع Python `3.12.13`.
-- لا تستخدم Python العام من Miniconda لأنه `3.13.13` وخارج قيد المشروع `>=3.12,<3.13`.
-- المرجع المعماري يطلب Structured Logging وrequest correlation id ضمن FastAPI logging.
-- لا تدخل Internal API Security قبل D4.
-- لا تدخل Health endpoint قبل D5.
+- الإعدادات typed والمركزية موجودة في `app/core/config.py` عبر `Settings` و`get_settings()`.
+- Structured Application Logging موجود في `app/core/logging.py`.
+- Correlation ID middleware موجود في `app/middleware/correlation_id.py`.
+- بيئة التنفيذ المحلية الحالية هي `fastapi-app/.venv` مع Python `3.12.14`.
+- المرجع المعماري ينص على أن FastAPI ليست API عامة وأن المسار الصحيح هو `Browser → Laravel → FastAPI`.
+- المرجع المعماري يحدد `X-Internal-API-Key` كمفتاح داخلي وتبقى قيمته في Environment Variables فقط.
+- لا تسجل قيمة المفتاح أو أي Secret ضمن Structured logs.
+- لا تنفذ Health endpoint قبل D5.
 - لا تدخل Versioned DTO schemas قبل D6.
-- لا تدخل Structured Exceptions قبل D7 إلا بالحد الضروري الذي يخدم logging نفسه دون بناء نظام الاستثناءات الكامل.
-- لا تدخل AI أو Qdrant أو Parsing أو Providers ضمن D3.
+- لا تبنِ Structured Exceptions الكامل قبل D7؛ يكفي سلوك رفض واضح ومحدود يخدم D4.
+- لا تدخل Deployment capabilities قبل D8 أو Startup validation الكامل قبل D9.
+- لا تدخل AI أو Qdrant أو Parsing أو Providers ضمن D4.
 - لا تضف Cloud/Local dependency split قبل D10.
+- الاختبارات تقتصر على أقل عدد يثبت عقد المصادقة الداخلية مباشرة.
 
 ## Definition of Done
 
-- توجد آلية Structured Logging مركزية وواضحة لخدمة FastAPI.
-- يوجد request correlation id يمكن استخدامه لتتبع طلب واحد عبر السجلات.
-- لا يتسرب Logging setup إلى مكونات التطبيق بصورة عشوائية أو مكررة.
-- ينجح تحقق صغير ومباشر يثبت أن logging/correlation يعملان كما هو متوقع.
-- تبقى Security وHealth وDTOs وAI/Qdrant خارج نطاق المهمة.
-- يتغير D3 في جدول المرحلة إلى `DONE` عند الإغلاق.
-- يحدّث `CURRENT HANDOFF` إلى D4 — Internal API security.
+- يوجد إعداد typed ومركزي للمفتاح الداخلي ويقرأ من Environment Variables، دون hardcoding للقيمة داخل الكود.
+- توجد آلية مركزية للتحقق من `X-Internal-API-Key` بدلاً من تكرار منطق المصادقة داخل كل endpoint.
+- الطلب الذي لا يحمل المفتاح يرفض.
+- الطلب الذي يحمل مفتاحاً غير صحيح يرفض.
+- الطلب الذي يحمل المفتاح الصحيح يسمح له بالمرور إلى المسار المحمي.
+- قيمة المفتاح لا تظهر في logs أو error bodies أو responses.
+- Correlation ID وStructured logging المنفذان في D3 يبقيان عاملين دون كسر.
+- لا يتم إنشاء Health endpoint أو DTO layer أو Structured Exceptions framework أو AI/Qdrant ضمن D4.
+- ينجح تحقق صغير ومباشر يغطي الحالات الثلاث الضرورية: missing / invalid / valid key.
+- يتغير D4 في جدول المرحلة إلى `DONE` عند الإغلاق.
+- يحدّث `CURRENT HANDOFF` إلى D5 — Health endpoint.
 
 ---
 
@@ -793,7 +861,7 @@ Next: D4 — Internal API security
 
 - لا توجد عوائق حالية.
 - توجد ملاحظة تنسيق Pint قديمة في `laravel-app/bootstrap/providers.php` خارج نطاق المهام الحالية؛ غير حاجبة.
-- عند تنفيذ مهام FastAPI استخدم `.venv` الرسمية لتجنب التقاط Miniconda Python 3.13 من PATH.
+- عند تنفيذ مهام FastAPI استخدم `fastapi-app/.venv` الرسمية مع Python 3.12.x؛ البيئة الحالية Python `3.12.14`، ولا تستخدم Miniconda Python `3.13.13`.
 
 ---
 
