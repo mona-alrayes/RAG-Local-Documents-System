@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 594f24635e11143da66293ebf08a73f02265604a
-Last Merged PR: #42 — feat(D5): add FastAPI health endpoint
-Latest Task PR: #42 — feat(D5): add FastAPI health endpoint
-D5 Implementation Commit: bcf4f304c80f82dfae33b190305d0a04d85b1e88
-D5 Verification: Python 3.12.14 (.venv); authenticated GET /api/v1/health returned 200 + {"status":"ok"} + Correlation ID; focused D5 test 1 passed; D4+D5 regression 4 passed; compileall + pip check + diff-check PASS
-Last Completed Task: D5 — Health endpoint
-Current Task: D6 — Versioned DTO schemas
+Verified Main Commit: 4f5924d45aa81b837f2c711a987f6865e36c90fd
+Last Merged PR: #43 — feat(D6): add versioned FastAPI DTO schemas
+Latest Task PR: #43 — feat(D6): add versioned FastAPI DTO schemas
+D6 Implementation Commit: 3318a6bc02b9441b8208f0b87695cb8f1a4bdacc
+D6 Verification: Python 3.12.14 (.venv); focused D6 schema tests 2 passed; D4–D6 regression 6 passed; compileall + pip check + diff-check PASS; DTO contract aligned with Laravel processing schema including nullable total_pages
+Last Completed Task: D6 — Versioned DTO schemas
+Current Task: D7 — Structured exceptions
 Current Task Status: TODO
-Expected Task Branch: task/D6-versioned-dto-schemas
-Next Task After Completion: D7 — Structured exceptions
+Expected Task Branch: task/D7-structured-exceptions
+Next Task After Completion: D8 — Deployment capabilities endpoint
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -152,7 +152,7 @@ Open Blockers: لا يوجد
 | D3 Structured logging/correlation IDs | DONE |
 | D4 Internal API security | DONE |
 | D5 Health endpoint | DONE |
-| D6 Versioned DTO schemas | TODO |
+| D6 Versioned DTO schemas | DONE |
 | D7 Structured exceptions | TODO |
 | D8 Deployment capabilities endpoint | TODO |
 | D9 Startup configuration validation | TODO |
@@ -795,6 +795,7 @@ pending
 | D3 — Structured logging/correlation IDs | #40 | Central JSON logging + async-safe ContextVar correlation IDs + request/response propagation; supplied/generated ID verification + compileall/diff-check PASS |
 | D4 — Internal API security | #41 | `X-Internal-API-Key` + `SecretStr` + centralized ASGI auth; missing/invalid/valid coverage؛ 3 tests + compileall/pip/diff-check PASS |
 | D5 — Health endpoint | #42 | `GET /api/v1/health` + internal auth + Correlation ID preserved؛ 1 focused test + D4/D5 regression + compileall/pip/diff-check PASS |
+| D6 — Versioned DTO schemas | #43 | Pydantic DTOs لعقود document processing وRAG؛ nullable `total_pages`؛ 2 focused tests + D4–D6 regression + compileall/pip/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -806,7 +807,7 @@ pending
 - D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
 - D3 أضافت Structured JSON logging مركزية وCorrelation IDs عبر Pure ASGI middleware وContextVar، مع الحفاظ على Security وHealth خارج النطاق.
 - D4 أضافت Internal API authentication مركزية باستخدام `X-Internal-API-Key` و`SecretStr` و`compare_digest`، مع Fail-Closed للمفتاح المفقود/غير الصالح والحفاظ على Correlation ID حول طبقة المصادقة.
-- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D5 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
+- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D6 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
 - لا توجد عوائق حالية.
 
 ---
@@ -814,13 +815,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D6 — Versioned DTO schemas
+D7 — Structured exceptions
 Status: TODO
-Expected Branch: task/D6-versioned-dto-schemas
-Next: D7 — Structured exceptions
+Expected Branch: task/D7-structured-exceptions
+Next: D8 — Deployment capabilities endpoint
 ```
 
-> تفاصيل نطاق D6 وعقودها تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` عند بدء المهمة، دون توسيعها إلى D7 وما بعدها.
+> تفاصيل نطاق D7 وعقد Structured Exceptions تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` عند بدء المهمة، دون توسيعها إلى D8 وما بعدها.
 
 ---
 
