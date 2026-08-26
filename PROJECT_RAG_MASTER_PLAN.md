@@ -2514,14 +2514,12 @@ errors
 من المفيد أن يرسل Laravel:
 
 ```text
-X-Request-ID
+X-Correlation-ID
 ```
 
 إلى FastAPI.
 
-ويظهر نفس ID في logs في النظامين.
-
-يساعد كثيراً في debugging.
+ويظهر نفس ID في logs في النظامين، ويعيد FastAPI نفس القيمة في Response Header عند وجودها، أو يولد Correlation ID جديداً عند غيابها.
 
 ---
 
@@ -4840,6 +4838,7 @@ docker compose version
 APP_KEY
 DB_PASSWORD
 AI_SERVICE_API_KEY
+INTERNAL_API_KEY
 HF_TOKEN
 JINAAI_API_KEY
 LLAMA_CLOUD_API_KEY
@@ -5821,6 +5820,7 @@ FastAPI المشتركة:
 
 ```text
 RAG_DEPLOYMENT_MODE=cloud|local
+INTERNAL_API_KEY=...
 QDRANT_URL=http://qdrant:6333
 QDRANT_CLOUD_COLLECTION=rag_documents_cloud
 QDRANT_HYBRID_LOCAL_COLLECTION=rag_documents_hybrid_local
@@ -5833,6 +5833,8 @@ SPARSE_CANDIDATES=12
 RRF_TOP_K=12
 RERANK_TOP_N=5
 ```
+
+يستخدم Laravel المتغير `AI_SERVICE_API_KEY` عند إرسال الطلبات إلى FastAPI، بينما يستخدم FastAPI المتغير `INTERNAL_API_KEY` للتحقق من الطلبات الواردة. يجب Provision نفس قيمة الـsecret لكلا المتغيرين في بيئة التشغيل، مع بقاء الاسمين مختلفين لأن لكل Service مسؤولية مختلفة.
 
 Cloud providers:
 

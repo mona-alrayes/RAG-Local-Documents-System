@@ -45,10 +45,16 @@ def test_rag_request_and_response_contracts() -> None:
 
     response = RagQueryResponse(
         answer="أظهرت الدراسة ...",
+        llm={
+            "provider": "hugging_face",
+            "model": "Qwen/Qwen3.5-9B",
+        },
+        processing_profiles=["cloud"],
         sources=[
             {
                 "source_number": 1,
                 "document_id": 12,
+                "document_title": "study.pdf",
                 "processing_run_id": 81,
                 "processing_profile": "cloud",
                 "page": 15,
@@ -73,3 +79,7 @@ def test_rag_request_and_response_contracts() -> None:
     assert response.sources[0].document_id == 12
     assert response.sources[0].reranker_score == 0.91
     assert response.timings_ms["total"] == 110
+    assert response.llm.provider == "hugging_face"
+    assert response.llm.model == "Qwen/Qwen3.5-9B"
+    assert response.processing_profiles == ["cloud"]
+    assert response.sources[0].document_title == "study.pdf"
