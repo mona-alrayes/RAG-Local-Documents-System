@@ -48,6 +48,9 @@ class Settings(BaseSettings):
 
     internal_api_key: SecretStr | None = None
 
+    qdrant_url: str = "http://127.0.0.1:6333"
+    qdrant_cloud_collection: str = "rag_documents_cloud"
+
 
 def validate_startup_configuration(settings: Settings) -> None:
     if "rag_deployment_mode" not in settings.model_fields_set:
@@ -82,3 +85,4 @@ def validate_startup_configuration(settings: Settings) -> None:
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
