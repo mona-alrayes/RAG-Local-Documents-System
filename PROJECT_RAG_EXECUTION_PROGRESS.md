@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 8d24fcd42b2ed5d13463872de693ea89b5ccebed
-Last Merged PR: #47 — feat(D9): validate startup configuration
-Latest Task PR: #47 — feat(D9): validate startup configuration
-D9 Implementation Commit: 33d6148933827a2e650601c4ecd98eca98781353
-D9 Verification: Python 3.12.13 (.venv); focused D9 startup configuration tests 4 passed; full FastAPI regression 13 passed
-Last Completed Task: D9 — Startup configuration validation
-Current Task: D10 — Base/cloud/local dependency split
+Verified Main Commit: 17378696f95474e7cf8f93b5eb751738d85a1380
+Last Merged PR: #48 — feat(D10): split cloud and local dependencies
+Latest Task PR: #48 — feat(D10): split cloud and local dependencies
+D10 Implementation Commit: 1d7e56b3fe7df437e442f1b4684d248e9ac239b8
+D10 Verification: fastapi-app/.venv; focused D10 dependency split/installer tests 4 passed; full FastAPI regression 17 passed; packaging dry-run and git diff --check passed
+Last Completed Task: D10 — Base/cloud/local dependency split
+Current Task: D11 — Local runtime/device resolver + startup probe + resource telemetry
 Current Task Status: TODO
-Expected Task Branch: task/D10-base-cloud-local-dependency-split
-Next Task After Completion: D11 — Local runtime/device resolver + startup probe + resource telemetry
+Expected Task Branch: task/D11-local-runtime-device-resolver
+Next Task After Completion: E1 — Local Qdrant + persistent volume
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -156,7 +156,7 @@ Open Blockers: لا يوجد
 | D7 Structured exceptions | DONE |
 | D8 Deployment capabilities endpoint | DONE |
 | D9 Startup configuration validation | DONE |
-| D10 Base/cloud/local dependency split | TODO |
+| D10 Base/cloud/local dependency split | DONE |
 | D11 Local runtime/device resolver + startup probe + resource telemetry | TODO |
 
 **معيار انتهاء المرحلة:** Laravel يرى صحة FastAPI وقدرات البيئة، وCloud image لا يحمل Local AI dependencies، وLocal runtime يعلن Backend/dtype المقاسين بلا Fallback صامت.
@@ -477,7 +477,6 @@ show
 store
 download
 ```
-
 المكونات المهمة للمسار الحالي:
 
 ```text
@@ -799,6 +798,7 @@ pending
 - أخطاء التطبيق المنظمة في FastAPI تستخدم `ApplicationException` مع Handler مركزي يعيد `error.code` و`error.message` و`correlation_id` ويحافظ على Structured Logging؛ أي أخطاء Application جديدة لاحقاً تبنى فوق هذا العقد بدلاً من إنشاء JSON أخطاء خاص بكل Route.
 - عقد D8 يفصل بين `supported_profiles` كقدرة مسموحة معمارياً و`available_profiles` كجاهزية مؤكدة؛ `compare_available` مشتقة ولا يمثل Profile ثالثة، وProvider readiness لا يفترض قبل التحقق الفعلي.
 - عقد D9 يفرض Configuration صريحة ومتوافقة: `cloud` يمنع `LOCAL_AI_TOPOLOGY`، و`local` يتطلب `LOCAL_AI_TOPOLOGY=host_native`؛ لا يتضمن ذلك أي Runtime/provider/device probe.
+- عقد D10 يفصل Base/Cloud عن Local Native: تبقى الاعتماديات الأساسية خفيفة بلا `torch` أو `transformers` أو `ollama`، وتضاف Local AI dependencies عبر `local-native` فقط؛ يثبت PyTorch محلياً عبر Host bootstrap يختار Windows XPU index أو macOS default index حسب نظام التشغيل، من دون Runtime/device probing قبل D11، ويبقى Ollama خدمة Host-native مستقلة وليس FastAPI dependency.
 
 ---
 
@@ -842,6 +842,7 @@ pending
 | D7 — Structured exceptions | #44 | `ApplicationException` + ErrorResponse + handler مركزي مع Correlation ID؛ 1 focused test + D4–D7 regression + compileall/pip PASS |
 | D8 — Deployment capabilities | #46 | `GET /api/v1/capabilities` + Cloud/Local supported profiles + truthful `not_checked` readiness؛ 2 tests + diff-check PASS |
 | D9 — Startup configuration validation | #47 | Startup validation مركزية لـdeployment mode وInternal API key وLocal AI topology؛ 4 focused tests + 13 FastAPI regression tests PASS |
+| D10 — Base/cloud/local dependency split | #48 | Base/Cloud خفيف + `local-native` extra + PyTorch Host bootstrap؛ 4 focused tests + 17 FastAPI regression + packaging/diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -857,6 +858,7 @@ pending
 - D7 أضافت عقد Structured Exceptions مركزي مع `ApplicationException` و`ErrorResponse` وCorrelation ID، دون إدخال D8 أو AI/Qdrant/Parsing/Providers.
 - D8 أضافت Capabilities endpoint داخلياً بعقد يفصل supported عن available ويترك readiness بحالة `not_checked` حتى الفحص الفعلي، من دون Provider calls.
 - D9 أضافت Startup validation مركزية عبر FastAPI lifespan، مع إلزام deployment mode وInternal API key ورفض Cloud/Local topology المتعارضة، دون Runtime/provider/device probes.
+- D10 ثبتت فصل الاعتماديات بحيث يبقى Base/Cloud بلا Local AI packages، ويثبت PyTorch المحلي عبر Host bootstrap منفصل حسب نظام التشغيل، مع إبقاء Runtime/device detection لـD11.
 - لا توجد عوائق حالية.
 
 ---
@@ -864,13 +866,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D10 — Base/cloud/local dependency split
+D11 — Local runtime/device resolver + startup probe + resource telemetry
 Status: TODO
-Expected Branch: task/D10-base-cloud-local-dependency-split
-Next: D11 — Local runtime/device resolver + startup probe + resource telemetry
+Expected Branch: task/D11-local-runtime-device-resolver
+Next: E1 — Local Qdrant + persistent volume
 ```
 
-> تفاصيل نطاق D10 وعقد فصل Base/Cloud/Local dependencies تؤخذ من `PROJECT_RAG_MASTER_PLAN.md`، مع الحفاظ على أن Cloud deployment لا يحمل Local AI packages أو weights، ودون إدخال D11 runtime/device probing.
+> تفاصيل نطاق D11 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md`: قياس Local runtime/backend/dtype والموارد عند Startup دون تحميل Models، مع الحفاظ على عقد D9 (`LOCAL_AI_TOPOLOGY=host_native`) وفصل الاعتماديات المنفذ في D10، ومن دون Fallback صامت أو Provider implementation.
 
 ---
 
