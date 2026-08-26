@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.core.config import Settings, get_settings
+from app.runtime.state import local_runtime_state
 from app.schemas.capabilities import DeploymentCapabilitiesResponse
 from app.services.capabilities import CapabilitiesService
 
@@ -19,4 +20,7 @@ capabilities_service = CapabilitiesService()
 def capabilities(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> DeploymentCapabilitiesResponse:
-    return capabilities_service.build(settings.rag_deployment_mode)
+    return capabilities_service.build(
+        settings.rag_deployment_mode,
+        local_runtime_state.get(),
+    )

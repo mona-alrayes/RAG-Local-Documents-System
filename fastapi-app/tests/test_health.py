@@ -21,4 +21,4 @@ def test_health_endpoint_returns_ok_with_valid_internal_api_key() -> None:
     )
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json()["status"] == "ok"

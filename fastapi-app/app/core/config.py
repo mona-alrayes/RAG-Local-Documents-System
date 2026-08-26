@@ -14,6 +14,19 @@ class LocalAiTopology(StrEnum):
     HOST_NATIVE = "host_native"
 
 
+class LocalDevice(StrEnum):
+    AUTO = "auto"
+    CUDA = "cuda"
+    ROCM = "rocm"
+    XPU = "xpu"
+    MPS = "mps"
+    CPU = "cpu"
+
+
+class LocalDtype(StrEnum):
+    AUTO = "auto"
+
+
 class StartupConfigurationError(RuntimeError):
     pass
 
@@ -30,6 +43,8 @@ class Settings(BaseSettings):
 
     rag_deployment_mode: DeploymentMode = DeploymentMode.LOCAL
     local_ai_topology: LocalAiTopology | None = None
+    local_device: LocalDevice = LocalDevice.AUTO
+    local_dtype: LocalDtype = LocalDtype.AUTO
 
     internal_api_key: SecretStr | None = None
 
