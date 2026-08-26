@@ -22,9 +22,15 @@ class RagQueryRequest(BaseModel):
     recent_completed_turns: list[RecentCompletedTurn] | None = None
 
 
+class LlmInfo(BaseModel):
+    provider: str
+    model: str
+
+
 class RagSource(BaseModel):
     source_number: int
     document_id: int
+    document_title: str
     processing_run_id: int
     processing_profile: str
     page: int | None = None
@@ -37,5 +43,7 @@ class RagSource(BaseModel):
 
 class RagQueryResponse(BaseModel):
     answer: str
+    llm: LlmInfo
+    processing_profiles: list[str]
     sources: list[RagSource]
     timings_ms: dict[str, int]
