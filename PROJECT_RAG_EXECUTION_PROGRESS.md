@@ -17,17 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 566f6c8fac4f3b712909e76b7a572d368efca959
-Last Merged PR: #49 — feat(D11): add local runtime device resolver
-Latest Task PR: #49 — feat(D11): add local runtime device resolver
-D11 Implementation Commit: f996371
-D10 Bootstrap Refinement Commit: 0c7322e
-D11 Verification: fastapi-app/.venv; focused D11 regression 11 passed; D10 installer coverage 14 passed; full FastAPI regression 31 passed; Cloud startup/API smoke verified with torch/psutil absent; git diff checks passed
-Last Completed Task: D11 — Local runtime/device resolver + startup probe + resource telemetry
-Current Task: E1 — Local Qdrant + persistent volume
+Verified Main Commit: a529b5c4bba56e34c4c59de139d793618e10d9a9
+Last Merged PR: #50 — feat(E1): add local Qdrant persistent storage
+Latest Task PR: #50 — feat(E1): add local Qdrant persistent storage
+E1 Implementation Commit: bbf5ad5
+E1 Verification: Qdrant v1.19.0 via Docker Compose; REST bound to 127.0.0.1:6333; /healthz passed; qdrant_data persisted across container removal/recreation; compose config and git diff checks passed
+Last Completed Task: E1 — Local Qdrant + persistent volume
+Current Task: E2 — rag_documents_cloud collection
 Current Task Status: TODO
-Expected Task Branch: task/E1-local-qdrant-persistent-volume
-Next Task After Completion: E2 — rag_documents_cloud collection
+Expected Task Branch: task/E2-rag-documents-cloud-collection
+Next Task After Completion: E3 — rag_documents_hybrid_local collection
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -168,7 +167,7 @@ Open Blockers: لا يوجد
 
 | المهمة | الحالة |
 |---|---|
-| E1 Local Qdrant + persistent volume | TODO |
+| E1 Local Qdrant + persistent volume | DONE |
 | E2 `rag_documents_cloud` collection | TODO |
 | E3 `rag_documents_hybrid_local` collection | TODO |
 | E4 Dense/sparse configs | TODO |
@@ -825,6 +824,19 @@ pending
   - Cloud isolation smoke وLocal API contract smoke نجحا.
   - `git diff --check` / staged diff checks نجحت.
 
+## 22.14 Local Qdrant Infrastructure المنفذة في E1
+
+تم تنفيذ E1 كبنية Infrastructure مستقلة فقط، من دون إدخال Collections أو Vector configuration أو Qdrant client داخل FastAPI:
+
+- أضيفت خدمة `qdrant` إلى `laravel-app/compose.yaml` باستخدام الصورة المثبتة `qdrant/qdrant:v1.19.0`.
+- REST port `6333` منشور على Host loopback فقط عبر `127.0.0.1:${QDRANT_FORWARD_PORT:-6333}:6333`، ولا يوجد نشر Host لمنفذ gRPC `6334`.
+- أضيف named volume باسم `qdrant_data` مربوطاً إلى `/qdrant/storage`.
+- أضيف `QDRANT_FORWARD_PORT=6333` إلى `laravel-app/.env.example` لتوثيق منفذ البنية المحلية؛ لم يضف `QDRANT_URL` أو إعداد Collections ضمن E1.
+- تحقق `docker compose config --quiet` بنجاح، وعملت Qdrant بصورة مستقرة مع نجاح `/healthz`.
+- تم إثبات الـpersistence عملياً بوضع marker داخل `/qdrant/storage` ثم إيقاف وحذف Qdrant container وإعادة إنشائه؛ بقيت البيانات موجودة عبر `qdrant_data` ثم أزيل marker الاختباري.
+- `git diff --check` وstaged diff checks نجحت، ولم يتغير سوى `laravel-app/compose.yaml` و`laravel-app/.env.example` في Implementation commit.
+- لا يوجد ربط Laravel مباشر بـQdrant، ولا FastAPI Qdrant client، ولا Collections أو Dense/Sparse configs أو Payload indexes أو Point builders ضمن E1؛ تبدأ هذه المسؤوليات من E2 وما بعدها حسب خريطة المهام.
+
 ---
 
 # 23. Baseline معماري تنفيذي
@@ -836,6 +848,7 @@ pending
 - Local Demo = Docker للبنية الأساسية وFastAPI/Ollama على Host.
 - Local heavy work = concurrency `1` + global Redis lock + single-active-model + release-after-stage.
 - Security scan = ClamAV on-demand افتراضياً (`DOCUMENT_SECURITY_SCAN_ENABLED=true`) مع Fail-Closed؛ التعطيل مسموح فقط بإعداد صريح ويؤدي إلى direct permanent storage بعد Validation، بلا fallback تلقائي عند فشل الفاحص. `scanning` يبدأ عند تشغيل Security Job فعلياً، و`queued` لا يستخدم قبل dispatch حقيقي لـProcessing Job.
+- Qdrant runtime بعد E1 = `qdrant/qdrant:v1.19.0` داخل `laravel-app/compose.yaml`، REST على loopback فقط، مع `qdrant_data:/qdrant/storage` كـPersistent Volume؛ لم يبدأ ربط FastAPI أو إنشاء Collections بعد.
 - Qdrant = Collection منفصلة لكل Processing Profile مع mandatory user/document/run filters.
 - Persistent Qdrant يحتفظ بالـselected winner فقط بعد التحقق.
 - Laravel/MySQL هو مصدر الحقيقة للتطبيق؛ لا توجد DB علائقية مستقلة لـFastAPI في v1.
@@ -896,6 +909,7 @@ pending
 | D9 — Startup configuration validation | #47 | Startup validation مركزية لـdeployment mode وInternal API key وLocal AI topology؛ 4 focused tests + 13 FastAPI regression tests PASS |
 | D10 — Base/cloud/local dependency split | #48 | Base/Cloud خفيف + `local-native` extra + PyTorch Host bootstrap؛ 4 focused tests + 17 FastAPI regression + packaging/diff-check PASS |
 | D11 — Local runtime/device resolver | #49 | CUDA/ROCm/XPU/MPS/CPU resolver + Tensor startup probe + telemetry + health/capabilities؛ D10 bootstrap صار accelerator-aware؛ 31 FastAPI tests PASS |
+| E1 — Local Qdrant + persistent volume | #50 | Qdrant v1.19.0 + loopback REST + `qdrant_data`؛ health/persistence/config/diff checks PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -920,13 +934,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-E1 — Local Qdrant + persistent volume
+E2 — rag_documents_cloud collection
 Status: TODO
-Expected Branch: task/E1-local-qdrant-persistent-volume
-Next: E2 — rag_documents_cloud collection
+Expected Branch: task/E2-rag-documents-cloud-collection
+Next: E3 — rag_documents_hybrid_local collection
 ```
 
-> تفاصيل نطاق E1 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md`: إعداد Qdrant محلياً كجزء من البنية الأساسية مع persistent volume والتحقق من health/persistence عبر restart، دون إنشاء Collections الخاصة بالـProfiles قبل E2/E3، ودون إدخال Point builders أو indexing/retrieval logic الخاصة بالمهام اللاحقة.
+> تفاصيل نطاق E2 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد Qdrant في `174.8`: تنفذ Collection الخاصة بمسار Cloud فقط فوق Qdrant المحلية المثبتة في E1، مع إبقاء `rag_documents_hybrid_local` لـE3 وDense/Sparse configs لـE4 وPayload indexes لـE5 وPoint builder/metadata لـE6 وخدمات upsert/count/delete لـE7.
 
 ---
 
