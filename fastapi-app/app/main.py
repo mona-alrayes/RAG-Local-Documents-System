@@ -1,9 +1,15 @@
-﻿from fastapi import FastAPI
+﻿from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
 
 from app.api.exception_handler import application_exception_handler
 from app.api.v1.capabilities_routes import router as capabilities_router
 from app.api.v1.health import router as health_router
-from app.core.config import get_settings
+from app.core.config import (
+    get_settings,
+    validate_startup_configuration,
+)
 from app.core.exceptions import ApplicationException
 from app.core.logging import configure_logging
 from app.middleware.correlation_id import CorrelationIdMiddleware
@@ -15,9 +21,15 @@ def create_app() -> FastAPI:
 
     configure_logging()
 
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        validate_startup_configuration(settings)
+        yield
+
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
+        lifespan=lifespan,
     )
 
     app.add_exception_handler(
