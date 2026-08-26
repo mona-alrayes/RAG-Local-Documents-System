@@ -1,7 +1,9 @@
 ﻿from fastapi import FastAPI
 
+from app.api.exception_handler import application_exception_handler
 from app.api.v1.health import router as health_router
 from app.core.config import get_settings
+from app.core.exceptions import ApplicationException
 from app.core.logging import configure_logging
 from app.middleware.correlation_id import CorrelationIdMiddleware
 from app.middleware.internal_api_auth import InternalApiAuthMiddleware
@@ -16,6 +18,12 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
     )
+
+    app.add_exception_handler(
+        ApplicationException,
+        application_exception_handler,
+    )
+
     app.include_router(health_router)
 
     app.add_middleware(
