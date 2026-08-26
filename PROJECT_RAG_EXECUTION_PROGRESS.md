@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: a34d96ac74dcdc8ab425c88f7e160c3ca4acd749
-Last Merged PR: #46 — feat(D8): add deployment capabilities endpoint
-Latest Task PR: #46 — feat(D8): add deployment capabilities endpoint
-D8 Implementation Commit: 1ad6c2d75f08f40de529b19208183f4c5a1a41b3
-D8 Verification: Python 3.12.14 (.venv); focused D8 capabilities test 2 passed; git diff --cached --check PASS; Cloud/Local capability contract verified
-Last Completed Task: D8 — Deployment capabilities endpoint
-Current Task: D9 — Startup configuration validation
+Verified Main Commit: 8d24fcd42b2ed5d13463872de693ea89b5ccebed
+Last Merged PR: #47 — feat(D9): validate startup configuration
+Latest Task PR: #47 — feat(D9): validate startup configuration
+D9 Implementation Commit: 33d6148933827a2e650601c4ecd98eca98781353
+D9 Verification: Python 3.12.13 (.venv); focused D9 startup configuration tests 4 passed; full FastAPI regression 13 passed
+Last Completed Task: D9 — Startup configuration validation
+Current Task: D10 — Base/cloud/local dependency split
 Current Task Status: TODO
-Expected Task Branch: task/D9-startup-config-validation
-Next Task After Completion: D10 — Base/cloud/local dependency split
+Expected Task Branch: task/D10-base-cloud-local-dependency-split
+Next Task After Completion: D11 — Local runtime/device resolver + startup probe + resource telemetry
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -155,7 +155,7 @@ Open Blockers: لا يوجد
 | D6 Versioned DTO schemas | DONE |
 | D7 Structured exceptions | DONE |
 | D8 Deployment capabilities endpoint | DONE |
-| D9 Startup configuration validation | TODO |
+| D9 Startup configuration validation | DONE |
 | D10 Base/cloud/local dependency split | TODO |
 | D11 Local runtime/device resolver + startup probe + resource telemetry | TODO |
 
@@ -718,7 +718,7 @@ pending
 تم تنفيذ D4 كطبقة مصادقة داخلية مركزية وصغيرة تحمي FastAPI من الوصول المباشر، مع الحفاظ على D3 وعدم إدخال مسؤوليات D5 وما بعدها:
 
 - أضيف `internal_api_key` إلى `Settings` كـ`SecretStr | None` ويقرأ من Environment Variable باسم `INTERNAL_API_KEY` دون hardcoding للقيمة.
-- بقيت القيمة `None` مسموحة على مستوى typed configuration لأن Startup Configuration Validation الكامل مؤجل إلى D9؛ عند عدم وجود المفتاح يطبق Middleware سلوك Fail-Closed ويرفض الطلب.
+- كانت القيمة `None` مسموحة ضمن D4 لأن Startup Configuration Validation كان مؤجلاً إلى D9؛ بعد D9 أصبح Startup يرفض `INTERNAL_API_KEY` المفقود أو الفارغ قبل استقبال الطلبات.
 - أضيف `app/middleware/internal_api_auth.py` كـPure ASGI middleware مركزي:
   - يطبق فقط على HTTP requests.
   - يقرأ `X-Internal-API-Key` من request headers.
@@ -760,7 +760,22 @@ pending
 - `CapabilitiesService` يحوي منطق بناء القدرات، بينما `capabilities_routes.py` مسؤول عن HTTP فقط، و`schemas/capabilities.py` مسؤول عن DTOs؛ بقيت المسؤوليات منفصلة.
 - لا يعرض endpoint أي Secrets.
 - التحقق المركز لـD8 نجح بحالتي Cloud وLocal: `2 passed` داخل `fastapi-app/.venv` على Python `3.12.14`، و`git diff --cached --check` نجح.
-- D9 يبقى مسؤولاً عن Startup configuration validation، وD11 عن Local runtime/device probe؛ D8 لم يتوسع إلى أي منهما.
+- D9 أُنجز لاحقاً كطبقة Startup configuration validation، بينما D11 يبقى مسؤولاً عن Local runtime/device probe.
+
+## 22.12 Startup Configuration Validation المنفذة في D9
+
+تم تنفيذ D9 كطبقة تحقق مركزية تعمل عند FastAPI startup دون إدخال مسؤوليات D10 أو D11:
+
+- أضيف `validate_startup_configuration()` داخل `app/core/config.py` فوق نفس Typed Settings الموجودة منذ D2، دون إنشاء نظام إعدادات موازٍ.
+- أصبح `RAG_DEPLOYMENT_MODE` مطلوباً بشكل صريح عند Startup، مع بقاء القيم المقبولة Typed إلى `cloud` أو `local`.
+- أصبح `INTERNAL_API_KEY` مطلوباً وغير فارغ عند Startup، ولا تظهر قيمته في رسائل الخطأ.
+- أضيف `LOCAL_AI_TOPOLOGY` كإعداد Typed، والقيمة المدعومة حالياً هي `host_native`.
+- عند `RAG_DEPLOYMENT_MODE=local` يجب تحديد `LOCAL_AI_TOPOLOGY=host_native`.
+- عند `RAG_DEPLOYMENT_MODE=cloud` يجب ألا يكون `LOCAL_AI_TOPOLOGY` مضبوطاً، لمنع Configuration تعلن Cloud مع Local AI runtime.
+- رُبط التحقق بـFastAPI `lifespan` بحيث يفشل Startup قبل استقبال Requests، من دون كسر import/application factory.
+- أضيف `fastapi-app/.env.example` للإعدادات المطلوبة فعلياً في هذه المرحلة فقط.
+- لم تدخل فحوص Ollama أو Models أو GPU/MPS أو Qdrant أو Provider credentials/readiness؛ تبقى هذه المسؤوليات للمراحل اللاحقة.
+- التحقق النهائي نجح داخل `fastapi-app/.venv` باستخدام Python `3.12.13`: اختبارات D9 المركزة `4 passed`، وكامل FastAPI regression `13 passed`.
 
 ---
 
@@ -780,9 +795,10 @@ pending
 - لا يوجد True Streaming/NDJSON/Redis Stream في v1؛ `جاري التفكير` وProgressive Reveal تأثيران Frontend-only.
 - LLM Provider يحدد من Processing Profile موثوقة/Capabilities عبر Registry، بلا global `LLM_PROVIDER` switch وبلا Fallback صامت.
 - تشغيل أوامر FastAPI محلياً يعتمد `fastapi-app/.venv` وPython 3.12.x، وليس Python العام على النظام إذا كان خارج النطاق `>=3.12,<3.13`.
-- FastAPI ليس API عاماً للمستخدم النهائي؛ المسار المعتمد هو `Browser → Laravel → FastAPI`. المصادقة الداخلية المنفذة في D4 تستخدم `X-Internal-API-Key`، وقيمته من `INTERNAL_API_KEY` في Environment Variables فقط؛ missing/invalid/unconfigured يرفض Fail-Closed، بينما Correlation ID يبقى فعالاً حول طبقة المصادقة.
+- FastAPI ليس API عاماً للمستخدم النهائي؛ المسار المعتمد هو `Browser → Laravel → FastAPI`. المصادقة الداخلية تستخدم `X-Internal-API-Key`؛ D9 يرفض Startup إذا كان `INTERNAL_API_KEY` مفقوداً/فارغاً، بينما المفتاح المفقود أو غير الصالح في Request يرفض بـ`401`، وCorrelation ID يبقى فعالاً حول طبقة المصادقة.
 - أخطاء التطبيق المنظمة في FastAPI تستخدم `ApplicationException` مع Handler مركزي يعيد `error.code` و`error.message` و`correlation_id` ويحافظ على Structured Logging؛ أي أخطاء Application جديدة لاحقاً تبنى فوق هذا العقد بدلاً من إنشاء JSON أخطاء خاص بكل Route.
 - عقد D8 يفصل بين `supported_profiles` كقدرة مسموحة معمارياً و`available_profiles` كجاهزية مؤكدة؛ `compare_available` مشتقة ولا يمثل Profile ثالثة، وProvider readiness لا يفترض قبل التحقق الفعلي.
+- عقد D9 يفرض Configuration صريحة ومتوافقة: `cloud` يمنع `LOCAL_AI_TOPOLOGY`، و`local` يتطلب `LOCAL_AI_TOPOLOGY=host_native`؛ لا يتضمن ذلك أي Runtime/provider/device probe.
 
 ---
 
@@ -825,6 +841,7 @@ pending
 | D6 — Versioned DTO schemas | #43 | Pydantic DTOs لعقود document processing وRAG؛ nullable `total_pages`؛ 2 focused tests + D4–D6 regression + compileall/pip/diff-check PASS |
 | D7 — Structured exceptions | #44 | `ApplicationException` + ErrorResponse + handler مركزي مع Correlation ID؛ 1 focused test + D4–D7 regression + compileall/pip PASS |
 | D8 — Deployment capabilities | #46 | `GET /api/v1/capabilities` + Cloud/Local supported profiles + truthful `not_checked` readiness؛ 2 tests + diff-check PASS |
+| D9 — Startup configuration validation | #47 | Startup validation مركزية لـdeployment mode وInternal API key وLocal AI topology؛ 4 focused tests + 13 FastAPI regression tests PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -836,9 +853,10 @@ pending
 - D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
 - D3 أضافت Structured JSON logging مركزية وCorrelation IDs عبر Pure ASGI middleware وContextVar، مع الحفاظ على Security وHealth خارج النطاق.
 - D4 أضافت Internal API authentication مركزية باستخدام `X-Internal-API-Key` و`SecretStr` و`compare_digest`، مع Fail-Closed للمفتاح المفقود/غير الصالح والحفاظ على Correlation ID حول طبقة المصادقة.
-- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D8 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
+- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D8 على `3.12.14`، وD9 على `3.12.13`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
 - D7 أضافت عقد Structured Exceptions مركزي مع `ApplicationException` و`ErrorResponse` وCorrelation ID، دون إدخال D8 أو AI/Qdrant/Parsing/Providers.
-- D8 أضافت Capabilities endpoint داخلياً بعقد يفصل supported عن available ويترك readiness بحالة `not_checked` حتى الفحص الفعلي، من دون إدخال D9/D11 أو Provider calls.
+- D8 أضافت Capabilities endpoint داخلياً بعقد يفصل supported عن available ويترك readiness بحالة `not_checked` حتى الفحص الفعلي، من دون Provider calls.
+- D9 أضافت Startup validation مركزية عبر FastAPI lifespan، مع إلزام deployment mode وInternal API key ورفض Cloud/Local topology المتعارضة، دون Runtime/provider/device probes.
 - لا توجد عوائق حالية.
 
 ---
@@ -846,13 +864,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D9 — Startup configuration validation
+D10 — Base/cloud/local dependency split
 Status: TODO
-Expected Branch: task/D9-startup-config-validation
-Next: D10 — Base/cloud/local dependency split
+Expected Branch: task/D10-base-cloud-local-dependency-split
+Next: D11 — Local runtime/device resolver + startup probe + resource telemetry
 ```
 
-> تفاصيل نطاق D9 وعقد Startup Configuration Validation تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` عند بدء المهمة، دون توسيعها إلى D10/D11 أو Provider implementations.
+> تفاصيل نطاق D10 وعقد فصل Base/Cloud/Local dependencies تؤخذ من `PROJECT_RAG_MASTER_PLAN.md`، مع الحفاظ على أن Cloud deployment لا يحمل Local AI packages أو weights، ودون إدخال D11 runtime/device probing.
 
 ---
 
@@ -860,7 +878,7 @@ Next: D10 — Base/cloud/local dependency split
 
 - لا توجد عوائق حالية.
 - توجد ملاحظة تنسيق Pint قديمة في `laravel-app/bootstrap/providers.php` خارج نطاق المهام الحالية؛ غير حاجبة.
-- عند تنفيذ مهام FastAPI استخدم `fastapi-app/.venv` الرسمية مع Python 3.12.x؛ البيئة الحالية Python `3.12.14`، ولا تستخدم Miniconda Python `3.13.13`.
+- عند تنفيذ مهام FastAPI استخدم `fastapi-app/.venv` الرسمية مع Python 3.12.x؛ البيئة الحالية Python `3.12.13`، ولا تستخدم Miniconda Python `3.13.13`.
 
 ---
 
