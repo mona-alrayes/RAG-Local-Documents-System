@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 4f5924d45aa81b837f2c711a987f6865e36c90fd
-Last Merged PR: #43 — feat(D6): add versioned FastAPI DTO schemas
-Latest Task PR: #43 — feat(D6): add versioned FastAPI DTO schemas
-D6 Implementation Commit: 3318a6bc02b9441b8208f0b87695cb8f1a4bdacc
-D6 Verification: Python 3.12.14 (.venv); focused D6 schema tests 2 passed; D4–D6 regression 6 passed; compileall + pip check + diff-check PASS; DTO contract aligned with Laravel processing schema including nullable total_pages
-Last Completed Task: D6 — Versioned DTO schemas
-Current Task: D7 — Structured exceptions
+Verified Main Commit: 0a9f03c1d31096cc9f8164b61b3659c6169466eb
+Last Merged PR: #44 — feat(D7): add structured FastAPI exceptions
+Latest Task PR: #44 — feat(D7): add structured FastAPI exceptions
+D7 Implementation Commit: 423ea19fcb54f37c8778bfae725575942f2729c7
+D7 Verification: Python 3.12.14 (.venv); focused D7 structured-exception test 1 passed; D4–D7 regression 7 passed; compileall + pip check PASS; structured error response preserves correlation ID
+Last Completed Task: D7 — Structured exceptions
+Current Task: D8 — Deployment capabilities endpoint
 Current Task Status: TODO
-Expected Task Branch: task/D7-structured-exceptions
-Next Task After Completion: D8 — Deployment capabilities endpoint
+Expected Task Branch: task/D8-deployment-capabilities
+Next Task After Completion: D9 — Startup configuration validation
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -153,7 +153,7 @@ Open Blockers: لا يوجد
 | D4 Internal API security | DONE |
 | D5 Health endpoint | DONE |
 | D6 Versioned DTO schemas | DONE |
-| D7 Structured exceptions | TODO |
+| D7 Structured exceptions | DONE |
 | D8 Deployment capabilities endpoint | TODO |
 | D9 Startup configuration validation | TODO |
 | D10 Base/cloud/local dependency split | TODO |
@@ -756,6 +756,7 @@ pending
 - LLM Provider يحدد من Processing Profile موثوقة/Capabilities عبر Registry، بلا global `LLM_PROVIDER` switch وبلا Fallback صامت.
 - تشغيل أوامر FastAPI محلياً يعتمد `fastapi-app/.venv` وPython 3.12.x، وليس Python العام على النظام إذا كان خارج النطاق `>=3.12,<3.13`.
 - FastAPI ليس API عاماً للمستخدم النهائي؛ المسار المعتمد هو `Browser → Laravel → FastAPI`. المصادقة الداخلية المنفذة في D4 تستخدم `X-Internal-API-Key`، وقيمته من `INTERNAL_API_KEY` في Environment Variables فقط؛ missing/invalid/unconfigured يرفض Fail-Closed، بينما Correlation ID يبقى فعالاً حول طبقة المصادقة.
+- أخطاء التطبيق المنظمة في FastAPI تستخدم `ApplicationException` مع Handler مركزي يعيد `error.code` و`error.message` و`correlation_id` ويحافظ على Structured Logging؛ أي أخطاء Application جديدة لاحقاً تبنى فوق هذا العقد بدلاً من إنشاء JSON أخطاء خاص بكل Route.
 
 ---
 
@@ -796,6 +797,7 @@ pending
 | D4 — Internal API security | #41 | `X-Internal-API-Key` + `SecretStr` + centralized ASGI auth; missing/invalid/valid coverage؛ 3 tests + compileall/pip/diff-check PASS |
 | D5 — Health endpoint | #42 | `GET /api/v1/health` + internal auth + Correlation ID preserved؛ 1 focused test + D4/D5 regression + compileall/pip/diff-check PASS |
 | D6 — Versioned DTO schemas | #43 | Pydantic DTOs لعقود document processing وRAG؛ nullable `total_pages`؛ 2 focused tests + D4–D6 regression + compileall/pip/diff-check PASS |
+| D7 — Structured exceptions | #44 | `ApplicationException` + ErrorResponse + handler مركزي مع Correlation ID؛ 1 focused test + D4–D7 regression + compileall/pip PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -807,7 +809,8 @@ pending
 - D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
 - D3 أضافت Structured JSON logging مركزية وCorrelation IDs عبر Pure ASGI middleware وContextVar، مع الحفاظ على Security وHealth خارج النطاق.
 - D4 أضافت Internal API authentication مركزية باستخدام `X-Internal-API-Key` و`SecretStr` و`compare_digest`، مع Fail-Closed للمفتاح المفقود/غير الصالح والحفاظ على Correlation ID حول طبقة المصادقة.
-- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D6 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
+- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D7 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
+- D7 أضافت عقد Structured Exceptions مركزي مع `ApplicationException` و`ErrorResponse` وCorrelation ID، دون إدخال D8 أو AI/Qdrant/Parsing/Providers.
 - لا توجد عوائق حالية.
 
 ---
@@ -815,13 +818,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D7 — Structured exceptions
+D8 — Deployment capabilities endpoint
 Status: TODO
-Expected Branch: task/D7-structured-exceptions
-Next: D8 — Deployment capabilities endpoint
+Expected Branch: task/D8-deployment-capabilities
+Next: D9 — Startup configuration validation
 ```
 
-> تفاصيل نطاق D7 وعقد Structured Exceptions تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` عند بدء المهمة، دون توسيعها إلى D8 وما بعدها.
+> تفاصيل نطاق D8 وعقد Deployment Capabilities تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` عند بدء المهمة، دون توسيعها إلى D9 وما بعدها.
 
 ---
 
