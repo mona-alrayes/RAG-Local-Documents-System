@@ -17,16 +17,17 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 17378696f95474e7cf8f93b5eb751738d85a1380
-Last Merged PR: #48 — feat(D10): split cloud and local dependencies
-Latest Task PR: #48 — feat(D10): split cloud and local dependencies
-D10 Implementation Commit: 1d7e56b3fe7df437e442f1b4684d248e9ac239b8
-D10 Verification: fastapi-app/.venv; focused D10 dependency split/installer tests 4 passed; full FastAPI regression 17 passed; packaging dry-run and git diff --check passed
-Last Completed Task: D10 — Base/cloud/local dependency split
-Current Task: D11 — Local runtime/device resolver + startup probe + resource telemetry
+Verified Main Commit: 566f6c8fac4f3b712909e76b7a572d368efca959
+Last Merged PR: #49 — feat(D11): add local runtime device resolver
+Latest Task PR: #49 — feat(D11): add local runtime device resolver
+D11 Implementation Commit: f996371
+D10 Bootstrap Refinement Commit: 0c7322e
+D11 Verification: fastapi-app/.venv; focused D11 regression 11 passed; D10 installer coverage 14 passed; full FastAPI regression 31 passed; Cloud startup/API smoke verified with torch/psutil absent; git diff checks passed
+Last Completed Task: D11 — Local runtime/device resolver + startup probe + resource telemetry
+Current Task: E1 — Local Qdrant + persistent volume
 Current Task Status: TODO
-Expected Task Branch: task/D11-local-runtime-device-resolver
-Next Task After Completion: E1 — Local Qdrant + persistent volume
+Expected Task Branch: task/E1-local-qdrant-persistent-volume
+Next Task After Completion: E2 — rag_documents_cloud collection
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -157,7 +158,7 @@ Open Blockers: لا يوجد
 | D8 Deployment capabilities endpoint | DONE |
 | D9 Startup configuration validation | DONE |
 | D10 Base/cloud/local dependency split | DONE |
-| D11 Local runtime/device resolver + startup probe + resource telemetry | TODO |
+| D11 Local runtime/device resolver + startup probe + resource telemetry | DONE |
 
 **معيار انتهاء المرحلة:** Laravel يرى صحة FastAPI وقدرات البيئة، وCloud image لا يحمل Local AI dependencies، وLocal runtime يعلن Backend/dtype المقاسين بلا Fallback صامت.
 
@@ -776,6 +777,54 @@ pending
 - لم تدخل فحوص Ollama أو Models أو GPU/MPS أو Qdrant أو Provider credentials/readiness؛ تبقى هذه المسؤوليات للمراحل اللاحقة.
 - التحقق النهائي نجح داخل `fastapi-app/.venv` باستخدام Python `3.12.13`: اختبارات D9 المركزة `4 passed`، وكامل FastAPI regression `13 passed`.
 
+## 22.13 Local Runtime/Device Resolver المنفذ في D11
+
+تم تنفيذ D11 كطبقة Runtime مستقلة داخل FastAPI مع الحفاظ على فصل Cloud/Local المنفذ في D10 وعدم تحميل أي Model weights:
+
+- أضيفت إعدادات `LOCAL_DEVICE` و`LOCAL_DTYPE`، والقيمة المعتمدة افتراضياً لكليهما هي `auto`.
+- backends المدعومة في resolver:
+  - `cuda`
+  - `rocm`
+  - `xpu`
+  - `mps`
+  - `cpu`
+- ترتيب `LOCAL_DEVICE=auto` الحتمي هو:
+  `CUDA → ROCm → XPU → MPS → CPU`.
+- لا يكفي اكتشاف اسم الجهاز أو وجود package؛ ينجح backend فقط بعد **actual capability probe** ينشئ Tensor صغيراً، ينفذ عملية حسابية، يتحقق من النتيجة، ثم يزامن الـbackend وينظف الـcache.
+- ROCm يستخدم PyTorch `torch.cuda` API surface كما هو متوقع، ويُميّز عن CUDA عبر `torch.version.hip` مقابل `torch.version.cuda`.
+- سياسة dtype الحالية:
+  - Accelerator → `fp16`
+  - CPU → `fp32`
+- عند طلب backend صريح وفشله لا يوجد silent CPU fallback؛ تعاد Local runtime بحالة `ready=false` وسبب آمن.
+- `initialize_local_runtime()` يعمل فقط في `RAG_DEPLOYMENT_MODE=local`; في Cloud يخرج قبل استيراد Local runtime adapters.
+- تم التحقق عملياً أن Cloud startup و`/health` و`/capabilities` تعمل في Base venv لا تحتوي `torch` ولا `psutil`.
+- `/api/v1/health` و`/api/v1/capabilities` يعرضان `local_runtime` مع requested/selected backend وdtype وprobe status وfailure reason الآمن، بينما يبقى `status=ok` خاصاً بصحة خدمة FastAPI نفسها.
+- Provider readiness لم يُستنتج من نجاح الجهاز: بقيت Providers بحالة `not_checked`، و`available_profiles=[]` و`compare_available=false` حتى مراحل Providers/Processing اللاحقة.
+- أضيف `ResourceSnapshot` لقياس:
+  - FastAPI process RSS.
+  - system available memory.
+  - accelerator allocated memory.
+  - accelerator cached/reserved memory.
+- `psutil` بقي ضمن `local-native` فقط، وغيابه لا يسقط Startup؛ تعاد telemetry بقيم `None`.
+- لم تُحمّل BGE أو Reranker أو Qwen أو أي model weights، ولم يدخل Qdrant أو Parsing أو Provider implementation ضمن D11.
+- ضمن نفس PR #49 تم تحسين D10 Host bootstrap ليصبح accelerator-aware:
+  - macOS Apple Silicon → MPS مع PyTorch standard install.
+  - Windows NVIDIA → CUDA.
+  - Windows Intel → XPU.
+  - Windows بدون accelerator مدعوم → CPU.
+  - Windows AMD → رفض ROCm صريح لأن مسار ROCm المعتمد للمشروع Linux.
+  - Linux NVIDIA → CUDA.
+  - Linux AMD → ROCm.
+  - Linux Intel → XPU.
+  - Linux بدون accelerator مدعوم → CPU.
+- اكتشاف الـbootstrap يحدد توزيع PyTorch المناسب للتثبيت فقط؛ **D11 runtime probe هو المرجع النهائي لجاهزية backend الفعلية**.
+- التحقق النهائي:
+  - D10 installer coverage: `14 passed`.
+  - D11 focused regression بعد التعديلات النهائية: `11 passed`.
+  - Full FastAPI regression: `31 passed`.
+  - Cloud isolation smoke وLocal API contract smoke نجحا.
+  - `git diff --check` / staged diff checks نجحت.
+
 ---
 
 # 23. Baseline معماري تنفيذي
@@ -798,7 +847,10 @@ pending
 - أخطاء التطبيق المنظمة في FastAPI تستخدم `ApplicationException` مع Handler مركزي يعيد `error.code` و`error.message` و`correlation_id` ويحافظ على Structured Logging؛ أي أخطاء Application جديدة لاحقاً تبنى فوق هذا العقد بدلاً من إنشاء JSON أخطاء خاص بكل Route.
 - عقد D8 يفصل بين `supported_profiles` كقدرة مسموحة معمارياً و`available_profiles` كجاهزية مؤكدة؛ `compare_available` مشتقة ولا يمثل Profile ثالثة، وProvider readiness لا يفترض قبل التحقق الفعلي.
 - عقد D9 يفرض Configuration صريحة ومتوافقة: `cloud` يمنع `LOCAL_AI_TOPOLOGY`، و`local` يتطلب `LOCAL_AI_TOPOLOGY=host_native`؛ لا يتضمن ذلك أي Runtime/provider/device probe.
-- عقد D10 يفصل Base/Cloud عن Local Native: تبقى الاعتماديات الأساسية خفيفة بلا `torch` أو `transformers` أو `ollama`، وتضاف Local AI dependencies عبر `local-native` فقط؛ يثبت PyTorch محلياً عبر Host bootstrap يختار Windows XPU index أو macOS default index حسب نظام التشغيل، من دون Runtime/device probing قبل D11، ويبقى Ollama خدمة Host-native مستقلة وليس FastAPI dependency.
+- عقد D10 يفصل Base/Cloud عن Local Native: تبقى الاعتماديات الأساسية خفيفة بلا `torch` أو `transformers` أو `ollama`، وتضاف Local AI dependencies عبر `local-native` فقط؛ Host bootstrap أصبح accelerator-aware في PR #49 ويختار PyTorch distribution حسب المنصة/العائلة المدعومة، بينما يبقى Ollama خدمة Host-native مستقلة.
+- عقد D11 يفصل **bootstrap detection** عن **runtime verification**: ترتيب `auto` هو `CUDA → ROCm → XPU → MPS → CPU`، ولا تعتمد الجاهزية إلا بعد Tensor probe فعلي؛ Accelerators تستخدم FP16 وCPU يستخدم FP32، والطلب الصريح لا يعمل له silent fallback.
+- نجاح Local runtime لا يعني جاهزية Processing Profile أو Provider؛ `/health` و`/capabilities` يعرضان runtime capability فقط، بينما Provider statuses تبقى `not_checked` حتى مراحلها.
+- Cloud startup لا يستورد أو يتطلب Torch/psutil/Local AI runtime، وقد تم التحقق من ذلك عملياً على Base venv خفيفة.
 
 ---
 
@@ -843,6 +895,7 @@ pending
 | D8 — Deployment capabilities | #46 | `GET /api/v1/capabilities` + Cloud/Local supported profiles + truthful `not_checked` readiness؛ 2 tests + diff-check PASS |
 | D9 — Startup configuration validation | #47 | Startup validation مركزية لـdeployment mode وInternal API key وLocal AI topology؛ 4 focused tests + 13 FastAPI regression tests PASS |
 | D10 — Base/cloud/local dependency split | #48 | Base/Cloud خفيف + `local-native` extra + PyTorch Host bootstrap؛ 4 focused tests + 17 FastAPI regression + packaging/diff-check PASS |
+| D11 — Local runtime/device resolver | #49 | CUDA/ROCm/XPU/MPS/CPU resolver + Tensor startup probe + telemetry + health/capabilities؛ D10 bootstrap صار accelerator-aware؛ 31 FastAPI tests PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -854,11 +907,12 @@ pending
 - D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
 - D3 أضافت Structured JSON logging مركزية وCorrelation IDs عبر Pure ASGI middleware وContextVar، مع الحفاظ على Security وHealth خارج النطاق.
 - D4 أضافت Internal API authentication مركزية باستخدام `X-Internal-API-Key` و`SecretStr` و`compare_digest`، مع Fail-Closed للمفتاح المفقود/غير الصالح والحفاظ على Correlation ID حول طبقة المصادقة.
-- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D8 على `3.12.14`، وD9 على `3.12.13`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
+- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D8 على `3.12.14`، وD9 على `3.12.13`، وD11 full regression على Python `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
 - D7 أضافت عقد Structured Exceptions مركزي مع `ApplicationException` و`ErrorResponse` وCorrelation ID، دون إدخال D8 أو AI/Qdrant/Parsing/Providers.
 - D8 أضافت Capabilities endpoint داخلياً بعقد يفصل supported عن available ويترك readiness بحالة `not_checked` حتى الفحص الفعلي، من دون Provider calls.
 - D9 أضافت Startup validation مركزية عبر FastAPI lifespan، مع إلزام deployment mode وInternal API key ورفض Cloud/Local topology المتعارضة، دون Runtime/provider/device probes.
-- D10 ثبتت فصل الاعتماديات بحيث يبقى Base/Cloud بلا Local AI packages، ويثبت PyTorch المحلي عبر Host bootstrap منفصل حسب نظام التشغيل، مع إبقاء Runtime/device detection لـD11.
+- D10 ثبتت فصل الاعتماديات بحيث يبقى Base/Cloud بلا Local AI packages؛ وفي PR #49 صارت أداة Host bootstrap accelerator-aware لـNVIDIA/AMD-Linux/Intel/Apple/CPU قبل أن يتولى D11 التحقق الفعلي.
+- D11 أضافت Local runtime layer منفصلة وTensor capability probe وسياسة dtype وresource telemetry ونشرت النتيجة عبر health/capabilities دون استنتاج Provider readiness، مع إثبات أن Cloud يعمل بلا Torch/psutil.
 - لا توجد عوائق حالية.
 
 ---
@@ -866,13 +920,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D11 — Local runtime/device resolver + startup probe + resource telemetry
+E1 — Local Qdrant + persistent volume
 Status: TODO
-Expected Branch: task/D11-local-runtime-device-resolver
-Next: E1 — Local Qdrant + persistent volume
+Expected Branch: task/E1-local-qdrant-persistent-volume
+Next: E2 — rag_documents_cloud collection
 ```
 
-> تفاصيل نطاق D11 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md`: قياس Local runtime/backend/dtype والموارد عند Startup دون تحميل Models، مع الحفاظ على عقد D9 (`LOCAL_AI_TOPOLOGY=host_native`) وفصل الاعتماديات المنفذ في D10، ومن دون Fallback صامت أو Provider implementation.
+> تفاصيل نطاق E1 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md`: إعداد Qdrant محلياً كجزء من البنية الأساسية مع persistent volume والتحقق من health/persistence عبر restart، دون إنشاء Collections الخاصة بالـProfiles قبل E2/E3، ودون إدخال Point builders أو indexing/retrieval logic الخاصة بالمهام اللاحقة.
 
 ---
 
@@ -880,7 +934,7 @@ Next: E1 — Local Qdrant + persistent volume
 
 - لا توجد عوائق حالية.
 - توجد ملاحظة تنسيق Pint قديمة في `laravel-app/bootstrap/providers.php` خارج نطاق المهام الحالية؛ غير حاجبة.
-- عند تنفيذ مهام FastAPI استخدم `fastapi-app/.venv` الرسمية مع Python 3.12.x؛ البيئة الحالية Python `3.12.13`، ولا تستخدم Miniconda Python `3.13.13`.
+- عند تنفيذ مهام FastAPI استخدم `fastapi-app/.venv` الرسمية مع Python 3.12.x؛ بيئة D11 الحالية تحققت على Python `3.12.14`، ولا تستخدم Miniconda Python `3.13.13`.
 
 ---
 
