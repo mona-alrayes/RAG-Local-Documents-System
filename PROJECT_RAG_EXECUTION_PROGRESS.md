@@ -2,7 +2,7 @@
 
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات، دون تكرار التفاصيل الموجودة في الـMaster Plan أو Git/PRs.
-> **آخر تحديث:** 2026-08-26
+> **آخر تحديث:** 2026-08-27
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: a529b5c4bba56e34c4c59de139d793618e10d9a9
-Last Merged PR: #50 — feat(E1): add local Qdrant persistent storage
-Latest Task PR: #50 — feat(E1): add local Qdrant persistent storage
-E1 Implementation Commit: bbf5ad5
-E1 Verification: Qdrant v1.19.0 via Docker Compose; REST bound to 127.0.0.1:6333; /healthz passed; qdrant_data persisted across container removal/recreation; compose config and git diff checks passed
-Last Completed Task: E1 — Local Qdrant + persistent volume
-Current Task: E2 — rag_documents_cloud collection
+Verified Main Commit: 8a2f55edfa8df3a81cceaa4caf5ec292acb716b3
+Last Merged PR: #51 — feat(E2): bootstrap cloud Qdrant collection
+Latest Task PR: #51 — feat(E2): bootstrap cloud Qdrant collection
+E2 Implementation Commit: 9f58cc09d3b31b877928c405f088293ca6f5341d
+E2 Verification: qdrant-client 1.19.0; FastAPI startup creates rag_documents_cloud when absent and leaves it unchanged when present; vectors={} and sparse_vectors=None; startup smoke PASS; 6 focused regression tests PASS
+Last Completed Task: E2 — rag_documents_cloud collection
+Current Task: E3 — rag_documents_hybrid_local collection
 Current Task Status: TODO
-Expected Task Branch: task/E2-rag-documents-cloud-collection
-Next Task After Completion: E3 — rag_documents_hybrid_local collection
+Expected Task Branch: task/E3-rag-documents-hybrid-local-collection
+Next Task After Completion: E4 — Dense/sparse configs
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -168,7 +168,7 @@ Open Blockers: لا يوجد
 | المهمة | الحالة |
 |---|---|
 | E1 Local Qdrant + persistent volume | DONE |
-| E2 `rag_documents_cloud` collection | TODO |
+| E2 `rag_documents_cloud` collection | DONE |
 | E3 `rag_documents_hybrid_local` collection | TODO |
 | E4 Dense/sparse configs | TODO |
 | E5 Payload indexes | TODO |
@@ -837,6 +837,25 @@ pending
 - `git diff --check` وstaged diff checks نجحت، ولم يتغير سوى `laravel-app/compose.yaml` و`laravel-app/.env.example` في Implementation commit.
 - لا يوجد ربط Laravel مباشر بـQdrant، ولا FastAPI Qdrant client، ولا Collections أو Dense/Sparse configs أو Payload indexes أو Point builders ضمن E1؛ تبدأ هذه المسؤوليات من E2 وما بعدها حسب خريطة المهام.
 
+## 22.15 Cloud Qdrant Collection المنفذة في E2
+
+تم تنفيذ E2 كطبقة FastAPI Infrastructure مسؤولة عن تهيئة Collection الخاصة بمسار Cloud فقط، دون إدخال Vector schema أو Hybrid Local collection:
+
+- أضيف `qdrant-client==1.19.0` إلى اعتماديات FastAPI الأساسية.
+- أضيف الإعدادان `QDRANT_URL` و`QDRANT_CLOUD_COLLECTION` إلى Typed Settings و`.env.example`، والاسم المعتمد هو `rag_documents_cloud`.
+- أضيفت طبقة `app/infrastructure/qdrant` بفصل واضح للمسؤوليات:
+  - `client.py` لبناء `QdrantClient` من Settings.
+  - `collections.py` لضمان وجود Collection بصورة idempotent.
+  - `startup.py` لتهيئة Qdrant وإغلاق الـclient بأمان.
+- رُبط `initialize_qdrant()` بـFastAPI lifespan بعد Configuration validation وقبل Local runtime initialization، من دون تعديل `app/runtime/startup.py` الخاص بـD11.
+- إنشاء `rag_documents_cloud` يتم فقط عند غيابها، بينما Startup اللاحق يكتفي بفحص الوجود ولا يعيد إنشاءها.
+- تم التحقق عملياً من حذف Collection ثم تشغيل FastAPI؛ نفذ Startup `PUT /collections/rag_documents_cloud` بنجاح وأعاد إنشاءها تلقائياً.
+- تم التحقق أن Collection بقيت بلا Vector schema ضمن E2: `vectors={}` و`sparse_vectors=None`، لذلك Dense/Sparse configs تبقى لـE4.
+- لم تُنشأ `rag_documents_hybrid_local` ضمن E2؛ تبقى مسؤولية E3.
+- لا توجد Payload indexes أو Points أو upsert/count/delete أو Retrieval/Embeddings/Parsing/Providers ضمن E2.
+- Laravel لا يتصل مباشرة بـQdrant؛ الوصول بقي داخل FastAPI Infrastructure.
+- التحقق النهائي شمل Startup smoke حقيقي ضد Qdrant و`6 passed` لاختبارات Startup configuration وDependency split المرتبطة بالتغييرات.
+
 ---
 
 # 23. Baseline معماري تنفيذي
@@ -848,7 +867,7 @@ pending
 - Local Demo = Docker للبنية الأساسية وFastAPI/Ollama على Host.
 - Local heavy work = concurrency `1` + global Redis lock + single-active-model + release-after-stage.
 - Security scan = ClamAV on-demand افتراضياً (`DOCUMENT_SECURITY_SCAN_ENABLED=true`) مع Fail-Closed؛ التعطيل مسموح فقط بإعداد صريح ويؤدي إلى direct permanent storage بعد Validation، بلا fallback تلقائي عند فشل الفاحص. `scanning` يبدأ عند تشغيل Security Job فعلياً، و`queued` لا يستخدم قبل dispatch حقيقي لـProcessing Job.
-- Qdrant runtime بعد E1 = `qdrant/qdrant:v1.19.0` داخل `laravel-app/compose.yaml`، REST على loopback فقط، مع `qdrant_data:/qdrant/storage` كـPersistent Volume؛ لم يبدأ ربط FastAPI أو إنشاء Collections بعد.
+- Qdrant runtime بعد E2 = `qdrant/qdrant:v1.19.0` داخل `laravel-app/compose.yaml` مع persistent `qdrant_data`، وFastAPI تملك `qdrant-client==1.19.0` وتهيئ `rag_documents_cloud` تلقائياً عند Startup؛ لم تُنشأ `rag_documents_hybrid_local` بعد، ولا توجد Dense/Sparse configs أو Payload indexes أو Points.
 - Qdrant = Collection منفصلة لكل Processing Profile مع mandatory user/document/run filters.
 - Persistent Qdrant يحتفظ بالـselected winner فقط بعد التحقق.
 - Laravel/MySQL هو مصدر الحقيقة للتطبيق؛ لا توجد DB علائقية مستقلة لـFastAPI في v1.
@@ -910,6 +929,7 @@ pending
 | D10 — Base/cloud/local dependency split | #48 | Base/Cloud خفيف + `local-native` extra + PyTorch Host bootstrap؛ 4 focused tests + 17 FastAPI regression + packaging/diff-check PASS |
 | D11 — Local runtime/device resolver | #49 | CUDA/ROCm/XPU/MPS/CPU resolver + Tensor startup probe + telemetry + health/capabilities؛ D10 bootstrap صار accelerator-aware؛ 31 FastAPI tests PASS |
 | E1 — Local Qdrant + persistent volume | #50 | Qdrant v1.19.0 + loopback REST + `qdrant_data`؛ health/persistence/config/diff checks PASS |
+| E2 — rag_documents_cloud collection | #51 | FastAPI Qdrant client/bootstrap + idempotent `rag_documents_cloud`; no vector schema؛ startup smoke + 6 focused tests PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -927,6 +947,7 @@ pending
 - D9 أضافت Startup validation مركزية عبر FastAPI lifespan، مع إلزام deployment mode وInternal API key ورفض Cloud/Local topology المتعارضة، دون Runtime/provider/device probes.
 - D10 ثبتت فصل الاعتماديات بحيث يبقى Base/Cloud بلا Local AI packages؛ وفي PR #49 صارت أداة Host bootstrap accelerator-aware لـNVIDIA/AMD-Linux/Intel/Apple/CPU قبل أن يتولى D11 التحقق الفعلي.
 - D11 أضافت Local runtime layer منفصلة وTensor capability probe وسياسة dtype وresource telemetry ونشرت النتيجة عبر health/capabilities دون استنتاج Provider readiness، مع إثبات أن Cloud يعمل بلا Torch/psutil.
+- E2 أضافت FastAPI Qdrant infrastructure وتهيئة `rag_documents_cloud` عند Startup بصورة idempotent، مع إبقاء Hybrid Local collection لـE3 وVector schema لـE4.
 - لا توجد عوائق حالية.
 
 ---
@@ -934,13 +955,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-E2 — rag_documents_cloud collection
+E3 — rag_documents_hybrid_local collection
 Status: TODO
-Expected Branch: task/E2-rag-documents-cloud-collection
-Next: E3 — rag_documents_hybrid_local collection
+Expected Branch: task/E3-rag-documents-hybrid-local-collection
+Next: E4 — Dense/sparse configs
 ```
 
-> تفاصيل نطاق E2 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد Qdrant في `174.8`: تنفذ Collection الخاصة بمسار Cloud فقط فوق Qdrant المحلية المثبتة في E1، مع إبقاء `rag_documents_hybrid_local` لـE3 وDense/Sparse configs لـE4 وPayload indexes لـE5 وPoint builder/metadata لـE6 وخدمات upsert/count/delete لـE7.
+> تفاصيل نطاق E3 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد Qdrant في `174.8`: تنفذ Collection المنفصلة الخاصة بمسار `hybrid_local` فقط فوق طبقة Qdrant/FastAPI المثبتة في E1–E2، مع إبقاء Dense/Sparse configs لـE4 وPayload indexes لـE5 وPoint builder/metadata لـE6 وخدمات upsert/count/delete لـE7.
 
 ---
 
