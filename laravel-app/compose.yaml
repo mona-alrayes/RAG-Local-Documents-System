@@ -45,6 +45,13 @@ services:
       timeout: 3s
       retries: 10
       start_period: 5s
+  qdrant:
+    image: qdrant/qdrant:v1.19.0
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${QDRANT_FORWARD_PORT:-6333}:6333'
+    volumes:
+      - qdrant_data:/qdrant/storage
   security-worker:
     build:
       context: .
@@ -107,3 +114,5 @@ volumes:
     name: redis_data
   clamav_signatures:
     name: clamav_signatures
+  qdrant_data:
+    name: qdrant_data
