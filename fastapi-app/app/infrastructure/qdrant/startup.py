@@ -7,9 +7,13 @@ def initialize_qdrant(settings: Settings) -> None:
     client = build_qdrant_client(settings)
 
     try:
-        ensure_collection_exists(
-            client=client,
-            collection_name=settings.qdrant_cloud_collection,
-        )
+        for collection_name in (
+            settings.qdrant_cloud_collection,
+            settings.qdrant_hybrid_local_collection,
+        ):
+            ensure_collection_exists(
+                client=client,
+                collection_name=collection_name,
+            )
     finally:
         client.close()

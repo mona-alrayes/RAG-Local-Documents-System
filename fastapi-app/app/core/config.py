@@ -50,6 +50,7 @@ class Settings(BaseSettings):
 
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_cloud_collection: str = "rag_documents_cloud"
+    qdrant_hybrid_local_collection: str = "rag_documents_hybrid_local"
 
 
 def validate_startup_configuration(settings: Settings) -> None:
