@@ -1,9 +1,11 @@
 from app.core.config import DeploymentMode
+from app.runtime.models import LocalRuntimeSnapshot
 from app.schemas.capabilities import (
     DeploymentCapabilitiesResponse,
     ProviderCapability,
     ProviderStatus,
 )
+from app.schemas.runtime import LocalRuntimeCapability
 
 
 SHARED_PROVIDERS = (
@@ -27,6 +29,7 @@ class CapabilitiesService:
     def build(
         self,
         deployment_mode: DeploymentMode,
+        local_runtime_snapshot: LocalRuntimeSnapshot | None = None,
     ) -> DeploymentCapabilitiesResponse:
         if deployment_mode is DeploymentMode.CLOUD:
             return DeploymentCapabilitiesResponse(
@@ -37,6 +40,7 @@ class CapabilitiesService:
                 providers=self._providers(
                     SHARED_PROVIDERS + CLOUD_PROFILE_PROVIDERS,
                 ),
+                local_runtime=None,
             )
 
         return DeploymentCapabilitiesResponse(
@@ -48,6 +52,9 @@ class CapabilitiesService:
                 SHARED_PROVIDERS
                 + CLOUD_PROFILE_PROVIDERS
                 + HYBRID_LOCAL_PROFILE_PROVIDERS,
+            ),
+            local_runtime=self._local_runtime(
+                local_runtime_snapshot,
             ),
         )
 
@@ -62,3 +69,19 @@ class CapabilitiesService:
             )
             for provider_name in provider_names
         ]
+
+    def _local_runtime(
+        self,
+        snapshot: LocalRuntimeSnapshot | None,
+    ) -> LocalRuntimeCapability | None:
+        if snapshot is None:
+            return None
+
+        return LocalRuntimeCapability(
+            ready=snapshot.ready,
+            requested_device=snapshot.requested_device,
+            selected_backend=snapshot.selected_backend,
+            selected_dtype=snapshot.selected_dtype,
+            probe_status=snapshot.probe_status,
+            failure_reason=snapshot.failure_reason,
+        )

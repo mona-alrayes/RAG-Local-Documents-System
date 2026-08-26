@@ -14,6 +14,7 @@ from app.core.exceptions import ApplicationException
 from app.core.logging import configure_logging
 from app.middleware.correlation_id import CorrelationIdMiddleware
 from app.middleware.internal_api_auth import InternalApiAuthMiddleware
+from app.runtime.startup import initialize_local_runtime
 
 
 def create_app() -> FastAPI:
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         validate_startup_configuration(settings)
+        initialize_local_runtime(settings)
         yield
 
     app = FastAPI(

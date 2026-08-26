@@ -3,6 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel
 
 from app.core.config import DeploymentMode
+from app.schemas.runtime import LocalRuntimeCapability
 
 
 class ProviderStatus(StrEnum):
@@ -22,3 +23,4 @@ class DeploymentCapabilitiesResponse(BaseModel):
     available_profiles: list[str]
     compare_available: bool
     providers: list[ProviderCapability]
+    local_runtime: LocalRuntimeCapability | None = None
