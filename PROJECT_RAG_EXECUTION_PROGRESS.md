@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 0a9f03c1d31096cc9f8164b61b3659c6169466eb
-Last Merged PR: #44 — feat(D7): add structured FastAPI exceptions
-Latest Task PR: #44 — feat(D7): add structured FastAPI exceptions
-D7 Implementation Commit: 423ea19fcb54f37c8778bfae725575942f2729c7
-D7 Verification: Python 3.12.14 (.venv); focused D7 structured-exception test 1 passed; D4–D7 regression 7 passed; compileall + pip check PASS; structured error response preserves correlation ID
-Last Completed Task: D7 — Structured exceptions
-Current Task: D8 — Deployment capabilities endpoint
+Verified Main Commit: a34d96ac74dcdc8ab425c88f7e160c3ca4acd749
+Last Merged PR: #46 — feat(D8): add deployment capabilities endpoint
+Latest Task PR: #46 — feat(D8): add deployment capabilities endpoint
+D8 Implementation Commit: 1ad6c2d75f08f40de529b19208183f4c5a1a41b3
+D8 Verification: Python 3.12.14 (.venv); focused D8 capabilities test 2 passed; git diff --cached --check PASS; Cloud/Local capability contract verified
+Last Completed Task: D8 — Deployment capabilities endpoint
+Current Task: D9 — Startup configuration validation
 Current Task Status: TODO
-Expected Task Branch: task/D8-deployment-capabilities
-Next Task After Completion: D9 — Startup configuration validation
+Expected Task Branch: task/D9-startup-config-validation
+Next Task After Completion: D10 — Base/cloud/local dependency split
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -154,7 +154,7 @@ Open Blockers: لا يوجد
 | D5 Health endpoint | DONE |
 | D6 Versioned DTO schemas | DONE |
 | D7 Structured exceptions | DONE |
-| D8 Deployment capabilities endpoint | TODO |
+| D8 Deployment capabilities endpoint | DONE |
 | D9 Startup configuration validation | TODO |
 | D10 Base/cloud/local dependency split | TODO |
 | D11 Local runtime/device resolver + startup probe + resource telemetry | TODO |
@@ -737,6 +737,31 @@ pending
 - التحقق النهائي تم داخل `fastapi-app/.venv` باستخدام Python `3.12.14`: `compileall` نجح، واختبارات D4 الثلاثة أعادت `3 passed`، و`pip check` أعاد `No broken requirements found.`، و`git diff --cached --check` نجح.
 - لم تدخل Health endpoint أو Versioned DTO schemas أو Structured Exceptions framework الكامل أو Deployment capabilities أو AI/Qdrant/Parsing/Providers أو أي تعديل Laravel ضمن D4.
 
+## 22.11 Deployment Capabilities المنفذة في D8
+
+تم تنفيذ D8 كعقد Capabilities داخلي صغير ومفصول عن الـRoute والإعدادات، من دون إدخال Startup validation أو provider probes أو AI/Qdrant:
+
+- أضيف `GET /api/v1/capabilities` ويخضع تلقائياً لـInternal API Security وCorrelation ID الموجودين مسبقاً.
+- أضيف `DeploymentCapabilitiesResponse` ويعرض:
+  - `deployment_mode`
+  - `supported_profiles`
+  - `available_profiles`
+  - `compare_available`
+  - `providers`
+- `supported_profiles` تعني ما تسمح به بيئة النشر معمارياً، أما `available_profiles` فتعني ما ثبتت جاهزيته فعلياً؛ لا يتم الخلط بين المفهومين.
+- في `cloud` تكون الـProfiles المدعومة `cloud` فقط.
+- في `local` تكون الـProfiles المدعومة `cloud` و`hybrid_local`.
+- `compare` بقي Orchestration مشتقة وليس Processing Profile ثالثة؛ لذلك يمثلها الحقل `compare_available` فقط.
+- LlamaParse ممثل كـProvider مشترك للمسارين لأن Parsing في Cloud وHybrid Local يعتمد LlamaParse Cloud وفق الخطة الحالية.
+- Cloud-specific providers الحالية: Jina embeddings + Jina reranker + Hugging Face LLM.
+- Hybrid-local-specific providers الحالية: BGE-M3 embeddings + BGE reranker + Ollama LLM.
+- حالات Provider المعرفة في العقد: `available`, `unavailable`, `not_checked`.
+- ضمن D8 لا توجد فحوص جاهزية فعلية، لذلك تبقى جميع Providers بحالة `not_checked`، و`available_profiles=[]`، و`compare_available=false` بدلاً من ادعاء جاهزية غير متحققة.
+- `CapabilitiesService` يحوي منطق بناء القدرات، بينما `capabilities_routes.py` مسؤول عن HTTP فقط، و`schemas/capabilities.py` مسؤول عن DTOs؛ بقيت المسؤوليات منفصلة.
+- لا يعرض endpoint أي Secrets.
+- التحقق المركز لـD8 نجح بحالتي Cloud وLocal: `2 passed` داخل `fastapi-app/.venv` على Python `3.12.14`، و`git diff --cached --check` نجح.
+- D9 يبقى مسؤولاً عن Startup configuration validation، وD11 عن Local runtime/device probe؛ D8 لم يتوسع إلى أي منهما.
+
 ---
 
 # 23. Baseline معماري تنفيذي
@@ -757,6 +782,7 @@ pending
 - تشغيل أوامر FastAPI محلياً يعتمد `fastapi-app/.venv` وPython 3.12.x، وليس Python العام على النظام إذا كان خارج النطاق `>=3.12,<3.13`.
 - FastAPI ليس API عاماً للمستخدم النهائي؛ المسار المعتمد هو `Browser → Laravel → FastAPI`. المصادقة الداخلية المنفذة في D4 تستخدم `X-Internal-API-Key`، وقيمته من `INTERNAL_API_KEY` في Environment Variables فقط؛ missing/invalid/unconfigured يرفض Fail-Closed، بينما Correlation ID يبقى فعالاً حول طبقة المصادقة.
 - أخطاء التطبيق المنظمة في FastAPI تستخدم `ApplicationException` مع Handler مركزي يعيد `error.code` و`error.message` و`correlation_id` ويحافظ على Structured Logging؛ أي أخطاء Application جديدة لاحقاً تبنى فوق هذا العقد بدلاً من إنشاء JSON أخطاء خاص بكل Route.
+- عقد D8 يفصل بين `supported_profiles` كقدرة مسموحة معمارياً و`available_profiles` كجاهزية مؤكدة؛ `compare_available` مشتقة ولا يمثل Profile ثالثة، وProvider readiness لا يفترض قبل التحقق الفعلي.
 
 ---
 
@@ -798,6 +824,7 @@ pending
 | D5 — Health endpoint | #42 | `GET /api/v1/health` + internal auth + Correlation ID preserved؛ 1 focused test + D4/D5 regression + compileall/pip/diff-check PASS |
 | D6 — Versioned DTO schemas | #43 | Pydantic DTOs لعقود document processing وRAG؛ nullable `total_pages`؛ 2 focused tests + D4–D6 regression + compileall/pip/diff-check PASS |
 | D7 — Structured exceptions | #44 | `ApplicationException` + ErrorResponse + handler مركزي مع Correlation ID؛ 1 focused test + D4–D7 regression + compileall/pip PASS |
+| D8 — Deployment capabilities | #46 | `GET /api/v1/capabilities` + Cloud/Local supported profiles + truthful `not_checked` readiness؛ 2 tests + diff-check PASS |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -809,8 +836,9 @@ pending
 - D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
 - D3 أضافت Structured JSON logging مركزية وCorrelation IDs عبر Pure ASGI middleware وContextVar، مع الحفاظ على Security وHealth خارج النطاق.
 - D4 أضافت Internal API authentication مركزية باستخدام `X-Internal-API-Key` و`SecretStr` و`compare_digest`، مع Fail-Closed للمفتاح المفقود/غير الصالح والحفاظ على Correlation ID حول طبقة المصادقة.
-- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D7 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
+- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D8 على `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
 - D7 أضافت عقد Structured Exceptions مركزي مع `ApplicationException` و`ErrorResponse` وCorrelation ID، دون إدخال D8 أو AI/Qdrant/Parsing/Providers.
+- D8 أضافت Capabilities endpoint داخلياً بعقد يفصل supported عن available ويترك readiness بحالة `not_checked` حتى الفحص الفعلي، من دون إدخال D9/D11 أو Provider calls.
 - لا توجد عوائق حالية.
 
 ---
@@ -818,13 +846,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-D8 — Deployment capabilities endpoint
+D9 — Startup configuration validation
 Status: TODO
-Expected Branch: task/D8-deployment-capabilities
-Next: D9 — Startup configuration validation
+Expected Branch: task/D9-startup-config-validation
+Next: D10 — Base/cloud/local dependency split
 ```
 
-> تفاصيل نطاق D8 وعقد Deployment Capabilities تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` عند بدء المهمة، دون توسيعها إلى D9 وما بعدها.
+> تفاصيل نطاق D9 وعقد Startup Configuration Validation تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` عند بدء المهمة، دون توسيعها إلى D10/D11 أو Provider implementations.
 
 ---
 
