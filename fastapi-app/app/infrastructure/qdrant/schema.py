@@ -8,6 +8,13 @@ DENSE_VECTOR_DISTANCE = models.Distance.COSINE
 SPARSE_VECTOR_NAME = "bm25_sparse_vector"
 SPARSE_VECTOR_MODIFIER = models.Modifier.IDF
 
+PAYLOAD_INDEX_SCHEMA: dict[str, models.PayloadSchemaType] = {
+    "user_id": models.PayloadSchemaType.INTEGER,
+    "document_id": models.PayloadSchemaType.INTEGER,
+    "processing_run_id": models.PayloadSchemaType.INTEGER,
+    "processing_profile": models.PayloadSchemaType.KEYWORD,
+}
+
 
 def build_dense_vector_params() -> models.VectorParams:
     return models.VectorParams(
