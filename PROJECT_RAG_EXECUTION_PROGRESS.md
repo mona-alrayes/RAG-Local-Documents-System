@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 60a7fe866a7c761ca80bc90ccd2af16ea8cc825c
-Last Merged PR: #52 — feat(E3): add hybrid local Qdrant collection
-Latest Task PR: #52 — feat(E3): add hybrid local Qdrant collection
-E3 Implementation Commit: 0e855f4da33c10c5c1b2d45350f2f673c95726dd
-E3 Scope: QDRANT_HYBRID_LOCAL_COLLECTION + typed qdrant_hybrid_local_collection; shared FastAPI Startup ensures rag_documents_cloud and rag_documents_hybrid_local through ensure_collection_exists(); no Dense/Sparse configs, Payload indexes, Points, or E4–E7 services
-Last Completed Task: E3 — rag_documents_hybrid_local collection
-Current Task: E4 — Dense/sparse configs
+Verified Main Commit: b04edb90ced94e0887b86844e06b59bb603aa956
+Last Merged PR: #53 — feat(E4): add dense and sparse vector schema
+Latest Task PR: #53 — feat(E4): add dense and sparse vector schema
+E4 Implementation Commit: 88f80f79d021d11f30c9875365569017582ad250
+E4 Scope: مخطط Dense/Sparse مركزي داخل FastAPI/Qdrant للـCollectionين؛ dense_vector (1024/COSINE) وbm25_sparse_vector (IDF)؛ دعم الموجود والتحقق من التوافق بلا حذف أو إعادة إنشاء؛ Startup idempotent؛ لا Payload indexes أو Points
+Last Completed Task: E4 — Dense/sparse configs
+Current Task: E5 — Payload indexes
 Current Task Status: TODO
-Expected Task Branch: task/E4-dense-sparse-configs
-Next Task After Completion: E5 — Payload indexes
+Expected Task Branch: task/E5-payload-indexes
+Next Task After Completion: E6 — Point builder مع run metadata
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -170,7 +170,7 @@ Open Blockers: لا يوجد
 | E1 Local Qdrant + persistent volume | DONE |
 | E2 `rag_documents_cloud` collection | DONE |
 | E3 `rag_documents_hybrid_local` collection | DONE |
-| E4 Dense/sparse configs | TODO |
+| E4 Dense/sparse configs | DONE |
 | E5 Payload indexes | TODO |
 | E6 Point builder مع run metadata | TODO |
 | E7 Idempotent upsert/count/delete | TODO |
@@ -877,7 +877,7 @@ pending
 - Local Demo = Docker للبنية الأساسية وFastAPI/Ollama على Host.
 - Local heavy work = concurrency `1` + global Redis lock + single-active-model + release-after-stage.
 - Security scan = ClamAV on-demand افتراضياً (`DOCUMENT_SECURITY_SCAN_ENABLED=true`) مع Fail-Closed؛ التعطيل مسموح فقط بإعداد صريح ويؤدي إلى direct permanent storage بعد Validation، بلا fallback تلقائي عند فشل الفاحص. `scanning` يبدأ عند تشغيل Security Job فعلياً، و`queued` لا يستخدم قبل dispatch حقيقي لـProcessing Job.
-- Qdrant runtime بعد E3 = `qdrant/qdrant:v1.19.0` داخل `laravel-app/compose.yaml` مع persistent `qdrant_data`، وFastAPI تملك `qdrant-client==1.19.0` وتهيئ `rag_documents_cloud` و`rag_documents_hybrid_local` تلقائياً عند Startup عبر الطبقة المشتركة؛ لا توجد بعد Dense/Sparse configs أو Payload indexes أو Points.
+- Qdrant runtime بعد E4 = `qdrant/qdrant:v1.19.0` داخل `laravel-app/compose.yaml` مع persistent `qdrant_data`، وFastAPI تملك `qdrant-client==1.19.0` وتهيئ `rag_documents_cloud` و`rag_documents_hybrid_local` تلقائياً بمخطط مركزي: `dense_vector` بحجم `1024` و`COSINE`، و`bm25_sparse_vector` مع `IDF`؛ تدعم Collections الموجودة بلا حذف أو إعادة إنشاء، وتفشل بوضوح عند تعارض المخطط، مع Startup idempotent؛ لا توجد بعد Payload indexes أو Points.
 - Qdrant = Collection منفصلة لكل Processing Profile مع mandatory user/document/run filters.
 - Persistent Qdrant يحتفظ بالـselected winner فقط بعد التحقق.
 - Laravel/MySQL هو مصدر الحقيقة للتطبيق؛ لا توجد DB علائقية مستقلة لـFastAPI في v1.
@@ -941,6 +941,7 @@ pending
 | E1 — Local Qdrant + persistent volume | #50 | Qdrant v1.19.0 + loopback REST + `qdrant_data`؛ health/persistence/config/diff checks PASS |
 | E2 — rag_documents_cloud collection | #51 | FastAPI Qdrant client/bootstrap + idempotent `rag_documents_cloud`; no vector schema؛ startup smoke + 6 focused tests PASS |
 | E3 — rag_documents_hybrid_local collection | #52 | إعداد مستقل + Typed Setting؛ Startup يهيئ Collections الاثنتين عبر `ensure_collection_exists()`؛ بلا Dense/Sparse configs أو Payload indexes أو Points |
+| E4 — Dense/sparse configs | #53 | مخطط مركزي: `dense_vector` (`1024`/`COSINE`) و`bm25_sparse_vector` (`IDF`) لـ`rag_documents_cloud` و`rag_documents_hybrid_local`؛ دعم الموجود والتحقق من التوافق بلا حذف أو إعادة إنشاء؛ Startup idempotent؛ تحقق تشغيلي + `2 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -967,13 +968,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-E4 — Dense/sparse configs
+E5 — Payload indexes
 Status: TODO
-Expected Branch: task/E4-dense-sparse-configs
-Next: E5 — Payload indexes
+Expected Branch: task/E5-payload-indexes
+Next: E6 — Point builder مع run metadata
 ```
 
-> تفاصيل نطاق E4 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد Qdrant في `174.8`: تضبط Dense/Sparse configs للـCollections المنفصلة التي أصبحت FastAPI تهيئها في E2–E3، مع إبقاء Payload indexes لـE5 وPoint builder/metadata لـE6 وخدمات upsert/count/delete لـE7.
+> تفاصيل نطاق E5 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد Qdrant في `174.8`: تضيف Payload indexes الإلزامية `user_id` و`document_id` و`processing_run_id` و`processing_profile` للـCollections المنفصلة، مع إبقاء Point builder وrun metadata لـE6 وخدمات upsert/count/delete لـE7.
 
 ---
 
