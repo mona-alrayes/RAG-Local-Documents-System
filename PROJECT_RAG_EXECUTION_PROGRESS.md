@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: b04edb90ced94e0887b86844e06b59bb603aa956
-Last Merged PR: #53 — feat(E4): add dense and sparse vector schema
-Latest Task PR: #53 — feat(E4): add dense and sparse vector schema
-E4 Implementation Commit: 88f80f79d021d11f30c9875365569017582ad250
-E4 Scope: مخطط Dense/Sparse مركزي داخل FastAPI/Qdrant للـCollectionين؛ dense_vector (1024/COSINE) وbm25_sparse_vector (IDF)؛ دعم الموجود والتحقق من التوافق بلا حذف أو إعادة إنشاء؛ Startup idempotent؛ لا Payload indexes أو Points
-Last Completed Task: E4 — Dense/sparse configs
-Current Task: E5 — Payload indexes
+Verified Main Commit: ed70a3953042d8d682f914ffc19f2e7d01c3887e
+Last Merged PR: #54 — feat(E5): add qdrant payload indexes
+Latest Task PR: #54 — feat(E5): add qdrant payload indexes
+E5 Implementation Commit: 3f7366f0780d01802ecc6c90168a1ba7f55469b1
+E5 Scope: Payload Indexes مركزية لـrag_documents_cloud وrag_documents_hybrid_local عبر PAYLOAD_INDEX_SCHEMA؛ إنشاء الناقص فقط والتحقق من توافق الموجود؛ Startup idempotent بلا حذف أو إعادة إنشاء أو Points أو RESET_COLLECTION
+Last Completed Task: E5 — Payload indexes
+Current Task: E6 — Point builder + payload metadata
 Current Task Status: TODO
-Expected Task Branch: task/E5-payload-indexes
-Next Task After Completion: E6 — Point builder مع run metadata
+Expected Task Branch: task/E6-point-builder-payload-metadata
+Next Task After Completion: E7 — Idempotent upsert/count/delete
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -171,7 +171,7 @@ Open Blockers: لا يوجد
 | E2 `rag_documents_cloud` collection | DONE |
 | E3 `rag_documents_hybrid_local` collection | DONE |
 | E4 Dense/sparse configs | DONE |
-| E5 Payload indexes | TODO |
+| E5 Payload indexes | DONE |
 | E6 Point builder مع run metadata | TODO |
 | E7 Idempotent upsert/count/delete | TODO |
 | E8 Cross-user leakage tests | TODO |
@@ -866,6 +866,24 @@ pending
 - بقيت التهيئة idempotent: تتحقق من وجود كل Collection ولا تنشئها إلا عند غيابها.
 - لم تدخل E3 أي Dense/Sparse configs أو Payload indexes أو Points أو خدمات E4–E7.
 
+## 22.17 Payload Indexes المنفذة في E5
+
+تم تنفيذ E5 ضمن طبقة Qdrant المشتركة بإضافة Payload Indexes مركزية للـCollections `rag_documents_cloud` و`rag_documents_hybrid_local`:
+
+- يعتمد المخطط المركزي `PAYLOAD_INDEX_SCHEMA` الأنواع التالية:
+  - `user_id` → `INTEGER`
+  - `document_id` → `INTEGER`
+  - `processing_run_id` → `INTEGER`
+  - `processing_profile` → `KEYWORD`
+- تمر كلتا الـCollections عبر `initialize_qdrant()` و`ensure_collection_exists()`، ثم يفحص التنفيذ `payload_schema` الموجود قبل أي إنشاء.
+- تنشأ الـindexes الناقصة فقط، بينما تتجاوز الـindexes الموجودة والمتوافقة من دون duplication.
+- تدعم التهيئة Collections الموجودة من دون حذفها أو إعادة إنشائها، وتحافظ على idempotent Qdrant startup.
+- إذا وُجد Payload Index بالاسم نفسه ونوع غير متوافق، يفشل Startup بوضوح عبر `RuntimeError` يبيّن الحقل والنوع المتوقع والموجود؛ ولا يغير التعارض بصمت.
+- تحقق تشغيلياً أن كلتا الـCollections تحتويان `user_id: integer` و`document_id: integer` و`processing_run_id: integer` و`processing_profile: keyword`.
+- نجح تشغيل `initialize_qdrant()` مرة ثانية بلا duplication أو error.
+- أثبت اختبار conflict على Collection مؤقتة أن وجود `user_id` بنوع `KEYWORD` بدلاً من `INTEGER` يؤدي إلى `RuntimeError` واضح.
+- لم تُنشأ أي Points دائمة، ولم تدخل E5 بناء Points أو metadata الخاص بـE6، ولا Retrieval أو Embeddings أو Parsing، ولم يستخدم التنفيذ `RESET_COLLECTION`.
+
 ---
 
 # 23. Baseline معماري تنفيذي
@@ -877,7 +895,7 @@ pending
 - Local Demo = Docker للبنية الأساسية وFastAPI/Ollama على Host.
 - Local heavy work = concurrency `1` + global Redis lock + single-active-model + release-after-stage.
 - Security scan = ClamAV on-demand افتراضياً (`DOCUMENT_SECURITY_SCAN_ENABLED=true`) مع Fail-Closed؛ التعطيل مسموح فقط بإعداد صريح ويؤدي إلى direct permanent storage بعد Validation، بلا fallback تلقائي عند فشل الفاحص. `scanning` يبدأ عند تشغيل Security Job فعلياً، و`queued` لا يستخدم قبل dispatch حقيقي لـProcessing Job.
-- Qdrant runtime بعد E4 = `qdrant/qdrant:v1.19.0` داخل `laravel-app/compose.yaml` مع persistent `qdrant_data`، وFastAPI تملك `qdrant-client==1.19.0` وتهيئ `rag_documents_cloud` و`rag_documents_hybrid_local` تلقائياً بمخطط مركزي: `dense_vector` بحجم `1024` و`COSINE`، و`bm25_sparse_vector` مع `IDF`؛ تدعم Collections الموجودة بلا حذف أو إعادة إنشاء، وتفشل بوضوح عند تعارض المخطط، مع Startup idempotent؛ لا توجد بعد Payload indexes أو Points.
+- Qdrant runtime بعد E5 = `qdrant/qdrant:v1.19.0` داخل `laravel-app/compose.yaml` مع persistent `qdrant_data`، وFastAPI تملك `qdrant-client==1.19.0` وتهيئ `rag_documents_cloud` و`rag_documents_hybrid_local` تلقائياً بمخطط Vector مركزي: `dense_vector` بحجم `1024` و`COSINE`، و`bm25_sparse_vector` مع `IDF`؛ كما تطبق Payload Indexes مركزية: `user_id` و`document_id` و`processing_run_id` من نوع `INTEGER`، و`processing_profile` من نوع `KEYWORD`؛ تدعم Collections الموجودة بلا حذف أو إعادة إنشاء، وتفشل بوضوح عند تعارض المخطط، مع Startup idempotent؛ لا توجد Points بعد.
 - Qdrant = Collection منفصلة لكل Processing Profile مع mandatory user/document/run filters.
 - Persistent Qdrant يحتفظ بالـselected winner فقط بعد التحقق.
 - Laravel/MySQL هو مصدر الحقيقة للتطبيق؛ لا توجد DB علائقية مستقلة لـFastAPI في v1.
@@ -942,6 +960,7 @@ pending
 | E2 — rag_documents_cloud collection | #51 | FastAPI Qdrant client/bootstrap + idempotent `rag_documents_cloud`; no vector schema؛ startup smoke + 6 focused tests PASS |
 | E3 — rag_documents_hybrid_local collection | #52 | إعداد مستقل + Typed Setting؛ Startup يهيئ Collections الاثنتين عبر `ensure_collection_exists()`؛ بلا Dense/Sparse configs أو Payload indexes أو Points |
 | E4 — Dense/sparse configs | #53 | مخطط مركزي: `dense_vector` (`1024`/`COSINE`) و`bm25_sparse_vector` (`IDF`) لـ`rag_documents_cloud` و`rag_documents_hybrid_local`؛ دعم الموجود والتحقق من التوافق بلا حذف أو إعادة إنشاء؛ Startup idempotent؛ تحقق تشغيلي + `2 passed` |
+| E5 — Payload indexes | #54 | `PAYLOAD_INDEX_SCHEMA` مركزية للـCollectionين؛ إنشاء الناقص والتحقق من التعارض؛ Startup idempotent؛ تحقق تشغيلي بلا Points |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -968,13 +987,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-E5 — Payload indexes
+E6 — Point builder + payload metadata
 Status: TODO
-Expected Branch: task/E5-payload-indexes
-Next: E6 — Point builder مع run metadata
+Expected Branch: task/E6-point-builder-payload-metadata
+Next: E7 — Idempotent upsert/count/delete
 ```
 
-> تفاصيل نطاق E5 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد Qdrant في `174.8`: تضيف Payload indexes الإلزامية `user_id` و`document_id` و`processing_run_id` و`processing_profile` للـCollections المنفصلة، مع إبقاء Point builder وrun metadata لـE6 وخدمات upsert/count/delete لـE7.
+> تفاصيل نطاق E6 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد Qdrant في `174.8`: تنفذ Point builder وpayload metadata، مع إبقاء خدمات upsert/count/delete لـE7 واختبارات Cross-user leakage لـE8.
 
 ---
 
