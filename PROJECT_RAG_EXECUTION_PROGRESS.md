@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: cefa61947622b7b9bbcddcca61c6d6e4ac4b0aaf
-Last Merged PR: #66 — feat(G1): add processing profile registry
-Latest Task PR: #66
-G1 Implementation Commit: ab17e0eeb9b0409ea345f75c6ec642b622349096
-G1 Scope: تعريف `ProcessingProfile` بالقيمتين الرسميتين `cloud` و`hybrid_local` فقط دون `compare`؛ إضافة `BaseProcessingProfile` كـcontract ضيق و`ProcessingProfileRegistry` لحل القيم الموثوقة إلى implementations مسجلة؛ رفض raw strings ومنع silent fallback باستخدام `ApplicationException`؛ اختبارات بـFakes دون production implementations فارغة
-Last Completed Task: G1 — ProcessingProfile interface/registry
-Current Task: G2 — Cloud chunking
+Verified Main Commit: e4e50467408b46810e4488de93d228590057c853
+Last Merged PR: #67 — feat(G2): add cloud chunking
+Latest Task PR: #67
+G2 Implementation Commit: 23b55768c6ba9f8371efac5657d431adadd5ca7d
+G2 Scope: إضافة `CloudChunker` باستخدام `SentenceSplitter` لتقسيم كل `NormalizedDocument` بشكل مستقل مع الحفاظ على `page` و`section` وإرجاع `NormalizedChunk` كـvalue object ضيق؛ baseline `CHUNK_SIZE=800` و`CHUNK_OVERLAP=80` قابل للـoverride من Environment؛ إضافة `llama-index-core` واختبارات G2 المركزة؛ دون embeddings أو sparse أو reranking أو Qdrant indexing أو Hybrid Local chunking
+Last Completed Task: G2 — Cloud chunking
+Current Task: G3 — Cloud Jina embeddings
 Current Task Status: TODO
-Expected Task Branch: task/G2-cloud-chunking
-Next Task After Completion: G3 — Cloud Jina embeddings
+Expected Task Branch: task/G3-cloud-jina-embeddings
+Next Task After Completion: G4 — Cloud sparse representation
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -202,7 +202,7 @@ Open Blockers: لا يوجد
 | المهمة | الحالة |
 |---|---|
 | G1 ProcessingProfile registry | DONE |
-| G2 Cloud chunking | TODO |
+| G2 Cloud chunking | DONE |
 | G3 Cloud Jina embeddings | TODO |
 | G4 Cloud sparse representation | TODO |
 | G5 Hybrid Local chunking | TODO |
@@ -973,6 +973,7 @@ pending
 | F7 — Shared parse result reuse for Compare | #64 | shared normalized parse result؛ Parsing مرة واحدة وإعادة استخدام الناتج في Compare؛ `1 direct / 10 parsing regression / 47 full FastAPI` |
 | F8 — Loader tests | #65 | Tests-only: delegation لـPDF/DOCX/TXT مع `parse()` مرة واحدة وتمرير نتيجة الـProvider وأخطائه كما هي؛ `7 direct / 13 Phase F regression / 50 full FastAPI` |
 | G1 — ProcessingProfile registry | #66 | القيم الرسمية فقط + contract ضيق + registry موثوق بلا raw strings أو silent fallback؛ Fakes للاختبارات |
+| G2 — Cloud chunking | #67 | `CloudChunker` + `SentenceSplitter` مع metadata وbaseline قابل للضبط؛ Implementation `23b55768c6ba9f8371efac5657d431adadd5ca7d`؛ focused G2 tests: `4 passed`؛ full FastAPI suite: `59 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -999,13 +1000,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-G2 — Cloud chunking
+G3 — Cloud Jina embeddings
 Status: TODO
-Expected Branch: task/G2-cloud-chunking
-Next: G3 — Cloud Jina embeddings
+Expected Branch: task/G3-cloud-jina-embeddings
+Next: G4 — Cloud sparse representation
 ```
 
-> تبدأ G2 بعد اكتمال G1 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ G3 بعد اكتمال G2 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
