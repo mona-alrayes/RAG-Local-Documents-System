@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 392eadb252e7f9700b6028677bdc008b5e27e7f2
-Last Merged PR: #63 — feat(F6): add normalized page section schema
-Latest Task PR: #63
-F6 Implementation Commit: 3ab4d8b39b067686ec59632b108d625a3fd95096
-F6 Scope: إضافة NormalizedDocument كـimmutable internal value object بحقول text وpage: int | None وsection: str | None؛ إضافة normalization boundary يحول LlamaParsePage مع الحفاظ على page number عندما تكون semantics موثوقة وإسقاطها للـTXT/DOCX عندما لا تكون موثوقة، وعدم اختراع section؛ إبقاء domain representation مستقلة عن LlamaParse؛ بلا Chunking أو F7 Compare reuse أو dependency جديدة؛ F6 direct tests: 3 passed، وF1–F6 parsing regression: 9 passed، وFull FastAPI suite: 46 passed
-Last Completed Task: F6 — normalized page/section schema
-Current Task: F7 — shared parse result reuse for Compare
+Verified Main Commit: 628147a1a0d68619b693aa4e31888def0d7a955b
+Last Merged PR: #64 — feat(F7): reuse normalized parse result for compare
+Latest Task PR: #64
+F7 Implementation Commit: f0022ea23cddedfdc3a23f0f8e413015e8da6ee8
+F7 Scope: إضافة shared parsing helper يعيد `list[NormalizedDocument]` وينفذ `loader.load()` مرة واحدة فقط ثم يجري Normalization مرة واحدة؛ يتيح إعادة استخدام نفس normalized parse result من أكثر من downstream consumer في Compare بلا إعادة Parsing؛ يبقي تمثيل LlamaParse/provider-specific داخل parsing boundary؛ بلا Compare orchestration أو Profiles أو Chunking أو Embeddings أو Cache أو Artifact Store أو Qdrant logic أو dependency جديدة؛ F7 direct test: 1 passed، وF1–F7 parsing regression: 10 passed، وFull FastAPI suite: 47 passed
+Last Completed Task: F7 — shared parse result reuse for Compare
+Current Task: F8 — Loader tests
 Current Task Status: TODO
-Expected Task Branch: task/F7-shared-parse-result-reuse-for-compare
-Next Task After Completion: F8 — Loader tests
+Expected Task Branch: task/F8-loader-tests
+Next Task After Completion: G1 — ProcessingProfile interface/registry
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -190,7 +190,7 @@ Open Blockers: لا يوجد
 | F4 DOCX loader | DONE |
 | F5 TXT loader | DONE |
 | F6 Normalized page/section schema | DONE |
-| F7 Reuse parsed result in Compare | TODO |
+| F7 Reuse parsed result in Compare | DONE |
 | F8 Loader tests | TODO |
 
 **معيار انتهاء المرحلة:** الملفات الثلاثة تتحول إلى تمثيل موحد ويمكن مشاركة Parsing في Compare.
@@ -970,6 +970,7 @@ pending
 | F4 — DOCX loader | #61 | `DocxDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider`؛ بلا dependency جديدة وبلا تنفيذ F6؛ اختبار F4 المباشر `1 passed`، واختبارات F1–F4 المباشرة `5 passed`، وجميع اختبارات FastAPI `42 passed` |
 | F5 — TXT loader | #62 | `TxtDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider`؛ بلا coupling مباشر مع LlamaParse SDK ويستخدم `LlamaParsePage` كنتيجة provider-level فقط دون F6؛ بلا dependency جديدة؛ Implementation `293f2a79e4c7fa01e9cc2be26b98674dcbc60e95`، Merge `402ea0bd524bdcd18fee1a15d2a5a2ec7a261d74`؛ F5 `1 passed`، وF1–F5 `6 passed`، وجميع FastAPI `43 passed` |
 | F6 — Normalized page/section schema | #63 | `NormalizedDocument` immutable وLlamaParse normalization boundary مع page semantics موثوقة بلا section مخترع؛ بلا Chunking أو F7 أو dependencies جديدة؛ Implementation `3ab4d8b39b067686ec59632b108d625a3fd95096`، Merge `392eadb252e7f9700b6028677bdc008b5e27e7f2`؛ F6 `3 passed`، وF1–F6 `9 passed`، وجميع FastAPI `46 passed` |
+| F7 — Shared parse result reuse for Compare | #64 | shared normalized parse result؛ Parsing مرة واحدة وإعادة استخدام الناتج في Compare؛ `1 direct / 10 parsing regression / 47 full FastAPI` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -996,13 +997,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-F7 — shared parse result reuse for Compare
+F8 — Loader tests
 Status: TODO
-Expected Branch: task/F7-shared-parse-result-reuse-for-compare
-Next: F8 — Loader tests
+Expected Branch: task/F8-loader-tests
+Next: G1 — ProcessingProfile interface/registry
 ```
 
-> تبدأ F7 بعد اكتمال F6 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ويقتصر نطاقها على إعادة استخدام نتيجة Parsing المشتركة لمساري Compare دون بدء F8 أو توسيع النطاق.
+> تبدأ F8 بعد اكتمال F7 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ويقتصر نطاقها على اختبارات Loaders دون بدء G1 أو توسيع النطاق.
 
 ---
 
