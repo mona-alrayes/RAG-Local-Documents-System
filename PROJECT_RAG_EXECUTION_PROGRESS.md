@@ -17,16 +17,18 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 7bd8b351c88e1d572bd908c256ca18e5f641e19a
-Last Merged PR: #68 — feat(G3): add cloud Jina embeddings
-Latest Task PR: #68
-G3 Implementation Commit: 98ac012767f1fd64fad4fd33bdd8217dfd777f81
-G3 Scope: إضافة Cloud dense embeddings عبر Jina AI API باستخدام `jina-embeddings-v3` وTask `retrieval.passage` ومدخل `list[NormalizedChunk]`؛ إخراج vectors بترتيب الـchunks مع التحقق من تطابق العدد والبعد `1024`؛ تحويل فشل الـProvider إلى `ApplicationException` منظمة بلا silent fallback؛ إضافة `JINAAI_API_KEY` و`CLOUD_EMBED_MODEL=jina-embeddings-v3` و`llama-index-embeddings-jinaai==0.6.0`؛ بلا manual L2 normalization لأن Qdrant تستخدم Cosine؛ دون Query Embedding أو Sparse/BM25 أو Qdrant upsert/indexing أو batching/retry/rate limiting أو تغييرات Laravel/Local embedding
-Last Completed Task: G3 — Cloud Jina embeddings
-Current Task: G4 — Cloud sparse representation
+Verified Main Commit: 8636f8b179fd5f21351e8bd9fc6a274fb4b70252
+Last Merged PR: #69 — feat(G4): add cloud sparse representation
+Latest Task PR: #69
+G4 Implementation Commit: c179a87c1d131a3193d7d57b9c8b2efa177b6e43
+G4 Merge Commit: 8636f8b179fd5f21351e8bd9fc6a274fb4b70252
+G4 Scope: إضافة Cloud sparse representation لمسار Cloud بتحويل كل `NormalizedChunk` إلى `qdrant_client.models.Document` باستخدام model `Qdrant/bm25` وtokenizer `multilingual` مع الحفاظ على ترتيب الـchunks وعلاقة 1:1؛ لا يحسب FastAPI قيم أو indices لـBM25 بل يتولى Qdrant التمثيل الفعلي؛ بلا dependencies جديدة أو تعديل Qdrant schema أو environment configuration؛ خارج النطاق ولم يُنفذ: Local BM25 / G7 أو Query sparse representation أو Retrieval أو RRF fusion أو Qdrant upsert/indexing أو G5 وأي مهمة لاحقة
+G4 Verification: focused test: `1 passed`؛ full FastAPI suite: `66 passed`
+Last Completed Task: G4 — Cloud sparse representation
+Current Task: G5 — Hybrid Local chunking
 Current Task Status: TODO
-Expected Task Branch: task/G4-cloud-sparse-representation
-Next Task After Completion: G5 — Hybrid Local chunking
+Expected Task Branch: task/G5-hybrid-local-chunking
+Next Task After Completion: G6 — Local BGE-M3 embeddings
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -204,7 +206,7 @@ Open Blockers: لا يوجد
 | G1 ProcessingProfile registry | DONE |
 | G2 Cloud chunking | DONE |
 | G3 Cloud Jina embeddings | DONE |
-| G4 Cloud sparse representation | TODO |
+| G4 Cloud sparse representation | DONE |
 | G5 Hybrid Local chunking | TODO |
 | G6 Local BGE-M3 embeddings | TODO |
 | G7 Local BM25 | TODO |
@@ -975,6 +977,7 @@ pending
 | G1 — ProcessingProfile registry | #66 | القيم الرسمية فقط + contract ضيق + registry موثوق بلا raw strings أو silent fallback؛ Fakes للاختبارات |
 | G2 — Cloud chunking | #67 | `CloudChunker` + `SentenceSplitter` مع metadata وbaseline قابل للضبط؛ Implementation `23b55768c6ba9f8371efac5657d431adadd5ca7d`؛ focused G2 tests: `4 passed`؛ full FastAPI suite: `59 passed` |
 | G3 — Cloud Jina embeddings | #68 | Jina AI `jina-embeddings-v3` بـ`retrieval.passage` وdense vectors ببعد `1024` مع تحقق العدد/البعد و`ApplicationException` منظمة بلا fallback؛ focused G3 tests: `6 passed`؛ full FastAPI suite: `65 passed` |
+| G4 — Cloud sparse representation | #69 | تحويل `NormalizedChunk` إلى Qdrant `Document` بـ`Qdrant/bm25` و`multilingual` مع ترتيب 1:1؛ BM25 الفعلي داخل Qdrant؛ بلا dependencies أو تعديل schema/env؛ focused test: `1 passed`؛ full FastAPI suite: `66 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -1001,13 +1004,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-G4 — Cloud sparse representation
+G5 — Hybrid Local chunking
 Status: TODO
-Expected Branch: task/G4-cloud-sparse-representation
-Next: G5 — Hybrid Local chunking
+Expected Branch: task/G5-hybrid-local-chunking
+Next: G6 — Local BGE-M3 embeddings
 ```
 
-> تبدأ G4 بعد اكتمال G3 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ G5 بعد اكتمال G4 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
