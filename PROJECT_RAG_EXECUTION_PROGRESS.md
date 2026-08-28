@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: c08a20eb6fb851b15a285a87025253e5a0dcf556
-Last Merged PR: #65 — test(F8): complete loader coverage
-Latest Task PR: #65
-F8 Implementation Commit: a91d309a2a63e73791b3e312b90306c1e8a4be41
-F8 Scope: استكمال loader delegation coverage لـPDF/DOCX/TXT مع تمرير نفس `Path`، واستدعاء `parse()` مرة واحدة بالضبط، وتمرير نتيجة الـProvider نفسها دون normalization أو processing إضافي، وتمرير أخطائه كما هي دون swallowing أو wrapping؛ Tests-only بلا Production Code أو dependencies جديدة، وبلا Chunking أو Embeddings أو Compare orchestration؛ F8 direct loader tests: 7 passed، وPhase F parsing regression: 13 passed، وFull FastAPI suite: 50 passed
-Last Completed Task: F8 — Loader tests
-Current Task: G1 — ProcessingProfile interface/registry
+Verified Main Commit: cefa61947622b7b9bbcddcca61c6d6e4ac4b0aaf
+Last Merged PR: #66 — feat(G1): add processing profile registry
+Latest Task PR: #66
+G1 Implementation Commit: ab17e0eeb9b0409ea345f75c6ec642b622349096
+G1 Scope: تعريف `ProcessingProfile` بالقيمتين الرسميتين `cloud` و`hybrid_local` فقط دون `compare`؛ إضافة `BaseProcessingProfile` كـcontract ضيق و`ProcessingProfileRegistry` لحل القيم الموثوقة إلى implementations مسجلة؛ رفض raw strings ومنع silent fallback باستخدام `ApplicationException`؛ اختبارات بـFakes دون production implementations فارغة
+Last Completed Task: G1 — ProcessingProfile interface/registry
+Current Task: G2 — Cloud chunking
 Current Task Status: TODO
-Expected Task Branch: task/G1-processing-profile-registry
-Next Task After Completion: G2 — Cloud chunking
+Expected Task Branch: task/G2-cloud-chunking
+Next Task After Completion: G3 — Cloud Jina embeddings
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -201,7 +201,7 @@ Open Blockers: لا يوجد
 
 | المهمة | الحالة |
 |---|---|
-| G1 ProcessingProfile registry | TODO |
+| G1 ProcessingProfile registry | DONE |
 | G2 Cloud chunking | TODO |
 | G3 Cloud Jina embeddings | TODO |
 | G4 Cloud sparse representation | TODO |
@@ -972,6 +972,7 @@ pending
 | F6 — Normalized page/section schema | #63 | `NormalizedDocument` immutable وLlamaParse normalization boundary مع page semantics موثوقة بلا section مخترع؛ بلا Chunking أو F7 أو dependencies جديدة؛ Implementation `3ab4d8b39b067686ec59632b108d625a3fd95096`، Merge `392eadb252e7f9700b6028677bdc008b5e27e7f2`؛ F6 `3 passed`، وF1–F6 `9 passed`، وجميع FastAPI `46 passed` |
 | F7 — Shared parse result reuse for Compare | #64 | shared normalized parse result؛ Parsing مرة واحدة وإعادة استخدام الناتج في Compare؛ `1 direct / 10 parsing regression / 47 full FastAPI` |
 | F8 — Loader tests | #65 | Tests-only: delegation لـPDF/DOCX/TXT مع `parse()` مرة واحدة وتمرير نتيجة الـProvider وأخطائه كما هي؛ `7 direct / 13 Phase F regression / 50 full FastAPI` |
+| G1 — ProcessingProfile registry | #66 | القيم الرسمية فقط + contract ضيق + registry موثوق بلا raw strings أو silent fallback؛ Fakes للاختبارات |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -998,13 +999,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-G1 — ProcessingProfile interface/registry
+G2 — Cloud chunking
 Status: TODO
-Expected Branch: task/G1-processing-profile-registry
-Next: G2 — Cloud chunking
+Expected Branch: task/G2-cloud-chunking
+Next: G3 — Cloud Jina embeddings
 ```
 
-> تبدأ G1 بعد اكتمال المرحلة F وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ G2 بعد اكتمال G1 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
