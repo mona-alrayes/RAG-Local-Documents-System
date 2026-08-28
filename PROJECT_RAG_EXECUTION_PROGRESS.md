@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 3a94ec92cb7814a801fa43babdc0657e6b220fa7
-Last Merged PR: #57 — E8
-Latest Task PR: #57
-E8 Implementation Commit: 6c31a13392cc30734f8dc657c059f65fabb62861
-E8 Scope: اختبارات أمنية فعلية باستخدام QdrantLocal in-memory؛ إثبات عزل count_points() وdelete_points() بالنطاق user_id + document_id + processing_run_id؛ تغطية اختلاف المستخدم والوثيقة وProcessing Run؛ بلا تعديل Production Code؛ تحقق E7 + E8: 6 passed
-Last Completed Task: E8 — Cross-user leakage tests
-Current Task: F1 — Loader interface
+Verified Main Commit: 3e136e48cb6945bcb624225fc7a138b2084a60a0
+Last Merged PR: #58 — feat(F1): add document loader contract
+Latest Task PR: #58
+F1 Implementation Commit: 99121ec39bf6160460888ea861ab8aca99288837
+F1 Scope: إضافة BaseDocumentLoader بعقد load(Path) وoutput عام عمدًا حتى تعريف normalized schema في F6؛ بلا LlamaParse أو parsing provider أو Chunking أو Embeddings أو Qdrant؛ الاختبار الأدنى tests/test_loader_contract.py: 1 passed
+Last Completed Task: F1 — Loader interface
+Current Task: F2 — LlamaParse provider
 Current Task Status: TODO
-Expected Task Branch: task/F1-loader-interface
-Next Task After Completion: F2 — LlamaParse provider
+Expected Task Branch: task/F2-llamaparse-provider
+Next Task After Completion: F3 — PDF loader
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -184,7 +184,7 @@ Open Blockers: لا يوجد
 
 | المهمة | الحالة |
 |---|---|
-| F1 Loader interface | TODO |
+| F1 Loader interface | DONE |
 | F2 LlamaParse provider | TODO |
 | F3 PDF loader | TODO |
 | F4 DOCX loader | TODO |
@@ -964,6 +964,7 @@ pending
 | E6 — Point builder + payload metadata | #55 | `PointPayload` للحقول المعتمدة: `user_id` و`document_id` و`processing_run_id` و`processing_profile` و`file_type` و`source` و`page` و`section` و`chunk_index` و`text`؛ UUIDv5 حتمي؛ `models.PointStruct` بـ`dense_vector` و`bm25_sparse_vector`؛ بلا Qdrant I/O أو upsert/count/delete؛ Smoke Check للـID والـpayload وأسماء الـvectors PASS |
 | E7 — Idempotent upsert/count/delete | #56 | طبقة Qdrant persistence مركزية؛ `PointScope` مقيد بالمستخدم والوثيقة وProcessing Run؛ upsert يعيد استخدام `PointStruct` وIDs الحتمية من E6؛ count دقيق وحذف مفلتر؛ implementation مشتركة للـCollectionين؛ `4 passed` |
 | E8 — Cross-user leakage tests | #57 | اختبارات أمنية فعلية بـ`QdrantLocal` in-memory؛ عزل `count_points()` و`delete_points()` حسب `user_id + document_id + processing_run_id` مع اختلاف المستخدم والوثيقة وProcessing Run؛ بلا تعديل Production Code؛ E7 + E8: `6 passed` |
+| F1 — Loader interface | #58 | `BaseDocumentLoader` بعقد `load(Path)` وoutput عام عمدًا حتى F6؛ بلا provider أو Chunking أو Embeddings أو Qdrant؛ `tests/test_loader_contract.py`: `1 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -990,13 +991,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-F1 — Loader interface
+F2 — LlamaParse provider
 Status: TODO
-Expected Branch: task/F1-loader-interface
-Next: F2 — LlamaParse provider
+Expected Branch: task/F2-llamaparse-provider
+Next: F3 — PDF loader
 ```
 
-> تفاصيل نطاق F1 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة: تركز المهمة على تعريف Loader interface فقط، مع إبقاء LlamaParse provider للمهمة F2.
+> تفاصيل نطاق F2 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة: تبدأ المهمة بإضافة LlamaParse provider فوق عقد `BaseDocumentLoader` المنفذ في F1، دون بدء F3 أو توسيع النطاق.
 
 ---
 
