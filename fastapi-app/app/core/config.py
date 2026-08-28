@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     chunk_size: int = 800
     chunk_overlap: int = 80
 
+    jinaai_api_key: SecretStr = SecretStr("")
+    cloud_embed_model: str = "jina-embeddings-v3"
+
 
 def validate_startup_configuration(settings: Settings) -> None:
     if "rag_deployment_mode" not in settings.model_fields_set:
