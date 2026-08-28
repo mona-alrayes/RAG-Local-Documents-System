@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 41e1c38101c77e179a9af22108a1b290c49351b6
-Last Merged PR: #55 — feat(E6): إضافة Qdrant Point Builder حتمي مع Payload Metadata
-Latest Task PR: #55 — feat(E6): إضافة Qdrant Point Builder حتمي مع Payload Metadata
-E6 Implementation Commit: d512b70a94574496a855527543698bfb57a43b53
-E6 Scope: PointPayload وPayload metadata المعتمدة؛ deterministic UUIDv5 Point ID؛ بناء models.PointStruct باستخدام dense_vector وbm25_sparse_vector؛ بلا Qdrant I/O أو upsert/count/delete؛ Smoke Check للـdeterministic ID والـpayload وأسماء الـvectors
-Last Completed Task: E6 — Point builder + payload metadata
-Current Task: E7 — Idempotent upsert/count/delete
+Verified Main Commit: 39a29d2a637a54c806f6f31bdd1cbbce544746a7
+Last Merged PR: #56 — feat(E7): إضافة عمليات Qdrant persistence حتمية وآمنة النطاق
+Latest Task PR: #56 — feat(E7): إضافة عمليات Qdrant persistence حتمية وآمنة النطاق
+E7 Implementation Commit: c22c02ed2da9500d9d15761ebb183bbdeedc3880
+E7 Scope: طبقة Qdrant persistence مركزية؛ PointScope بالنطاق user_id + document_id + processing_run_id؛ upsert_points() يمرر PointStruct الجاهز من E6 بلا إعادة بناء Point ID أو Payload ويحقق idempotency عبر deterministic Point IDs؛ count_points() بفلتر النطاق وexact=True؛ delete_points() عبر scoped FilterSelector بلا حذف Collection كاملة؛ implementation واحدة لمساري Cloud وHybrid Local عبر collection_name؛ 4 passed
+Last Completed Task: E7 — Idempotent upsert/count/delete
+Current Task: E8 — Cross-user leakage tests
 Current Task Status: TODO
-Expected Task Branch: task/E7-idempotent-upsert-count-delete
-Next Task After Completion: E8 — Cross-user leakage tests
+Expected Task Branch: task/E8-cross-user-leakage-tests
+Next Task After Completion: F1 — Loader interface
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -173,7 +173,7 @@ Open Blockers: لا يوجد
 | E4 Dense/sparse configs | DONE |
 | E5 Payload indexes | DONE |
 | E6 Point builder مع run metadata | DONE |
-| E7 Idempotent upsert/count/delete | TODO |
+| E7 Idempotent upsert/count/delete | DONE |
 | E8 Cross-user leakage tests | TODO |
 
 **معيار انتهاء المرحلة:** Collections منفصلة ودائمة وآمنة وقابلة للإدخال والاسترجاع والحذف.
@@ -962,6 +962,7 @@ pending
 | E4 — Dense/sparse configs | #53 | مخطط مركزي: `dense_vector` (`1024`/`COSINE`) و`bm25_sparse_vector` (`IDF`) لـ`rag_documents_cloud` و`rag_documents_hybrid_local`؛ دعم الموجود والتحقق من التوافق بلا حذف أو إعادة إنشاء؛ Startup idempotent؛ تحقق تشغيلي + `2 passed` |
 | E5 — Payload indexes | #54 | `PAYLOAD_INDEX_SCHEMA` مركزية للـCollectionين؛ إنشاء الناقص والتحقق من التعارض؛ Startup idempotent؛ تحقق تشغيلي بلا Points |
 | E6 — Point builder + payload metadata | #55 | `PointPayload` للحقول المعتمدة: `user_id` و`document_id` و`processing_run_id` و`processing_profile` و`file_type` و`source` و`page` و`section` و`chunk_index` و`text`؛ UUIDv5 حتمي؛ `models.PointStruct` بـ`dense_vector` و`bm25_sparse_vector`؛ بلا Qdrant I/O أو upsert/count/delete؛ Smoke Check للـID والـpayload وأسماء الـvectors PASS |
+| E7 — Idempotent upsert/count/delete | #56 | طبقة Qdrant persistence مركزية؛ `PointScope` مقيد بالمستخدم والوثيقة وProcessing Run؛ upsert يعيد استخدام `PointStruct` وIDs الحتمية من E6؛ count دقيق وحذف مفلتر؛ implementation مشتركة للـCollectionين؛ `4 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -988,13 +989,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-E7 — Idempotent upsert/count/delete
+E8 — Cross-user leakage tests
 Status: TODO
-Expected Branch: task/E7-idempotent-upsert-count-delete
-Next: E8 — Cross-user leakage tests
+Expected Branch: task/E8-cross-user-leakage-tests
+Next: F1 — Loader interface
 ```
 
-> تفاصيل نطاق E7 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد Qdrant في `174.8`: تنفذ خدمات upsert/count/delete بصورة idempotent، مع إبقاء اختبارات Cross-user leakage لـE8.
+> تفاصيل نطاق E8 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد عزل Qdrant في `174.8`: تركز المهمة على اختبارات منع تسرب البيانات بين المستخدمين.
 
 ---
 
