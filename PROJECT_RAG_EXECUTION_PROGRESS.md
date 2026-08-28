@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: a7c14fca37939a987e0e0ff67fae246f6ffdf892
-Last Merged PR: #61 — feat(F4): add DOCX document loader
-Latest Task PR: #61
-F4 Implementation Commit: e88b20bf59bdf96a1d68969311df0d056d0a964f
-F4 Scope: إضافة DocxDocumentLoader متوافق مع BaseDocumentLoader؛ تفويض Parsing إلى BaseParsingProvider دون اعتماد مباشر على LlamaParse SDK؛ استخدام LlamaParsePage الحالية دون الدخول في F6؛ بلا dependency جديدة للـDOCX؛ اختبارات F1–F4 المباشرة 5 passed وجميع اختبارات FastAPI 42 passed
-Last Completed Task: F4 — DOCX loader
-Current Task: F5 — TXT loader
+Verified Main Commit: 402ea0bd524bdcd18fee1a15d2a5a2ec7a261d74
+Last Merged PR: #62 — feat(F5): add TXT document loader
+Latest Task PR: #62
+F5 Implementation Commit: 293f2a79e4c7fa01e9cc2be26b98674dcbc60e95
+F5 Scope: إضافة TxtDocumentLoader متوافق مع BaseDocumentLoader؛ تفويض Parsing إلى BaseParsingProvider بلا coupling مباشر مع LlamaParse SDK؛ استخدام LlamaParsePage الحالية كنتيجة provider-level فقط دون الدخول في normalized schema الخاصة بـF6؛ بلا dependency جديدة للـTXT؛ اختبار F5 المباشر 1 passed، وregression F1–F5 عددها 6 passed، وجميع اختبارات FastAPI عددها 43 passed
+Last Completed Task: F5 — TXT loader
+Current Task: F6 — normalized page/section schema
 Current Task Status: TODO
-Expected Task Branch: task/F5-txt-loader
-Next Task After Completion: F6 — normalized page/section schema
+Expected Task Branch: task/F6-normalized-page-section-schema
+Next Task After Completion: F7 — Reuse parsed result in Compare
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -188,7 +188,7 @@ Open Blockers: لا يوجد
 | F2 LlamaParse provider | DONE |
 | F3 PDF loader | DONE |
 | F4 DOCX loader | DONE |
-| F5 TXT loader | TODO |
+| F5 TXT loader | DONE |
 | F6 Normalized page/section schema | TODO |
 | F7 Reuse parsed result in Compare | TODO |
 | F8 Loader tests | TODO |
@@ -968,6 +968,7 @@ pending
 | F2 — LlamaParse provider | #59 | `BaseParsingProvider` + `LlamaParseProvider` + `LlamaParsePage`؛ `LLAMA_CLOUD_API_KEY` + `llama-cloud==2.14.1`؛ Agentic parsing وMarkdown tables وOCR عربي/إنجليزي؛ Fake/Mock بلا network calls؛ `40 passed` |
 | F3 — PDF loader | #60 | `PdfDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider` بلا اعتماد مباشر على LlamaParse SDK؛ يعيد `LlamaParsePage` الحالية دون F6؛ delegation test بلا network؛ `41 passed` |
 | F4 — DOCX loader | #61 | `DocxDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider`؛ بلا dependency جديدة وبلا تنفيذ F6؛ اختبار F4 المباشر `1 passed`، واختبارات F1–F4 المباشرة `5 passed`، وجميع اختبارات FastAPI `42 passed` |
+| F5 — TXT loader | #62 | `TxtDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider`؛ بلا coupling مباشر مع LlamaParse SDK ويستخدم `LlamaParsePage` كنتيجة provider-level فقط دون F6؛ بلا dependency جديدة؛ Implementation `293f2a79e4c7fa01e9cc2be26b98674dcbc60e95`، Merge `402ea0bd524bdcd18fee1a15d2a5a2ec7a261d74`؛ F5 `1 passed`، وF1–F5 `6 passed`، وجميع FastAPI `43 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -994,13 +995,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-F5 — TXT loader
+F6 — normalized page/section schema
 Status: TODO
-Expected Branch: task/F5-txt-loader
-Next: F6 — normalized page/section schema
+Expected Branch: task/F6-normalized-page-section-schema
+Next: F7 — Reuse parsed result in Compare
 ```
 
-> تبدأ F5 بعد اكتمال F4 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ويقتصر نطاقها على TXT loader دون بدء F6 أو توسيع النطاق.
+> تبدأ F6 بعد اكتمال F5 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ويقتصر نطاقها على normalized page/section schema دون بدء F7 أو توسيع النطاق.
 
 ---
 
