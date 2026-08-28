@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     local_dtype: LocalDtype = LocalDtype.AUTO
 
     internal_api_key: SecretStr | None = None
+    llama_cloud_api_key: SecretStr | None = None
 
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_cloud_collection: str = "rag_documents_cloud"
