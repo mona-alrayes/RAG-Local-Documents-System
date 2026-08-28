@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 402ea0bd524bdcd18fee1a15d2a5a2ec7a261d74
-Last Merged PR: #62 — feat(F5): add TXT document loader
-Latest Task PR: #62
-F5 Implementation Commit: 293f2a79e4c7fa01e9cc2be26b98674dcbc60e95
-F5 Scope: إضافة TxtDocumentLoader متوافق مع BaseDocumentLoader؛ تفويض Parsing إلى BaseParsingProvider بلا coupling مباشر مع LlamaParse SDK؛ استخدام LlamaParsePage الحالية كنتيجة provider-level فقط دون الدخول في normalized schema الخاصة بـF6؛ بلا dependency جديدة للـTXT؛ اختبار F5 المباشر 1 passed، وregression F1–F5 عددها 6 passed، وجميع اختبارات FastAPI عددها 43 passed
-Last Completed Task: F5 — TXT loader
-Current Task: F6 — normalized page/section schema
+Verified Main Commit: 392eadb252e7f9700b6028677bdc008b5e27e7f2
+Last Merged PR: #63 — feat(F6): add normalized page section schema
+Latest Task PR: #63
+F6 Implementation Commit: 3ab4d8b39b067686ec59632b108d625a3fd95096
+F6 Scope: إضافة NormalizedDocument كـimmutable internal value object بحقول text وpage: int | None وsection: str | None؛ إضافة normalization boundary يحول LlamaParsePage مع الحفاظ على page number عندما تكون semantics موثوقة وإسقاطها للـTXT/DOCX عندما لا تكون موثوقة، وعدم اختراع section؛ إبقاء domain representation مستقلة عن LlamaParse؛ بلا Chunking أو F7 Compare reuse أو dependency جديدة؛ F6 direct tests: 3 passed، وF1–F6 parsing regression: 9 passed، وFull FastAPI suite: 46 passed
+Last Completed Task: F6 — normalized page/section schema
+Current Task: F7 — shared parse result reuse for Compare
 Current Task Status: TODO
-Expected Task Branch: task/F6-normalized-page-section-schema
-Next Task After Completion: F7 — Reuse parsed result in Compare
+Expected Task Branch: task/F7-shared-parse-result-reuse-for-compare
+Next Task After Completion: F8 — Loader tests
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -189,7 +189,7 @@ Open Blockers: لا يوجد
 | F3 PDF loader | DONE |
 | F4 DOCX loader | DONE |
 | F5 TXT loader | DONE |
-| F6 Normalized page/section schema | TODO |
+| F6 Normalized page/section schema | DONE |
 | F7 Reuse parsed result in Compare | TODO |
 | F8 Loader tests | TODO |
 
@@ -969,6 +969,7 @@ pending
 | F3 — PDF loader | #60 | `PdfDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider` بلا اعتماد مباشر على LlamaParse SDK؛ يعيد `LlamaParsePage` الحالية دون F6؛ delegation test بلا network؛ `41 passed` |
 | F4 — DOCX loader | #61 | `DocxDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider`؛ بلا dependency جديدة وبلا تنفيذ F6؛ اختبار F4 المباشر `1 passed`، واختبارات F1–F4 المباشرة `5 passed`، وجميع اختبارات FastAPI `42 passed` |
 | F5 — TXT loader | #62 | `TxtDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider`؛ بلا coupling مباشر مع LlamaParse SDK ويستخدم `LlamaParsePage` كنتيجة provider-level فقط دون F6؛ بلا dependency جديدة؛ Implementation `293f2a79e4c7fa01e9cc2be26b98674dcbc60e95`، Merge `402ea0bd524bdcd18fee1a15d2a5a2ec7a261d74`؛ F5 `1 passed`، وF1–F5 `6 passed`، وجميع FastAPI `43 passed` |
+| F6 — Normalized page/section schema | #63 | `NormalizedDocument` immutable وLlamaParse normalization boundary مع page semantics موثوقة بلا section مخترع؛ بلا Chunking أو F7 أو dependencies جديدة؛ Implementation `3ab4d8b39b067686ec59632b108d625a3fd95096`، Merge `392eadb252e7f9700b6028677bdc008b5e27e7f2`؛ F6 `3 passed`، وF1–F6 `9 passed`، وجميع FastAPI `46 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -995,13 +996,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-F6 — normalized page/section schema
+F7 — shared parse result reuse for Compare
 Status: TODO
-Expected Branch: task/F6-normalized-page-section-schema
-Next: F7 — Reuse parsed result in Compare
+Expected Branch: task/F7-shared-parse-result-reuse-for-compare
+Next: F8 — Loader tests
 ```
 
-> تبدأ F6 بعد اكتمال F5 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ويقتصر نطاقها على normalized page/section schema دون بدء F7 أو توسيع النطاق.
+> تبدأ F7 بعد اكتمال F6 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ويقتصر نطاقها على إعادة استخدام نتيجة Parsing المشتركة لمساري Compare دون بدء F8 أو توسيع النطاق.
 
 ---
 
