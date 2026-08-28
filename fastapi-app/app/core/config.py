@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     qdrant_cloud_collection: str = "rag_documents_cloud"
     qdrant_hybrid_local_collection: str = "rag_documents_hybrid_local"
 
+    chunk_size: int = 800
+    chunk_overlap: int = 80
+
 
 def validate_startup_configuration(settings: Settings) -> None:
     if "rag_deployment_mode" not in settings.model_fields_set:
