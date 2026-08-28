@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 39a29d2a637a54c806f6f31bdd1cbbce544746a7
-Last Merged PR: #56 — feat(E7): إضافة عمليات Qdrant persistence حتمية وآمنة النطاق
-Latest Task PR: #56 — feat(E7): إضافة عمليات Qdrant persistence حتمية وآمنة النطاق
-E7 Implementation Commit: c22c02ed2da9500d9d15761ebb183bbdeedc3880
-E7 Scope: طبقة Qdrant persistence مركزية؛ PointScope بالنطاق user_id + document_id + processing_run_id؛ upsert_points() يمرر PointStruct الجاهز من E6 بلا إعادة بناء Point ID أو Payload ويحقق idempotency عبر deterministic Point IDs؛ count_points() بفلتر النطاق وexact=True؛ delete_points() عبر scoped FilterSelector بلا حذف Collection كاملة؛ implementation واحدة لمساري Cloud وHybrid Local عبر collection_name؛ 4 passed
-Last Completed Task: E7 — Idempotent upsert/count/delete
-Current Task: E8 — Cross-user leakage tests
+Verified Main Commit: 3a94ec92cb7814a801fa43babdc0657e6b220fa7
+Last Merged PR: #57 — E8
+Latest Task PR: #57
+E8 Implementation Commit: 6c31a13392cc30734f8dc657c059f65fabb62861
+E8 Scope: اختبارات أمنية فعلية باستخدام QdrantLocal in-memory؛ إثبات عزل count_points() وdelete_points() بالنطاق user_id + document_id + processing_run_id؛ تغطية اختلاف المستخدم والوثيقة وProcessing Run؛ بلا تعديل Production Code؛ تحقق E7 + E8: 6 passed
+Last Completed Task: E8 — Cross-user leakage tests
+Current Task: F1 — Loader interface
 Current Task Status: TODO
-Expected Task Branch: task/E8-cross-user-leakage-tests
-Next Task After Completion: F1 — Loader interface
+Expected Task Branch: task/F1-loader-interface
+Next Task After Completion: F2 — LlamaParse provider
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -174,7 +174,7 @@ Open Blockers: لا يوجد
 | E5 Payload indexes | DONE |
 | E6 Point builder مع run metadata | DONE |
 | E7 Idempotent upsert/count/delete | DONE |
-| E8 Cross-user leakage tests | TODO |
+| E8 Cross-user leakage tests | DONE |
 
 **معيار انتهاء المرحلة:** Collections منفصلة ودائمة وآمنة وقابلة للإدخال والاسترجاع والحذف.
 
@@ -963,6 +963,7 @@ pending
 | E5 — Payload indexes | #54 | `PAYLOAD_INDEX_SCHEMA` مركزية للـCollectionين؛ إنشاء الناقص والتحقق من التعارض؛ Startup idempotent؛ تحقق تشغيلي بلا Points |
 | E6 — Point builder + payload metadata | #55 | `PointPayload` للحقول المعتمدة: `user_id` و`document_id` و`processing_run_id` و`processing_profile` و`file_type` و`source` و`page` و`section` و`chunk_index` و`text`؛ UUIDv5 حتمي؛ `models.PointStruct` بـ`dense_vector` و`bm25_sparse_vector`؛ بلا Qdrant I/O أو upsert/count/delete؛ Smoke Check للـID والـpayload وأسماء الـvectors PASS |
 | E7 — Idempotent upsert/count/delete | #56 | طبقة Qdrant persistence مركزية؛ `PointScope` مقيد بالمستخدم والوثيقة وProcessing Run؛ upsert يعيد استخدام `PointStruct` وIDs الحتمية من E6؛ count دقيق وحذف مفلتر؛ implementation مشتركة للـCollectionين؛ `4 passed` |
+| E8 — Cross-user leakage tests | #57 | اختبارات أمنية فعلية بـ`QdrantLocal` in-memory؛ عزل `count_points()` و`delete_points()` حسب `user_id + document_id + processing_run_id` مع اختلاف المستخدم والوثيقة وProcessing Run؛ بلا تعديل Production Code؛ E7 + E8: `6 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -989,13 +990,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-E8 — Cross-user leakage tests
+F1 — Loader interface
 Status: TODO
-Expected Branch: task/E8-cross-user-leakage-tests
-Next: F1 — Loader interface
+Expected Branch: task/F1-loader-interface
+Next: F2 — LlamaParse provider
 ```
 
-> تفاصيل نطاق E8 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` وخصوصاً الخريطة النشطة `174.16` وعقد عزل Qdrant في `174.8`: تركز المهمة على اختبارات منع تسرب البيانات بين المستخدمين.
+> تفاصيل نطاق F1 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة: تركز المهمة على تعريف Loader interface فقط، مع إبقاء LlamaParse provider للمهمة F2.
 
 ---
 
