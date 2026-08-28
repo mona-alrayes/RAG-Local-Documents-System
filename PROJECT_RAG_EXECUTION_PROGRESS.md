@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: e4e50467408b46810e4488de93d228590057c853
-Last Merged PR: #67 — feat(G2): add cloud chunking
-Latest Task PR: #67
-G2 Implementation Commit: 23b55768c6ba9f8371efac5657d431adadd5ca7d
-G2 Scope: إضافة `CloudChunker` باستخدام `SentenceSplitter` لتقسيم كل `NormalizedDocument` بشكل مستقل مع الحفاظ على `page` و`section` وإرجاع `NormalizedChunk` كـvalue object ضيق؛ baseline `CHUNK_SIZE=800` و`CHUNK_OVERLAP=80` قابل للـoverride من Environment؛ إضافة `llama-index-core` واختبارات G2 المركزة؛ دون embeddings أو sparse أو reranking أو Qdrant indexing أو Hybrid Local chunking
-Last Completed Task: G2 — Cloud chunking
-Current Task: G3 — Cloud Jina embeddings
+Verified Main Commit: 7bd8b351c88e1d572bd908c256ca18e5f641e19a
+Last Merged PR: #68 — feat(G3): add cloud Jina embeddings
+Latest Task PR: #68
+G3 Implementation Commit: 98ac012767f1fd64fad4fd33bdd8217dfd777f81
+G3 Scope: إضافة Cloud dense embeddings عبر Jina AI API باستخدام `jina-embeddings-v3` وTask `retrieval.passage` ومدخل `list[NormalizedChunk]`؛ إخراج vectors بترتيب الـchunks مع التحقق من تطابق العدد والبعد `1024`؛ تحويل فشل الـProvider إلى `ApplicationException` منظمة بلا silent fallback؛ إضافة `JINAAI_API_KEY` و`CLOUD_EMBED_MODEL=jina-embeddings-v3` و`llama-index-embeddings-jinaai==0.6.0`؛ بلا manual L2 normalization لأن Qdrant تستخدم Cosine؛ دون Query Embedding أو Sparse/BM25 أو Qdrant upsert/indexing أو batching/retry/rate limiting أو تغييرات Laravel/Local embedding
+Last Completed Task: G3 — Cloud Jina embeddings
+Current Task: G4 — Cloud sparse representation
 Current Task Status: TODO
-Expected Task Branch: task/G3-cloud-jina-embeddings
-Next Task After Completion: G4 — Cloud sparse representation
+Expected Task Branch: task/G4-cloud-sparse-representation
+Next Task After Completion: G5 — Hybrid Local chunking
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -203,7 +203,7 @@ Open Blockers: لا يوجد
 |---|---|
 | G1 ProcessingProfile registry | DONE |
 | G2 Cloud chunking | DONE |
-| G3 Cloud Jina embeddings | TODO |
+| G3 Cloud Jina embeddings | DONE |
 | G4 Cloud sparse representation | TODO |
 | G5 Hybrid Local chunking | TODO |
 | G6 Local BGE-M3 embeddings | TODO |
@@ -974,6 +974,7 @@ pending
 | F8 — Loader tests | #65 | Tests-only: delegation لـPDF/DOCX/TXT مع `parse()` مرة واحدة وتمرير نتيجة الـProvider وأخطائه كما هي؛ `7 direct / 13 Phase F regression / 50 full FastAPI` |
 | G1 — ProcessingProfile registry | #66 | القيم الرسمية فقط + contract ضيق + registry موثوق بلا raw strings أو silent fallback؛ Fakes للاختبارات |
 | G2 — Cloud chunking | #67 | `CloudChunker` + `SentenceSplitter` مع metadata وbaseline قابل للضبط؛ Implementation `23b55768c6ba9f8371efac5657d431adadd5ca7d`؛ focused G2 tests: `4 passed`؛ full FastAPI suite: `59 passed` |
+| G3 — Cloud Jina embeddings | #68 | Jina AI `jina-embeddings-v3` بـ`retrieval.passage` وdense vectors ببعد `1024` مع تحقق العدد/البعد و`ApplicationException` منظمة بلا fallback؛ focused G3 tests: `6 passed`؛ full FastAPI suite: `65 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -1000,13 +1001,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-G3 — Cloud Jina embeddings
+G4 — Cloud sparse representation
 Status: TODO
-Expected Branch: task/G3-cloud-jina-embeddings
-Next: G4 — Cloud sparse representation
+Expected Branch: task/G4-cloud-sparse-representation
+Next: G5 — Hybrid Local chunking
 ```
 
-> تبدأ G3 بعد اكتمال G2 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ G4 بعد اكتمال G3 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
