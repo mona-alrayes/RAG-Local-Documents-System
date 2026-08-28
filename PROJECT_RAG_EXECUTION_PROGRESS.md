@@ -17,16 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 6d0d4250c778a2a83d20066e403cb7c720b9bc50
-Last Merged PR: #60 — feat(F3): add PDF document loader
-Latest Task PR: #60
-F3 Implementation Commit: e4ee489738871e8dc95e312bdee21f38ff148507
-F3 Scope: إضافة PdfDocumentLoader متوافق مع BaseDocumentLoader؛ تفويض Parsing إلى BaseParsingProvider دون اعتماد مباشر على LlamaParse SDK؛ إعادة LlamaParsePage الحالية دون الدخول في F6؛ اختبار delegation بلا network؛ جميع اختبارات FastAPI: 41 passed
-Last Completed Task: F3 — PDF loader
-Current Task: F4 — DOCX loader
+Verified Main Commit: a7c14fca37939a987e0e0ff67fae246f6ffdf892
+Last Merged PR: #61 — feat(F4): add DOCX document loader
+Latest Task PR: #61
+F4 Implementation Commit: e88b20bf59bdf96a1d68969311df0d056d0a964f
+F4 Scope: إضافة DocxDocumentLoader متوافق مع BaseDocumentLoader؛ تفويض Parsing إلى BaseParsingProvider دون اعتماد مباشر على LlamaParse SDK؛ استخدام LlamaParsePage الحالية دون الدخول في F6؛ بلا dependency جديدة للـDOCX؛ اختبارات F1–F4 المباشرة 5 passed وجميع اختبارات FastAPI 42 passed
+Last Completed Task: F4 — DOCX loader
+Current Task: F5 — TXT loader
 Current Task Status: TODO
-Expected Task Branch: task/F4-docx-loader
-Next Task After Completion: F5 — TXT loader
+Expected Task Branch: task/F5-txt-loader
+Next Task After Completion: F6 — normalized page/section schema
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -187,7 +187,7 @@ Open Blockers: لا يوجد
 | F1 Loader interface | DONE |
 | F2 LlamaParse provider | DONE |
 | F3 PDF loader | DONE |
-| F4 DOCX loader | TODO |
+| F4 DOCX loader | DONE |
 | F5 TXT loader | TODO |
 | F6 Normalized page/section schema | TODO |
 | F7 Reuse parsed result in Compare | TODO |
@@ -967,6 +967,7 @@ pending
 | F1 — Loader interface | #58 | `BaseDocumentLoader` بعقد `load(Path)` وoutput عام عمدًا حتى F6؛ بلا provider أو Chunking أو Embeddings أو Qdrant؛ `tests/test_loader_contract.py`: `1 passed` |
 | F2 — LlamaParse provider | #59 | `BaseParsingProvider` + `LlamaParseProvider` + `LlamaParsePage`؛ `LLAMA_CLOUD_API_KEY` + `llama-cloud==2.14.1`؛ Agentic parsing وMarkdown tables وOCR عربي/إنجليزي؛ Fake/Mock بلا network calls؛ `40 passed` |
 | F3 — PDF loader | #60 | `PdfDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider` بلا اعتماد مباشر على LlamaParse SDK؛ يعيد `LlamaParsePage` الحالية دون F6؛ delegation test بلا network؛ `41 passed` |
+| F4 — DOCX loader | #61 | `DocxDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider`؛ بلا dependency جديدة وبلا تنفيذ F6؛ اختبار F4 المباشر `1 passed`، واختبارات F1–F4 المباشرة `5 passed`، وجميع اختبارات FastAPI `42 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -993,13 +994,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-F4 — DOCX loader
+F5 — TXT loader
 Status: TODO
-Expected Branch: task/F4-docx-loader
-Next: F5 — TXT loader
+Expected Branch: task/F5-txt-loader
+Next: F6 — normalized page/section schema
 ```
 
-> تفاصيل نطاق F4 تؤخذ من `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة: تبدأ المهمة بإضافة DOCX loader فوق طبقة Parsing المنفذة، دون بدء F5 أو توسيع النطاق.
+> تبدأ F5 بعد اكتمال F4 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ويقتصر نطاقها على TXT loader دون بدء F6 أو توسيع النطاق.
 
 ---
 
