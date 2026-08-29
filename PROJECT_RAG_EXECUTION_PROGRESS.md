@@ -17,18 +17,19 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 1ca20ec54a029408c1455f481cb3bcca188eb439
-Last Merged PR: #78 — feat(H1): add private temporary artifact store
-Latest Task PR: #78
-H1 Implementation Commit: e80bdad1f397eef7b4ec2ce3d9f823824b6e78d5
-H1 Merge Commit: 1ca20ec54a029408c1455f481cb3bcca188eb439
-H1 Scope: مخزن FastAPI خاص للـtemporary artifacts عبر `ArtifactStore` abstraction وتنفيذ filesystem-backed بصلاحيات خاصة؛ opaque random references بلا تسريب لمسارات filesystem؛ internal manifest يحفظ provenance؛ أخطاء آمنة وحماية من traversal والـinvalid references؛ بلا TTL أو Qdrant promotion ضمن H1
-H1 Verification: Focused: `12 passed`؛ Related regression: `18 passed`؛ Full FastAPI suite: `135 passed`
-Last Completed Task: H1 — Private artifact store/opaque references
-Current Task: H2 — Configurable 24h TTL
+Verified Main Commit: b8c1675c678d855098f3043f7d1667f430b1bbf0
+Last Merged PR: #79 — feat(H2): add configurable temporary artifact TTL
+Latest Task PR: #79
+H2 Implementation Commit: e076bd93fb064ea60747b8cc2c72d5c210f3bea2
+H2 Merge Commit: b8c1675c678d855098f3043f7d1667f430b1bbf0
+H2 Scope: إضافة `TEMP_ARTIFACT_TTL_HOURS` بقيمة افتراضية 24 ساعة وقابلة للتهيئة؛ إضافة `created_at` و`expires_at` إلى artifact manifest كتوقيتات واعية بالمنطقة الزمنية ومحولة إلى UTC؛ يعتبر الـartifact منتهيًا عند `now >= expires_at`؛ إضافة `ArtifactExpiredError` ورفض `read()` للـartifact المنتهي دون حذفه؛ deterministic injected clock للاختبارات دون `sleep`؛ خارج النطاق: scheduled expiration cleanup وحذف الـartifacts المنتهية وtemporary retrieval index وQdrant promotion وLaravel orchestration وأي API endpoint جديد
+H2 Verification: Focused H2: `20 passed`؛ Related regression: `30 passed`؛ Full FastAPI suite: `143 passed`
+H2 Verification Note: احتاج تشغيل الـfull suite محليًا عزل `.env` بسبب `LOCAL_AI_TOPOLOGY=host_native`؛ كان ذلك تلوثًا من بيئة التطوير المحلية لا فشلًا في H2، ولم يتطلب تعديل production code
+Last Completed Task: H2 — Configurable 24h TTL
+Current Task: H3 — Temporary retrieval index
 Current Task Status: TODO
-Expected Task Branch: task/H2-configurable-24h-ttl
-Next Task After Completion: H3 — Temporary retrieval index
+Expected Task Branch: task/H3-temporary-retrieval-index
+Next Task After Completion: H4 — Winner promotion
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -224,7 +225,7 @@ Open Blockers: لا يوجد
 | المهمة | الحالة |
 |---|---|
 | H1 Private artifact store/opaque refs | DONE |
-| H2 Configurable 24h TTL | TODO |
+| H2 Configurable 24h TTL | DONE |
 | H3 Temporary retrieval index | TODO |
 | H4 Winner promotion | TODO |
 | H5 Count verification | TODO |
@@ -986,6 +987,7 @@ pending
 | G10 — Profile parity and isolation tests | #75 | Tests-only parity/isolation coverage بين Cloud وHybrid Local؛ dependency/runtime isolation؛ Full FastAPI suite: `114 passed` |
 | G11 — Single-active-model coordinator + lazy load/release-after-stage | #76 | `LocalModelCoordinator` واحد يفرض single-active heavy Local model؛ Lazy loading لـBGE-M3 داخل Stage lease والتحرير بعد النجاح أو الاستثناء مع memory gate وlifecycle/resource metrics؛ Local startup فقط مع Cloud isolation؛ Implementation `be7ac0a6daa6979a0ef20f55886b087b78b7c7eb`، Merge `e9d31deb247e7c30ccf20dddc7634104613ba46c`؛ `28 passed` focused و`123 passed` full FastAPI |
 | H1 — Private artifact store/opaque references | #78 | مخزن artifacts خاص مع opaque references وmanifest داخلي وحماية traversal؛ `12 passed` focused و`135 passed` full FastAPI |
+| H2 — Configurable 24h TTL | #79 | TTL قابل للتهيئة بقيمة افتراضية 24h مع UTC manifest timestamps ورفض القراءة بعد الانتهاء دون حذف؛ `20 passed` focused و`30 passed` related و`143 passed` full FastAPI |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -1012,13 +1014,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-H2 — Configurable 24h TTL
+H3 — Temporary retrieval index
 Status: TODO
-Expected Branch: task/H2-configurable-24h-ttl
-Next: H3 — Temporary retrieval index
+Expected Branch: task/H3-temporary-retrieval-index
+Next: H4 — Winner promotion
 ```
 
-> تبدأ H2 بعد اكتمال H1 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ H3 بعد اكتمال H2 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
