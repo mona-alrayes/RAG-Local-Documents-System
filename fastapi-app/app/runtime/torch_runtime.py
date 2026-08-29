@@ -72,7 +72,7 @@ class TorchRuntimeAdapter:
         finally:
             del result
             del tensor
-            self._release_cache(torch, backend)
+            self.release_cache(backend)
 
     def accelerator_memory(
         self,
@@ -103,6 +103,23 @@ class TorchRuntimeAdapter:
 
         return None, None
 
+    def release_cache(self, backend: RuntimeBackend) -> None:
+        torch = self._load_torch()
+
+        if backend in (
+            RuntimeBackend.CUDA,
+            RuntimeBackend.ROCM,
+        ):
+            torch.cuda.empty_cache()
+            return
+
+        if backend is RuntimeBackend.XPU:
+            torch.xpu.empty_cache()
+            return
+
+        if backend is RuntimeBackend.MPS:
+            torch.mps.empty_cache()
+
     def _device_name(self, backend: RuntimeBackend) -> str:
         if backend in (
             RuntimeBackend.CUDA,
@@ -132,21 +149,6 @@ class TorchRuntimeAdapter:
 
         if backend is RuntimeBackend.MPS:
             torch.mps.synchronize()
-
-    def _release_cache(self, torch, backend: RuntimeBackend) -> None:
-        if backend in (
-            RuntimeBackend.CUDA,
-            RuntimeBackend.ROCM,
-        ):
-            torch.cuda.empty_cache()
-            return
-
-        if backend is RuntimeBackend.XPU:
-            torch.xpu.empty_cache()
-            return
-
-        if backend is RuntimeBackend.MPS:
-            torch.mps.empty_cache()
 
     def _load_torch(self):
         try:

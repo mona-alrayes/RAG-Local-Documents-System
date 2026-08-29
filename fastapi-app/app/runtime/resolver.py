@@ -133,6 +133,9 @@ class LocalRuntimeResolver:
             system_available_memory_bytes=(
                 system_resources.system_available_memory_bytes
             ),
+            system_total_memory_bytes=(
+                system_resources.system_total_memory_bytes
+            ),
             accelerator_allocated_bytes=allocated,
             accelerator_cached_or_reserved_bytes=cached_or_reserved,
         )

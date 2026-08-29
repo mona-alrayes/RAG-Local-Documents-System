@@ -24,6 +24,7 @@ class RuntimeProbeStatus(StrEnum):
 class ResourceSnapshot:
     process_rss_bytes: int | None = None
     system_available_memory_bytes: int | None = None
+    system_total_memory_bytes: int | None = None
     accelerator_allocated_bytes: int | None = None
     accelerator_cached_or_reserved_bytes: int | None = None
 
