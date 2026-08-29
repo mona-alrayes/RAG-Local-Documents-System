@@ -2,7 +2,7 @@
 
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات، دون تكرار التفاصيل الموجودة في الـMaster Plan أو Git/PRs.
-> **آخر تحديث:** 2026-08-28
+> **آخر تحديث:** 2026-08-29
 > **الحالة العامة:** قيد التنفيذ
 
 ---
@@ -17,18 +17,18 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 8636f8b179fd5f21351e8bd9fc6a274fb4b70252
-Last Merged PR: #69 — feat(G4): add cloud sparse representation
-Latest Task PR: #69
-G4 Implementation Commit: c179a87c1d131a3193d7d57b9c8b2efa177b6e43
-G4 Merge Commit: 8636f8b179fd5f21351e8bd9fc6a274fb4b70252
-G4 Scope: إضافة Cloud sparse representation لمسار Cloud بتحويل كل `NormalizedChunk` إلى `qdrant_client.models.Document` باستخدام model `Qdrant/bm25` وtokenizer `multilingual` مع الحفاظ على ترتيب الـchunks وعلاقة 1:1؛ لا يحسب FastAPI قيم أو indices لـBM25 بل يتولى Qdrant التمثيل الفعلي؛ بلا dependencies جديدة أو تعديل Qdrant schema أو environment configuration؛ خارج النطاق ولم يُنفذ: Local BM25 / G7 أو Query sparse representation أو Retrieval أو RRF fusion أو Qdrant upsert/indexing أو G5 وأي مهمة لاحقة
-G4 Verification: focused test: `1 passed`؛ full FastAPI suite: `66 passed`
-Last Completed Task: G4 — Cloud sparse representation
-Current Task: G5 — Hybrid Local chunking
+Verified Main Commit: 576fb9da0d241374bc73614a9fe9ddd87190fd99
+Last Merged PR: #70 — feat(G5): add hybrid local chunking
+Latest Task PR: #70
+G5 Implementation Commit: abbdf4acab74be74ff26a29a5b2e849d71e12892
+G5 Merge Commit: 576fb9da0d241374bc73614a9fe9ddd87190fd99
+G5 Scope: إضافة `HybridLocalChunker` مستقل يستخدم `SentenceSplitter` مع baseline حالي `800/80`، ويستقبل `list[NormalizedDocument]` وينتج `list[NormalizedChunk]` مع الحفاظ على `page` و`section` وترتيب الوثائق والـchunks؛ نقل `NormalizedChunk` من module خاص بمسار Cloud إلى مكوّن مشترك ومحايد مع بقاء `CloudChunker` و`HybridLocalChunker` مستقلين؛ بلا dependencies جديدة أو vector normalization يدوي؛ خارج النطاق ولم يُنفذ: BGE-M3 أو Local BM25 أو أي جزء من G6 وما بعدها
+G5 Verification: focused chunking regression tests: `7 passed`؛ full FastAPI suite: `69 passed`
+Last Completed Task: G5 — Hybrid Local chunking
+Current Task: G6 — Local BGE-M3 embeddings
 Current Task Status: TODO
-Expected Task Branch: task/G5-hybrid-local-chunking
-Next Task After Completion: G6 — Local BGE-M3 embeddings
+Expected Task Branch: task/G6-local-bge-m3-embeddings
+Next Task After Completion: G7 — Local BM25
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -207,7 +207,7 @@ Open Blockers: لا يوجد
 | G2 Cloud chunking | DONE |
 | G3 Cloud Jina embeddings | DONE |
 | G4 Cloud sparse representation | DONE |
-| G5 Hybrid Local chunking | TODO |
+| G5 Hybrid Local chunking | DONE |
 | G6 Local BGE-M3 embeddings | TODO |
 | G7 Local BM25 | TODO |
 | G8 Batch/retry/rate-limit | TODO |
@@ -978,6 +978,7 @@ pending
 | G2 — Cloud chunking | #67 | `CloudChunker` + `SentenceSplitter` مع metadata وbaseline قابل للضبط؛ Implementation `23b55768c6ba9f8371efac5657d431adadd5ca7d`؛ focused G2 tests: `4 passed`؛ full FastAPI suite: `59 passed` |
 | G3 — Cloud Jina embeddings | #68 | Jina AI `jina-embeddings-v3` بـ`retrieval.passage` وdense vectors ببعد `1024` مع تحقق العدد/البعد و`ApplicationException` منظمة بلا fallback؛ focused G3 tests: `6 passed`؛ full FastAPI suite: `65 passed` |
 | G4 — Cloud sparse representation | #69 | تحويل `NormalizedChunk` إلى Qdrant `Document` بـ`Qdrant/bm25` و`multilingual` مع ترتيب 1:1؛ BM25 الفعلي داخل Qdrant؛ بلا dependencies أو تعديل schema/env؛ focused test: `1 passed`؛ full FastAPI suite: `66 passed` |
+| G5 — Hybrid Local chunking | #70 | `HybridLocalChunker` مستقل باستخدام `SentenceSplitter 800/80` وshared `NormalizedChunk` مع metadata propagation لـ`page` و`section` والحفاظ على ترتيب الوثائق والـchunks؛ focused tests: `7 passed`؛ full FastAPI suite: `69 passed` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -1004,13 +1005,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-G5 — Hybrid Local chunking
+G6 — Local BGE-M3 embeddings
 Status: TODO
-Expected Branch: task/G5-hybrid-local-chunking
-Next: G6 — Local BGE-M3 embeddings
+Expected Branch: task/G6-local-bge-m3-embeddings
+Next: G7 — Local BM25
 ```
 
-> تبدأ G5 بعد اكتمال G4 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ G6 بعد اكتمال G5 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
