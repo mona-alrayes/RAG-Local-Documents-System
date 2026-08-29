@@ -17,18 +17,18 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: b433231d74975690cb333925f17233467ce48383
-Last Merged PR: #73 — feat(G8): add embedding batching and retry controls
-Latest Task PR: #73
-G8 Implementation Commit: 0a6eaf114bca15977f8f08555c36d094939c1ac4
-G8 Merge Commit: b433231d74975690cb333925f17233467ce48383
-G8 Scope: إضافة batching قابل للضبط لمسار Cloud embeddings مع الحفاظ على ترتيب الـchunks والـvectors والتطابق `1:1`، وانتظار بين الـbatches من دون `sleep` بعد آخر batch؛ retry محدود للأخطاء المؤقتة فقط، بحيث تعد `429` و`500/502/503/504` retryable بينما تفشل `400/401/403/422` مباشرة؛ إضافة `JinaEmbeddingProvider` لعزل اتصال Jina والحفاظ على دلالة HTTP status، مع عدم إعادة معالجة الـbatches المكتملة عند فشل batch لاحق؛ استخدام structured `ApplicationException` مع exception chaining وsleeper قابل للحقن للاختبارات؛ الإعدادات الافتراضية: `EMBED_BATCH_SIZE=6` و`WAIT_BETWEEN_BATCHES=3` و`RATE_LIMIT_RETRY_WAIT=30` و`MAX_RETRIES=5`؛ بلا dependencies جديدة؛ خارج النطاق ولم يُعدّل: Local embeddings أو BM25 أو Qdrant أو G9/G10/G11
-G8 Verification: Focused Cloud Jina / G8 tests: `14 passed`؛ Jina provider tests: `6 passed`؛ G3 regression + dependency isolation: `16 passed`؛ Full FastAPI suite: `98 passed`
-Last Completed Task: G8 — Batching / Retries / Rate Limits
-Current Task: G9 — Metrics/report builder بلا vectors/cost
+Verified Main Commit: 79bab31b66ae6af1b267e519fc77bbbf02435a46
+Last Merged PR: #74 — feat(G9): add processing metrics and report builder
+Latest Task PR: #74
+G9 Implementation Commit: 065e4e2b14a2b5453a7567cd3d33868bb4c2ee87
+G9 Merge Commit: 79bab31b66ae6af1b267e519fc77bbbf02435a46
+G9 Scope: إضافة `ProcessingReportBuilder` مع typed processing/profile snapshots لتجميع والتحقق من أعداد الصفحات والـchunks والـvectors وأبعادها، بما في ذلك vector dimension validation، وstructured stage timings وstructured warnings؛ استخدام allowlist آمنة لإعدادات الـprofile، مع تضمين إعدادات Cloud batching/retry الآمنة من G8 ضمن الـsnapshot؛ لا يتضمن التقرير raw vector values أو cost/provider billing؛ خارج النطاق ولم يُعدّل: سلوك Parsing أو Chunking أو Embeddings أو Sparse، ولم تُدخل Compare orchestration أو Qdrant promotion أو G10/G11
+G9 Verification: Focused G9 tests: `10 passed`؛ Related processing regression: `48 passed`؛ Full FastAPI suite: `108 passed`
+Last Completed Task: G9 — Metrics/report builder بلا vectors/cost
+Current Task: G10 — Profile parity and isolation tests
 Current Task Status: TODO
-Expected Task Branch: task/G9-metrics-report-builder
-Next Task After Completion: G10 — Profile parity and isolation tests
+Expected Task Branch: task/G10-profile-parity-isolation-tests
+Next Task After Completion: G11 — Single-active-model coordinator + lazy load/release-after-stage
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -211,7 +211,7 @@ Open Blockers: لا يوجد
 | G6 Local BGE-M3 embeddings | DONE |
 | G7 Local BM25 | DONE |
 | G8 Batching / Retries / Rate Limits | DONE |
-| G9 Metrics/report بلا vectors/cost | TODO |
+| G9 Metrics/report بلا vectors/cost | DONE |
 | G10 Profile isolation tests | TODO |
 | G11 Single-active-model coordinator + lazy load/release-after-stage | TODO |
 
@@ -982,6 +982,7 @@ pending
 | G6 — Local BGE-M3 embeddings | #71 | `LocalBgeM3Embedder` بـ`BAAI/bge-m3` وCLS pooling؛ ترتيب 1:1 وDense Vector ثابت `1024` مع تحقق العدد/البعد؛ runtime D11 بلا silent fallback وlazy imports بلا dependencies جديدة؛ focused regression: `17 passed in 0.75s`؛ full FastAPI: `78 passed in 1.55s` |
 | G7 — Local BM25 | #72 | `LocalBm25Representer` بـ`Qdrant/bm25` وArabic sparse vectors بترتيب 1:1؛ تحقق count و`indices`/`values` وتوافق `build_point()`/`bm25_sparse_vector`؛ `fastembed==0.8.0` داخل `local-native` فقط مع Cloud isolation وlazy import؛ `8 passed in 0.72s` focused، و`11 passed in 1.32s` regression، و`84 passed in 1.82s` full، وreal Arabic smoke test بـ`exit_code=0` |
 | G8 — Batching / Retries / Rate Limits | #73 | batching قابل للضبط لمسار Cloud Jina مع ترتيب chunks/vectors بنسبة 1:1 ومن دون sleep بعد آخر batch؛ retry محدود لـ`429` و`500/502/503/504` فقط، وفشل مباشر لـ`400/401/403/422`؛ `JinaEmbeddingProvider` مع HTTP status classification وexception chaining وsleeper قابل للحقن وعدم إعادة batches المكتملة؛ defaults: `6/3/30/5`؛ بلا dependencies جديدة أو تعديل Local embeddings/BM25/Qdrant/G9–G11؛ `14 passed` focused، و`6 passed` provider، و`16 passed` regression/isolation، و`98 passed` full |
+| G9 — Metrics/report بلا vectors/cost | #74 | `ProcessingReportBuilder` + typed processing/profile snapshots لأعداد الصفحات/chunks/vectors والتحقق من vector dimension وstructured stage timings/warnings وإعدادات profile آمنة allowlisted، مع Cloud batching/retry الآمنة ضمن snapshot؛ Implementation `065e4e2b14a2b5453a7567cd3d33868bb4c2ee87`، Merge `79bab31b66ae6af1b267e519fc77bbbf02435a46`؛ `10 passed` focused، و`48 passed` related regression، و`108 passed` full FastAPI؛ بلا raw vector values أو cost/provider billing |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -1008,13 +1009,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-G9 — Metrics/report builder بلا vectors/cost
+G10 — Profile parity and isolation tests
 Status: TODO
-Expected Branch: task/G9-metrics-report-builder
-Next: G10 — Profile parity and isolation tests
+Expected Branch: task/G10-profile-parity-isolation-tests
+Next: G11 — Single-active-model coordinator + lazy load/release-after-stage
 ```
 
-> تبدأ G9 بعد اكتمال G8 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ G10 بعد اكتمال G9 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
