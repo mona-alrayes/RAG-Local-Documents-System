@@ -17,18 +17,18 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 576fb9da0d241374bc73614a9fe9ddd87190fd99
-Last Merged PR: #70 — feat(G5): add hybrid local chunking
-Latest Task PR: #70
-G5 Implementation Commit: abbdf4acab74be74ff26a29a5b2e849d71e12892
-G5 Merge Commit: 576fb9da0d241374bc73614a9fe9ddd87190fd99
-G5 Scope: إضافة `HybridLocalChunker` مستقل يستخدم `SentenceSplitter` مع baseline حالي `800/80`، ويستقبل `list[NormalizedDocument]` وينتج `list[NormalizedChunk]` مع الحفاظ على `page` و`section` وترتيب الوثائق والـchunks؛ نقل `NormalizedChunk` من module خاص بمسار Cloud إلى مكوّن مشترك ومحايد مع بقاء `CloudChunker` و`HybridLocalChunker` مستقلين؛ بلا dependencies جديدة أو vector normalization يدوي؛ خارج النطاق ولم يُنفذ: BGE-M3 أو Local BM25 أو أي جزء من G6 وما بعدها
-G5 Verification: focused chunking regression tests: `7 passed`؛ full FastAPI suite: `69 passed`
-Last Completed Task: G5 — Hybrid Local chunking
-Current Task: G6 — Local BGE-M3 embeddings
+Verified Main Commit: c7c5dce9eb24a8a77444564263131c6f91e3ab1f
+Last Merged PR: #71 — feat(G6): add local BGE-M3 embeddings
+Latest Task PR: #71
+G6 Implementation Commit: d127e7aff490bcd59fadb344704d6a8e19da4201
+G6 Merge Commit: c7c5dce9eb24a8a77444564263131c6f91e3ab1f
+G6 Scope: إضافة `LocalBgeM3Embedder` باستخدام `BAAI/bge-m3` لتحويل `list[NormalizedChunk]` إلى `list[list[float]]` مع الحفاظ على ترتيب 1:1 وإنتاج Dense Vector واحد ببعد ثابت `1024` لكل Chunk والتحقق من العدد والأبعاد؛ استخدام CLS pooling بلا manual L2 normalization؛ استهلاك runtime decision من D11 ودعم `CUDA / ROCm / XPU / MPS / CPU` بلا silent fallback إلى CPU، مع PyTorch device mapping المناسب لـROCm؛ إضافة `LOCAL_EMBED_MODEL=BAAI/bge-m3` واستخدام lazy imports لـ`torch` و`transformers` لعزل Cloud dependencies بلا تعديل `pyproject.toml`؛ خارج النطاق ولم يُنفذ: G7/G8/G9/G11 أو Qdrant indexing/retrieval/reranking/LLM
+G6 Verification: focused regression tests: `17 passed in 0.75s`؛ full FastAPI suite: `78 passed in 1.55s`
+Last Completed Task: G6 — Local BGE-M3 embeddings
+Current Task: G7 — Local BM25
 Current Task Status: TODO
-Expected Task Branch: task/G6-local-bge-m3-embeddings
-Next Task After Completion: G7 — Local BM25
+Expected Task Branch: task/G7-local-bm25
+Next Task After Completion: G8 — batching / retries / rate limits
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -208,7 +208,7 @@ Open Blockers: لا يوجد
 | G3 Cloud Jina embeddings | DONE |
 | G4 Cloud sparse representation | DONE |
 | G5 Hybrid Local chunking | DONE |
-| G6 Local BGE-M3 embeddings | TODO |
+| G6 Local BGE-M3 embeddings | DONE |
 | G7 Local BM25 | TODO |
 | G8 Batch/retry/rate-limit | TODO |
 | G9 Metrics/report بلا vectors/cost | TODO |
@@ -979,6 +979,7 @@ pending
 | G3 — Cloud Jina embeddings | #68 | Jina AI `jina-embeddings-v3` بـ`retrieval.passage` وdense vectors ببعد `1024` مع تحقق العدد/البعد و`ApplicationException` منظمة بلا fallback؛ focused G3 tests: `6 passed`؛ full FastAPI suite: `65 passed` |
 | G4 — Cloud sparse representation | #69 | تحويل `NormalizedChunk` إلى Qdrant `Document` بـ`Qdrant/bm25` و`multilingual` مع ترتيب 1:1؛ BM25 الفعلي داخل Qdrant؛ بلا dependencies أو تعديل schema/env؛ focused test: `1 passed`؛ full FastAPI suite: `66 passed` |
 | G5 — Hybrid Local chunking | #70 | `HybridLocalChunker` مستقل باستخدام `SentenceSplitter 800/80` وshared `NormalizedChunk` مع metadata propagation لـ`page` و`section` والحفاظ على ترتيب الوثائق والـchunks؛ focused tests: `7 passed`؛ full FastAPI suite: `69 passed` |
+| G6 — Local BGE-M3 embeddings | #71 | `LocalBgeM3Embedder` بـ`BAAI/bge-m3` وCLS pooling؛ ترتيب 1:1 وDense Vector ثابت `1024` مع تحقق العدد/البعد؛ runtime D11 بلا silent fallback وlazy imports بلا dependencies جديدة؛ focused regression: `17 passed in 0.75s`؛ full FastAPI: `78 passed in 1.55s` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -1005,13 +1006,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-G6 — Local BGE-M3 embeddings
+G7 — Local BM25
 Status: TODO
-Expected Branch: task/G6-local-bge-m3-embeddings
-Next: G7 — Local BM25
+Expected Branch: task/G7-local-bm25
+Next: G8 — batching / retries / rate limits
 ```
 
-> تبدأ G6 بعد اكتمال G5 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ G7 بعد اكتمال G6 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
