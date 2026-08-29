@@ -17,18 +17,18 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: ee349aef0a60800e1f8e10c8bc948df756235c9d
-Last Merged PR: #75 — test(G10): add profile parity and isolation coverage
-Latest Task PR: #75
-G10 Implementation Commit: 3c2456d164cd9c579216400c1e0172525695e641
-G10 Merge Commit: ee349aef0a60800e1f8e10c8bc948df756235c9d
-G10 Scope: اختبارات parity بين `cloud` و`hybrid_local` لعقد Chunking والحفاظ على عدد Sparse representations وعقد Processing Report، مع التحقق من عزل إعدادات الـprofiles؛ إثبات أن Cloud import path لا يحمل `torch` أو `transformers` أو `fastembed` وأن Cloud runtime initialization لا يدخل إلى Local runtime components؛ تغييرات Tests-only بلا أي تعديل production code أو إدخال من نطاق G11
-G10 Verification: Focused G10 tests: `8 passed`؛ Related processing regression: `64 passed`؛ Full FastAPI suite: `114 passed`
-Last Completed Task: G10 — Profile parity and isolation tests
-Current Task: G11 — Single-active-model coordinator + lazy load/release-after-stage
+Verified Main Commit: e9d31deb247e7c30ccf20dddc7634104613ba46c
+Last Merged PR: #76 — feat(G11): add single-active local model coordinator
+Latest Task PR: #76
+G11 Implementation Commit: be7ac0a6daa6979a0ef20f55886b087b78b7c7eb
+G11 Merge Commit: e9d31deb247e7c30ccf20dddc7634104613ba46c
+G11 Scope: منسق `LocalModelCoordinator` واحد على مستوى FastAPI worker يفرض single-active heavy Local model؛ Lazy loading لـBGE-M3 داخل Stage lease وتحريره بعد النجاح أو الاستثناء مع `gc.collect()` وتنظيف backend cache؛ Memory gate وLifecycle/resource metrics؛ إنشاء المنسق في Local startup فقط مع الحفاظ على Cloud isolation
+G11 Verification: Focused G11 tests: `28 passed`؛ Full FastAPI suite: `123 passed`
+Last Completed Task: G11 — Single-active-model coordinator + lazy load/release-after-stage
+Current Task: H1 — Private artifact store/opaque references
 Current Task Status: TODO
-Expected Task Branch: task/G11-single-active-model-coordinator
-Next Task After Completion: H1 — Private artifact store/opaque refs
+Expected Task Branch: task/H1-private-artifact-store
+Next Task After Completion: H2 — Configurable 24h TTL
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -213,7 +213,7 @@ Open Blockers: لا يوجد
 | G8 Batching / Retries / Rate Limits | DONE |
 | G9 Metrics/report بلا vectors/cost | DONE |
 | G10 Profile isolation tests | DONE |
-| G11 Single-active-model coordinator + lazy load/release-after-stage | TODO |
+| G11 Single-active-model coordinator + lazy load/release-after-stage | DONE |
 
 **معيار انتهاء المرحلة:** كل Profile ينتج Chunks وVectors وتقريراً صحيحاً دون خلط Providers، ولا يوجد أكثر من Model ثقيل واحد في الذاكرة؛ يحمل Lazy ويحرر بعد انتهاء Stage قبل تحميل التالي.
 
@@ -984,6 +984,7 @@ pending
 | G8 — Batching / Retries / Rate Limits | #73 | batching قابل للضبط لمسار Cloud Jina مع ترتيب chunks/vectors بنسبة 1:1 ومن دون sleep بعد آخر batch؛ retry محدود لـ`429` و`500/502/503/504` فقط، وفشل مباشر لـ`400/401/403/422`؛ `JinaEmbeddingProvider` مع HTTP status classification وexception chaining وsleeper قابل للحقن وعدم إعادة batches المكتملة؛ defaults: `6/3/30/5`؛ بلا dependencies جديدة أو تعديل Local embeddings/BM25/Qdrant/G9–G11؛ `14 passed` focused، و`6 passed` provider، و`16 passed` regression/isolation، و`98 passed` full |
 | G9 — Metrics/report بلا vectors/cost | #74 | `ProcessingReportBuilder` + typed processing/profile snapshots لأعداد الصفحات/chunks/vectors والتحقق من vector dimension وstructured stage timings/warnings وإعدادات profile آمنة allowlisted، مع Cloud batching/retry الآمنة ضمن snapshot؛ Implementation `065e4e2b14a2b5453a7567cd3d33868bb4c2ee87`، Merge `79bab31b66ae6af1b267e519fc77bbbf02435a46`؛ `10 passed` focused، و`48 passed` related regression، و`108 passed` full FastAPI؛ بلا raw vector values أو cost/provider billing |
 | G10 — Profile parity and isolation tests | #75 | Tests-only parity/isolation coverage بين Cloud وHybrid Local؛ dependency/runtime isolation؛ Full FastAPI suite: `114 passed` |
+| G11 — Single-active-model coordinator + lazy load/release-after-stage | #76 | `LocalModelCoordinator` واحد يفرض single-active heavy Local model؛ Lazy loading لـBGE-M3 داخل Stage lease والتحرير بعد النجاح أو الاستثناء مع memory gate وlifecycle/resource metrics؛ Local startup فقط مع Cloud isolation؛ Implementation `be7ac0a6daa6979a0ef20f55886b087b78b7c7eb`، Merge `e9d31deb247e7c30ccf20dddc7634104613ba46c`؛ `28 passed` focused و`123 passed` full FastAPI |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -1010,13 +1011,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-G11 — Single-active-model coordinator + lazy load/release-after-stage
+H1 — Private artifact store/opaque references
 Status: TODO
-Expected Branch: task/G11-single-active-model-coordinator
-Next: H1 — Private artifact store/opaque refs
+Expected Branch: task/H1-private-artifact-store
+Next: H2 — Configurable 24h TTL
 ```
 
-> تبدأ G11 بعد اكتمال G10 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ H1 بعد اكتمال G11 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
