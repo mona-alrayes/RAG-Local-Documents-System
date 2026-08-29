@@ -8,6 +8,7 @@ PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 FORBIDDEN_CLOUD_DEPENDENCIES = {
     "torch",
     "transformers",
+    "fastembed",
     "ollama",
 }
 
@@ -42,3 +43,4 @@ def test_local_native_extra_contains_local_ai_dependencies() -> None:
     dependency_names = {_dependency_name(item) for item in local_dependencies}
 
     assert "transformers" in dependency_names
+    assert "fastembed" in dependency_names
