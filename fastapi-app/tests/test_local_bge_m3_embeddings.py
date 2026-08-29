@@ -1,4 +1,7 @@
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from types import SimpleNamespace
+from typing import Any
 
 from app.core.config import Settings
 from app.core.exceptions import ApplicationException
@@ -51,6 +54,26 @@ class FakeInferenceMode:
         return None
 
 
+class FakeLocalModelCoordinator:
+    def __init__(self) -> None:
+        self.model_ids: list[str] = []
+
+    @contextmanager
+    def lease(
+        self,
+        *,
+        model_id: str,
+        loader: Callable[[], Any],
+    ) -> Iterator[SimpleNamespace]:
+        self.model_ids.append(model_id)
+        resource = loader()
+
+        try:
+            yield SimpleNamespace(resource=resource)
+        finally:
+            resource = None
+
+
 def make_runtime(
     backend: RuntimeBackend = RuntimeBackend.CPU,
     dtype: RuntimeDtype = RuntimeDtype.FP32,
@@ -63,6 +86,16 @@ def make_runtime(
         probe_status=RuntimeProbeStatus.PASSED,
         failure_reason=None,
         resources=ResourceSnapshot(),
+    )
+
+
+def make_embedder(
+    runtime: LocalRuntimeSnapshot | None = None,
+) -> LocalBgeM3Embedder:
+    return LocalBgeM3Embedder(
+        model="BAAI/bge-m3",
+        runtime=runtime or make_runtime(),
+        coordinator=FakeLocalModelCoordinator(),
     )
 
 
@@ -120,6 +153,7 @@ def install_fake_local_modules(
     def fake_import_module(name: str):
         if name == "torch":
             return fake_torch
+
         if name == "transformers":
             return fake_transformers
 
@@ -142,10 +176,7 @@ def test_local_bge_m3_embedder_preserves_chunk_order_and_dense_values(
     ]
     received, _ = install_fake_local_modules(monkeypatch, vectors)
 
-    embedder = LocalBgeM3Embedder(
-        model="BAAI/bge-m3",
-        runtime=make_runtime(),
-    )
+    embedder = make_embedder()
 
     chunks = [
         NormalizedChunk(text="first chunk"),
@@ -169,12 +200,11 @@ def test_local_bge_m3_embedder_uses_runtime_device_and_dtype(
         [[1.0] * 1024],
     )
 
-    embedder = LocalBgeM3Embedder(
-        model="BAAI/bge-m3",
-        runtime=make_runtime(
+    embedder = make_embedder(
+        make_runtime(
             backend=RuntimeBackend.MPS,
             dtype=RuntimeDtype.FP16,
-        ),
+        )
     )
 
     embedder.embed([NormalizedChunk(text="chunk")])
@@ -193,13 +223,14 @@ def test_local_bge_m3_embedder_maps_rocm_to_torch_cuda_device(
         [[1.0] * 1024],
     )
 
-    LocalBgeM3Embedder(
-        model="BAAI/bge-m3",
-        runtime=make_runtime(
+    embedder = make_embedder(
+        make_runtime(
             backend=RuntimeBackend.ROCM,
             dtype=RuntimeDtype.FP16,
-        ),
+        )
     )
+
+    embedder.embed([NormalizedChunk(text="chunk")])
 
     assert received["device"] == "cuda"
 
@@ -216,10 +247,7 @@ def test_local_bge_m3_embedder_rejects_unavailable_runtime() -> None:
     )
 
     try:
-        LocalBgeM3Embedder(
-            model="BAAI/bge-m3",
-            runtime=runtime,
-        )
+        make_embedder(runtime)
     except ApplicationException as exc:
         assert exc.code == "local_embedding_runtime_unavailable"
     else:
@@ -234,10 +262,7 @@ def test_local_bge_m3_embedder_rejects_vector_count_mismatch(
         [[1.0] * 1024],
     )
 
-    embedder = LocalBgeM3Embedder(
-        model="BAAI/bge-m3",
-        runtime=make_runtime(),
-    )
+    embedder = make_embedder()
 
     chunks = [
         NormalizedChunk(text="first"),
@@ -260,10 +285,7 @@ def test_local_bge_m3_embedder_rejects_invalid_vector_dimension(
         [[1.0] * 512],
     )
 
-    embedder = LocalBgeM3Embedder(
-        model="BAAI/bge-m3",
-        runtime=make_runtime(),
-    )
+    embedder = make_embedder()
 
     try:
         embedder.embed([NormalizedChunk(text="chunk")])
@@ -301,6 +323,7 @@ def test_local_bge_m3_embedder_wraps_model_load_failure(
     def fake_import_module(name: str):
         if name == "torch":
             return fake_torch
+
         if name == "transformers":
             return fake_transformers
 
@@ -311,11 +334,10 @@ def test_local_bge_m3_embedder_wraps_model_load_failure(
         fake_import_module,
     )
 
+    embedder = make_embedder()
+
     try:
-        LocalBgeM3Embedder(
-            model="BAAI/bge-m3",
-            runtime=make_runtime(),
-        )
+        embedder.embed([NormalizedChunk(text="chunk")])
     except ApplicationException as exc:
         assert exc.code == "local_embedding_model_failed"
     else:
@@ -360,6 +382,7 @@ def test_local_bge_m3_embedder_wraps_inference_failure(
     def fake_import_module(name: str):
         if name == "torch":
             return fake_torch
+
         if name == "transformers":
             return fake_transformers
 
@@ -370,10 +393,7 @@ def test_local_bge_m3_embedder_wraps_inference_failure(
         fake_import_module,
     )
 
-    embedder = LocalBgeM3Embedder(
-        model="BAAI/bge-m3",
-        runtime=make_runtime(),
-    )
+    embedder = make_embedder()
 
     try:
         embedder.embed([NormalizedChunk(text="chunk")])

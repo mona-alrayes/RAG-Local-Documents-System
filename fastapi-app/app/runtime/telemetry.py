@@ -21,4 +21,6 @@ class PsutilResourceTelemetry:
         return ResourceSnapshot(
             process_rss_bytes=process.memory_info().rss,
             system_available_memory_bytes=system_memory.available,
+            system_total_memory_bytes=system_memory.total,
         )
+

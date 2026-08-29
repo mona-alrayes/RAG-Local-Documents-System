@@ -65,6 +65,17 @@ class Settings(BaseSettings):
 
     local_embed_model: str = "BAAI/bge-m3"
 
+    local_min_available_memory_ratio: float = Field(
+        default=0.15,
+        gt=0,
+        lt=1,
+    )
+    local_ai_max_concurrency: int = Field(
+        default=1,
+        ge=1,
+        le=1,
+    )
+
 
 def validate_startup_configuration(settings: Settings) -> None:
     if "rag_deployment_mode" not in settings.model_fields_set:
