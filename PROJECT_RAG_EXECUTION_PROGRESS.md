@@ -17,18 +17,19 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: c7c5dce9eb24a8a77444564263131c6f91e3ab1f
-Last Merged PR: #71 — feat(G6): add local BGE-M3 embeddings
-Latest Task PR: #71
-G6 Implementation Commit: d127e7aff490bcd59fadb344704d6a8e19da4201
-G6 Merge Commit: c7c5dce9eb24a8a77444564263131c6f91e3ab1f
-G6 Scope: إضافة `LocalBgeM3Embedder` باستخدام `BAAI/bge-m3` لتحويل `list[NormalizedChunk]` إلى `list[list[float]]` مع الحفاظ على ترتيب 1:1 وإنتاج Dense Vector واحد ببعد ثابت `1024` لكل Chunk والتحقق من العدد والأبعاد؛ استخدام CLS pooling بلا manual L2 normalization؛ استهلاك runtime decision من D11 ودعم `CUDA / ROCm / XPU / MPS / CPU` بلا silent fallback إلى CPU، مع PyTorch device mapping المناسب لـROCm؛ إضافة `LOCAL_EMBED_MODEL=BAAI/bge-m3` واستخدام lazy imports لـ`torch` و`transformers` لعزل Cloud dependencies بلا تعديل `pyproject.toml`؛ خارج النطاق ولم يُنفذ: G7/G8/G9/G11 أو Qdrant indexing/retrieval/reranking/LLM
-G6 Verification: focused regression tests: `17 passed in 0.75s`؛ full FastAPI suite: `78 passed in 1.55s`
-Last Completed Task: G6 — Local BGE-M3 embeddings
-Current Task: G7 — Local BM25
+Verified Main Commit: 04c3dbf2050f380cb380d64fbfd4076a5ed33005
+Last Merged PR: #72 — feat(G7): add local BM25 sparse representation
+Latest Task PR: #72
+G7 Implementation Commit: d849d510eaaec3aeb19f040bfa60f2d6ec2516fd
+G7 Merge Commit: 04c3dbf2050f380cb380d64fbfd4076a5ed33005
+G7 Scope: إضافة `LocalBm25Representer` باستخدام `Qdrant/bm25` و`language="arabic"` و`disable_stemmer=True` لتحويل `list[NormalizedChunk]` إلى `list[models.SparseVector]` مع الحفاظ على الترتيب والتطابق `1:1`؛ التحقق من تطابق عدد النتائج ومن تساوي أطوال `indices` و`values`، وإرجاع قائمة فارغة للإدخال الفارغ؛ توافق الناتج مع Qdrant `build_point()` و`bm25_sparse_vector`؛ إضافة `fastembed==0.8.0` داخل `local-native` فقط مع Cloud dependency isolation وlazy import لـ`fastembed`؛ G7 مستقلة عن Torch و`LocalRuntimeSnapshot` وG6 device/runtime lifecycle؛ خارج النطاق ولم يُنفذ: Qdrant retrieval/upsert أو query-time BM25 أو RRF/fusion أو reranker أو LLM أو batching/retries/rate limits أو metrics
+G7 Operational Note: اعتمد `disable_stemmer=True` في العقد العام للمهمة لأن Arabic stemming عبر FastEmbed تسبب في native process abort على macOS ARM64 بعد إنتاج الـvectors، بينما أدى تعطيل الـstemmer إلى نجاح real Arabic BM25 smoke test والخروج الطبيعي بـ`exit_code=0`
+G7 Verification: Focused G7/dependency tests: `8 passed in 0.72s`؛ Related regression tests (G4/G5/G7): `11 passed in 1.32s`؛ Full FastAPI suite: `84 passed in 1.82s`؛ Real Arabic Local BM25 smoke test: succeeded with `exit_code=0`
+Last Completed Task: G7 — Local BM25
+Current Task: G8 — Batch/retry/rate-limit
 Current Task Status: TODO
-Expected Task Branch: task/G7-local-bm25
-Next Task After Completion: G8 — batching / retries / rate limits
+Expected Task Branch: task/G8-batch-retry-rate-limit
+Next Task After Completion: G9 — Metrics/report بلا vectors/cost
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -209,7 +210,7 @@ Open Blockers: لا يوجد
 | G4 Cloud sparse representation | DONE |
 | G5 Hybrid Local chunking | DONE |
 | G6 Local BGE-M3 embeddings | DONE |
-| G7 Local BM25 | TODO |
+| G7 Local BM25 | DONE |
 | G8 Batch/retry/rate-limit | TODO |
 | G9 Metrics/report بلا vectors/cost | TODO |
 | G10 Profile isolation tests | TODO |
@@ -980,6 +981,7 @@ pending
 | G4 — Cloud sparse representation | #69 | تحويل `NormalizedChunk` إلى Qdrant `Document` بـ`Qdrant/bm25` و`multilingual` مع ترتيب 1:1؛ BM25 الفعلي داخل Qdrant؛ بلا dependencies أو تعديل schema/env؛ focused test: `1 passed`؛ full FastAPI suite: `66 passed` |
 | G5 — Hybrid Local chunking | #70 | `HybridLocalChunker` مستقل باستخدام `SentenceSplitter 800/80` وshared `NormalizedChunk` مع metadata propagation لـ`page` و`section` والحفاظ على ترتيب الوثائق والـchunks؛ focused tests: `7 passed`؛ full FastAPI suite: `69 passed` |
 | G6 — Local BGE-M3 embeddings | #71 | `LocalBgeM3Embedder` بـ`BAAI/bge-m3` وCLS pooling؛ ترتيب 1:1 وDense Vector ثابت `1024` مع تحقق العدد/البعد؛ runtime D11 بلا silent fallback وlazy imports بلا dependencies جديدة؛ focused regression: `17 passed in 0.75s`؛ full FastAPI: `78 passed in 1.55s` |
+| G7 — Local BM25 | #72 | `LocalBm25Representer` بـ`Qdrant/bm25` وArabic sparse vectors بترتيب 1:1؛ تحقق count و`indices`/`values` وتوافق `build_point()`/`bm25_sparse_vector`؛ `fastembed==0.8.0` داخل `local-native` فقط مع Cloud isolation وlazy import؛ `8 passed in 0.72s` focused، و`11 passed in 1.32s` regression، و`84 passed in 1.82s` full، وreal Arabic smoke test بـ`exit_code=0` |
 
 ## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
 
@@ -1006,13 +1008,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-G7 — Local BM25
+G8 — Batch/retry/rate-limit
 Status: TODO
-Expected Branch: task/G7-local-bm25
-Next: G8 — batching / retries / rate limits
+Expected Branch: task/G8-batch-retry-rate-limit
+Next: G9 — Metrics/report بلا vectors/cost
 ```
 
-> تبدأ G7 بعد اكتمال G6 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ G8 بعد اكتمال G7 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
 
 ---
 
