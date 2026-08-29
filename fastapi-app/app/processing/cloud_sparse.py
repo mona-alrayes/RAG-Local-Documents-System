@@ -1,6 +1,6 @@
 from qdrant_client import models
 
-from app.processing.cloud_chunking import NormalizedChunk
+from app.processing.chunks import NormalizedChunk
 
 
 CLOUD_SPARSE_MODEL = "Qdrant/bm25"

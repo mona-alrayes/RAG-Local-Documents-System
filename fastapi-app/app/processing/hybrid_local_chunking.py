@@ -4,7 +4,7 @@ from app.parsing.normalized import NormalizedDocument
 from app.processing.chunks import NormalizedChunk
 
 
-class CloudChunker:
+class HybridLocalChunker:
     def __init__(self, chunk_size: int, chunk_overlap: int) -> None:
         self._splitter = SentenceSplitter(
             chunk_size=chunk_size,
