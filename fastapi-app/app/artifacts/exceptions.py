@@ -23,3 +23,11 @@ class ArtifactStorageError(ApplicationException):
             code="artifact_storage_error",
             message="The temporary artifact could not be processed.",
         )
+
+
+class ArtifactExpiredError(ApplicationException):
+    def __init__(self) -> None:
+        super().__init__(
+            code="artifact_expired",
+            message="The requested temporary artifact has expired.",
+        )

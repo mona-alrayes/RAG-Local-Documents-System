@@ -3,11 +3,14 @@ import os
 import re
 import secrets
 import shutil
-from dataclasses import asdict
+from collections.abc import Callable
+from dataclasses import asdict, replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.artifacts.base import ArtifactStore
 from app.artifacts.exceptions import (
+    ArtifactExpiredError,
     ArtifactNotFoundError,
     ArtifactStorageError,
     InvalidArtifactReferenceError,
@@ -21,8 +24,16 @@ _PAYLOAD_FILENAME = "payload.bin"
 
 
 class FilesystemArtifactStore(ArtifactStore):
-    def __init__(self, *, root: Path) -> None:
+    def __init__(
+        self,
+        *,
+        root: Path,
+        ttl_hours: int = 24,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         self._root = root.resolve()
+        self._ttl = timedelta(hours=ttl_hours)
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._root.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     def create(
@@ -31,6 +42,13 @@ class FilesystemArtifactStore(ArtifactStore):
         manifest: ArtifactManifest,
         payload: bytes,
     ) -> str:
+        now = self._now_utc()
+        stored_manifest = replace(
+            manifest,
+            created_at=now,
+            expires_at=now + self._ttl,
+        )
+
         artifact_ref = secrets.token_hex(32)
         artifact_dir = self._artifact_directory(artifact_ref)
         directory_created = False
@@ -40,7 +58,11 @@ class FilesystemArtifactStore(ArtifactStore):
             directory_created = True
 
             manifest_bytes = json.dumps(
-                asdict(manifest),
+                {
+                    **asdict(stored_manifest),
+                    "created_at": stored_manifest.created_at.isoformat(),
+                    "expires_at": stored_manifest.expires_at.isoformat(),
+                },
                 ensure_ascii=False,
                 separators=(",", ":"),
             ).encode("utf-8")
@@ -73,9 +95,30 @@ class FilesystemArtifactStore(ArtifactStore):
                     encoding="utf-8"
                 )
             )
+
+            manifest_data["created_at"] = self._parse_datetime(
+                manifest_data["created_at"]
+            )
+            manifest_data["expires_at"] = self._parse_datetime(
+                manifest_data["expires_at"]
+            )
+
             manifest = ArtifactManifest(**manifest_data)
+        except (
+            OSError,
+            json.JSONDecodeError,
+            TypeError,
+            ValueError,
+            KeyError,
+        ) as exc:
+            raise ArtifactStorageError() from exc
+
+        if self._now_utc() >= manifest.expires_at:
+            raise ArtifactExpiredError()
+
+        try:
             payload = (artifact_dir / _PAYLOAD_FILENAME).read_bytes()
-        except (OSError, json.JSONDecodeError, TypeError) as exc:
+        except OSError as exc:
             raise ArtifactStorageError() from exc
 
         return StoredArtifact(
@@ -93,6 +136,23 @@ class FilesystemArtifactStore(ArtifactStore):
             raise InvalidArtifactReferenceError()
 
         return artifact_dir
+
+    def _now_utc(self) -> datetime:
+        now = self._clock()
+
+        if now.tzinfo is None or now.utcoffset() is None:
+            raise ValueError("Artifact clock must return a timezone-aware datetime.")
+
+        return now.astimezone(timezone.utc)
+
+    @staticmethod
+    def _parse_datetime(value: str) -> datetime:
+        parsed = datetime.fromisoformat(value)
+
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("Artifact timestamp must include timezone information.")
+
+        return parsed.astimezone(timezone.utc)
 
     @staticmethod
     def _write_private_file(path: Path, content: bytes) -> None:
