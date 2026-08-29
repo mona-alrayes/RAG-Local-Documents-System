@@ -1,7 +1,7 @@
 from enum import StrEnum
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,6 +58,10 @@ class Settings(BaseSettings):
 
     jinaai_api_key: SecretStr = SecretStr("")
     cloud_embed_model: str = "jina-embeddings-v3"
+    embed_batch_size: int = Field(default=6, ge=1)
+    wait_between_batches: float = Field(default=3, ge=0)
+    rate_limit_retry_wait: float = Field(default=30, ge=0)
+    max_retries: int = Field(default=5, ge=0)
 
     local_embed_model: str = "BAAI/bge-m3"
 
