@@ -1,8 +1,7 @@
 from llama_index.embeddings.jinaai import JinaEmbedding
 
 from app.core.exceptions import ApplicationException
-from app.processing.cloud_chunking import NormalizedChunk
-
+from app.processing.chunks import NormalizedChunk
 
 JINA_PASSAGE_TASK = "retrieval.passage"
 CLOUD_EMBEDDING_DIMENSION = 1024
