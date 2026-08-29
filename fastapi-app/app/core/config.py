@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     qdrant_hybrid_local_collection: str = "rag_documents_hybrid_local"
 
     temp_artifact_root: Path = Path("/app/data/artifacts")
+    temp_artifact_ttl_hours: int = Field(default=24, gt=0)
 
     chunk_size: int = 800
     chunk_overlap: int = 80
