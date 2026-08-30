@@ -21,6 +21,5 @@ class DeploymentCapabilitiesResponse(BaseModel):
     deployment_mode: DeploymentMode
     supported_profiles: list[str]
     available_profiles: list[str]
-    compare_available: bool
     providers: list[ProviderCapability]
     local_runtime: LocalRuntimeCapability | None = None

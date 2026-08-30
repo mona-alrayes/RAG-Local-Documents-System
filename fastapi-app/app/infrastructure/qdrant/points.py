@@ -10,6 +10,9 @@ from app.infrastructure.qdrant.schema import (
 )
 
 
+SparseRepresentation = models.SparseVector | models.Document
+
+
 @dataclass(frozen=True, slots=True)
 class PointPayload:
     user_id: int
@@ -55,13 +58,13 @@ def build_point(
     *,
     payload: PointPayload,
     dense_vector: Sequence[float],
-    sparse_vector: models.SparseVector,
+    sparse_representation: SparseRepresentation,
 ) -> models.PointStruct:
     return models.PointStruct(
         id=str(build_point_id(payload)),
         vector={
             DENSE_VECTOR_NAME: list(dense_vector),
-            SPARSE_VECTOR_NAME: sparse_vector,
+            SPARSE_VECTOR_NAME: sparse_representation,
         },
         payload=payload.as_dict(),
     )

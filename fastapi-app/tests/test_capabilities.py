@@ -64,7 +64,6 @@ def test_capabilities_endpoint_reflects_deployment_mode(
     assert payload["deployment_mode"] == deployment_mode
     assert payload["supported_profiles"] == expected_profiles
     assert payload["available_profiles"] == []
-    assert payload["compare_available"] is False
     assert [
         provider["provider"]
         for provider in payload["providers"]

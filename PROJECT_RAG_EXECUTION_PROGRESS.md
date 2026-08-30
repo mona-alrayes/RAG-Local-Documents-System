@@ -1,9 +1,9 @@
 # سجل تنفيذ مشروع RAG
 
-> **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`
-> **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات، دون تكرار التفاصيل الموجودة في الـMaster Plan أو Git/PRs.
-> **آخر تحديث:** 2026-08-30
-> **الحالة العامة:** قيد التنفيذ
+> **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
+> **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
+> **آخر تحديث:** 2026-08-31  
+> **الحالة العامة:** قيد التنفيذ — Compare/Winner lifecycle removed; roadmap renumbered
 
 ---
 
@@ -17,175 +17,211 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: c697a90e339bd754d73fc5c8f1aebef69bf01acf
-Last Merged PR: #79 — feat(H2): add configurable temporary artifact TTL
-Latest Task PR: #79
-H2 Implementation Commit: e076bd93fb064ea60747b8cc2c72d5c210f3bea2
-H2 Merge Commit: b8c1675c678d855098f3043f7d1667f430b1bbf0
-Compare Simplification Commit: c697a90e339bd754d73fc5c8f1aebef69bf01acf
-Compare Simplification Decision: إلغاء Trial Question وTemporary Retrieval Index وأي Retrieval قبل اختيار الفائز؛ H3/I7/J7 = N/A؛ الاختيار يعتمد على Processing Report + Chunk Samples ثم Promotion مباشرة
-H2 Scope: إضافة `TEMP_ARTIFACT_TTL_HOURS` بقيمة افتراضية 24 ساعة وقابلة للتهيئة؛ إضافة `created_at` و`expires_at` إلى artifact manifest كتوقيتات واعية بالمنطقة الزمنية ومحولة إلى UTC؛ يعتبر الـartifact منتهيًا عند `now >= expires_at`؛ إضافة `ArtifactExpiredError` ورفض `read()` للـartifact المنتهي دون حذفه؛ deterministic injected clock للاختبارات دون `sleep`؛ خارج النطاق: scheduled expiration cleanup وحذف الـartifacts المنتهية وtemporary retrieval index وQdrant promotion وLaravel orchestration وأي API endpoint جديد
-H2 Verification: Focused H2: `20 passed`؛ Related regression: `30 passed`؛ Full FastAPI suite: `143 passed`
-H2 Verification Note: احتاج تشغيل الـfull suite محليًا عزل `.env` بسبب `LOCAL_AI_TOPOLOGY=host_native`؛ كان ذلك تلوثًا من بيئة التطوير المحلية لا فشلًا في H2، ولم يتطلب تعديل production code
-Last Completed Task: H2 — Configurable 24h TTL
-Current Task: H4 — Winner promotion
-Current Task Status: TODO
-Expected Task Branch: task/H4-winner-promotion
-Next Task After Completion: H5 — Count verification
+Verified Main Commit: a1f28097b398b9bb277f85990a55e489bd54d880
+Last Merged Feature PR on main: #79 — feat(H2): add configurable temporary artifact TTL
 
-Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
-Live Tables: 13
-Open Blockers: لا يوجد
+Current Working Branch: task/remove-compare-winner-flow
+Branch State:
+ARC-1 implementation and verification completed locally.
+The branch has not been assumed merged into main.
+
+Latest Completed Initiative:
+ARC-1 — Remove Compare/Winner lifecycle
+
+Architectural Result:
+- One trusted Processing Profile per ProcessingRun: cloud | hybrid_local.
+- No Compare upload workflow.
+- No Winner/Loser selection lifecycle.
+- No temporary comparison artifacts or promotion flow.
+- Direct persistent Qdrant indexing is the target path.
+- active_processing_run_id is the document pointer to the current indexed run.
+- Shared parsing means common LlamaParse contracts, not a dual-profile parse-result reuse workflow.
+
+Latest Verification:
+Laravel: 43 passed (181 assertions)
+FastAPI: 129 passed
+MySQL: migrate:fresh succeeded on the cleaned development baseline
+Final code audit: no active Compare/Winner/temporary-artifact references;
+the remaining comparison_report mention is a negative regression assertion.
+
+Next Planned Task After ARC-1 Merge:
+H1 — AiServiceClient
+
+Open Blockers: none
 ```
-
-## المراجع المطلوبة
-
-- هذا الملف = **Single Source of Truth للحالة التنفيذية**.
-- `PROJECT_RAG_MASTER_PLAN.md` = **المرجع الأعلى للمعمارية والنطاق**.
-- القسم `174` هو المرجع المعماري النشط، و`174.20` له الأولوية ضمن القرارات التي يغطيها.
-- مهام AI ترجع أيضاً إلى الـNotebookين المرجعيين عند الحاجة.
-- **Task واحدة = Chat مستقل**.
 
 ---
 
-# 1. قواعد التنفيذ
+# 1. مصادر الحقيقة
 
-1. لا تعتبر أي Task `DONE` إلا بعد التنفيذ والتحقق المناسب.
-2. لا نفترض نجاح أي أمر دون رؤية مخرجاته.
-3. نحافظ على Clean Code وSeparation of Concerns ولا نوسع Scope المهمة.
-4. الاختبارات تقتصر على الضروري للمهمة والـregression المرتبط مباشرة بها.
-5. أي قرار معماري جديد يجب أن ينعكس في الـMaster Plan؛ هذا الملف يسجل الحالة التنفيذية فقط.
-6. Git commits وPull Requests هي المرجع التفصيلي للملفات والـdiffs والأوامر التاريخية، لذلك لا نكررها هنا.
-7. عند إغلاق أي Task:
-   - نغير حالتها في جدول المرحلة إلى `DONE`.
-   - نضيف سطراً مختصراً في سجل الإنجاز.
-   - نحدّث `CURRENT HANDOFF`.
-   - نحدد المهمة التالية.
+- `PROJECT_RAG_MASTER_PLAN.md` = المرجع الأعلى للمعمارية والنطاق.
+- هذا الملف = **Single Source of Truth للحالة التنفيذية ونقطة الاستلام**.
+- Git وPull Requests = التاريخ التفصيلي للتنفيذ السابق.
+- أي تصميم سابق لا يظهر في خريطة المهام النشطة هنا لا يوجّه تنفيذاً جديداً.
+- عند التعارض، يجب تحديث هذا الملف والـMaster Plan معاً قبل بدء Task جديدة.
 
-## حالات المهام
+---
+
+# 2. قواعد التنفيذ
+
+1. لا تعتبر أي Task `DONE` قبل التنفيذ والتحقق المناسب.
+2. لا نفترض نجاح Command أو Test قبل رؤية الناتج.
+3. Clean Code وSeparation of Concerns وLow Coupling إلزامية.
+4. لا Scope expansion بلا قرار معماري واضح.
+5. لا نحذف أو نغير Domain/Schema قبل Reference Audit مناسب.
+6. أثناء التطوير الحالي، ومع قاعدة بيانات محلية فارغة وقبل وجود بيانات يجب الحفاظ عليها، يمكن Consolidate للـbaseline migrations بعد تحقق صريح.
+7. بعد وجود بيانات يجب الحفاظ عليها أو بعد اعتماد Release baseline، تكون تغييرات الـSchema عبر Forward Migrations.
+8. لا Push/PR/Merge تلقائياً؛ المستخدم ينفذ Git operations ما لم يطلب خلاف ذلك صراحةً.
+9. المهام غير المطلوبة في Target Architecture تزال من خريطة التنفيذ النشطة بالكامل؛ تاريخها محفوظ في Git.
+10. عند حذف مهمة من الخطة النشطة يعاد ترقيم المهام اللاحقة داخل المرحلة، وإذا أزيلت مرحلة كاملة يعاد ترقيم المراحل اللاحقة.
+
+---
+
+# 3. حالات المهام النشطة
 
 | الحالة | المعنى |
 |---|---|
-| `TODO` | لم تبدأ بعد |
+| `TODO` | لم تبدأ |
 | `IN PROGRESS` | قيد التنفيذ |
 | `VERIFY` | التنفيذ موجود ويحتاج تحقق |
 | `BLOCKED` | متوقفة بسبب عائق |
 | `DONE` | منجزة ومتحقق منها |
-| `N/A` | غير مطلوبة وفق قرار موثق |
 
 ---
 
-# 2. جداول المهام حسب المراحل
+# 4. آخر تغيير معماري مكتمل — ARC-1
 
-> هذه الجداول تبقى كاملة عمداً لأنها المرجع البصري السريع لتغيير حالة كل Task بين `TODO` و`DONE`.
-> تفاصيل المعمارية لكل مهمة تبقى في `PROJECT_RAG_MASTER_PLAN.md`، أما التفاصيل التاريخية للتنفيذ فتبقى في Git/PRs.
+## ARC-1 — Remove Compare/Winner lifecycle
 
-# 3. بوابة البداية — P0 Baseline Audit
+**الحالة:** `DONE` محلياً على `task/remove-compare-winner-flow`.
 
-> **الحالة: `N/A`**
->
-> تم إلغاء هذه البوابة لأن القرار النهائي هو **بدء المشروع من الصفر** وليس استكمال Codebase سابق.
+تم تنفيذ:
 
-| المهمة | الحالة | السبب |
-|---|---|---|
-| P0 Baseline Audit | N/A | لا يوجد مشروع سابق يحتاج إلى مراجعة قبل التنفيذ |
+- تدقيق كامل لمراجع Compare/Winner/temporary artifacts.
+- حذف Comparison domain من Laravel.
+- إزالة compare-only statuses.
+- اعتماد `active_processing_run_id`.
+- تنظيف baseline migrations لأن قاعدة التطوير كانت فارغة.
+- حذف `DocumentProcessingComparison` والـcomparison schema من الـbaseline.
+- حذف FastAPI `app/artifacts/` بالكامل.
+- حذف إعدادات `TEMP_ARTIFACT_ROOT` و`TEMP_ARTIFACT_TTL_HOURS`.
+- حذف `temporary_artifact_ref` من processing response.
+- حذف `compare_available` من capabilities contract.
+- حذف F7 القديم الذي كان يعيد استخدام parsed result بين Cloud وLocal من أجل Compare:
+  - `app/parsing/shared.py`
+  - `tests/test_shared_parse_result.py`
+- الإبقاء على normalization نفسها واختباراتها المستقلة.
+- إضافة Direct Indexing foundation:
+  - `QdrantDocumentIndexer`
+  - `IndexingContext`
+  - `IndexingResult`
+  - profile-to-collection resolver
+  - دعم Cloud `models.Document` وHybrid Local `models.SparseVector` عند Qdrant boundary
+  - persisted-count verification بعد upsert
+- عدم بناء Processing endpoint/orchestrator أو Laravel job ضمن ARC-1؛ هذه ضمن المرحلة H.
 
-**الانتقال المباشر:** `A1 — إنشاء Laravel Application`.
+## Verification
+
+```text
+Laravel
+43 passed
+181 assertions
+
+FastAPI
+129 passed
+
+Schema
+php artisan migrate:fresh succeeded
+
+Final active-code audit
+No active Compare/Winner/temporary-artifact lifecycle references.
+```
+
+ملاحظة:
+
+```python
+assert "comparison_report" not in payload
+```
+
+يبقى عمداً كـregression guard يثبت أن الحقل القديم لا يعود إلى serialized processing report.
 
 ---
 
----
+# 5. المراحل المنجزة
 
-# 4. المرحلة A — تأسيس المشروع
+## A — Foundation
 
 | المهمة | الحالة |
 |---|---|
-| A1 إنشاء Laravel application | DONE |
-| A2 إعداد Authentication | DONE |
-| A3 إعداد MySQL | DONE |
-| A4 إعداد Redis | DONE |
-| A5 إعداد Queue | DONE |
+| A1 Laravel application | DONE |
+| A2 Authentication | DONE |
+| A3 MySQL | DONE |
+| A4 Redis | DONE |
+| A5 Queue | DONE |
 
-**معيار انتهاء المرحلة:** المستخدم يستطيع التسجيل والدخول، والـQueue تعمل بنجاح.
-
----
-
-# 5. المرحلة B — Documents Foundation
+## B — Documents Foundation
 
 | المهمة | الحالة |
 |---|---|
-| B1 documents migration وفق Master Plan 174.7.1 | DONE |
-| B2 Document model والعلاقات الأساسية | DONE |
-| B3 FileType وDocumentStatus enums/casts | DONE |
-| B4 DocumentPolicy واختبارات ownership | DONE |
-| B5 Documents index/details Blade skeleton | DONE |
-| B6 Upload validation لملف واحد | DONE |
-| B7 Private storage/download authorization | DONE |
-| B8 SHA-256 وسياسة duplicate في Application | DONE |
+| B1 documents migration | DONE |
+| B2 Document model | DONE |
+| B3 FileType / DocumentStatus | DONE |
+| B4 DocumentPolicy | DONE |
+| B5 Documents pages | DONE |
+| B6 Upload validation | DONE |
+| B7 Private storage / download authorization | DONE |
+| B8 SHA-256 / duplicate policy | DONE |
 | B9 document_processing_runs migration | DONE |
-| B10 ProcessingRun model/enums/relations | DONE |
-| B11 selected_processing_run_id migration/invariants | DONE |
-| B12 document_processing_comparisons migration/model | DONE |
+| B10 ProcessingRun model / enums / relations | DONE |
+| B11 active_processing_run_id baseline + active-run relation/invariants | DONE |
 
-**معيار انتهاء المرحلة:** Domain الوثائق وRuns والمقارنات ممثلة بوضوح، دون تنفيذ AI.
-
----
-
-# 6. المرحلة C — Security Pipeline
+## C — Security Pipeline
 
 | المهمة | الحالة |
 |---|---|
-| C1 On-demand ClamAV CLI scan worker + persistent signatures + Local heavy-resource lock contract | DONE |
+| C1 On-demand ClamAV worker / signatures / lock contract | DONE |
 | C2 DocumentSecurityService | DONE |
-| C3 Temporary upload flow | DONE |
+| C3 Temporary upload / quarantine flow | DONE |
 | C4 Clean path | DONE |
-| C5 Infected/fail-closed path | DONE |
-| C6 Configurable security-scan routing | DONE |
-| C7 Aggregate status transitions | DONE |
+| C5 Infected / fail-closed path | DONE |
+| C6 Configurable security routing | DONE |
+| C7 Aggregate security status transitions | DONE |
 | C8 Security tests | DONE |
 
-**معيار انتهاء المرحلة:** يطبق Validation دائماً. يكون فحص ClamAV مفعّلاً افتراضياً؛ عند تفعيله يمر الملف عبر `document_quarantine` و`security-scan` ويطبق Fail-Closed قبل أي AI. يمكن تعطيله فقط بإعداد صريح، وعندها يخزن الملف مباشرة في `documents` بعد Validation من دون Quarantine أو Scan. تعطل ClamAV لا يحوّل المسار تلقائياً إلى bypass. عند تفعيل الفحص يعمل Scan/Signature Update متسلسلاً، وفي Local Demo يشترك مع `ai-local` في القفل العالمي.
+> كلمة `Temporary` في C3 تخص quarantine الأمني قبل اعتماد الملف في Private Storage، وليست temporary comparison artifact.
 
----
-
-# 7. المرحلة D — FastAPI Foundation and Capabilities
+## D — FastAPI Foundation
 
 | المهمة | الحالة |
 |---|---|
 | D1 FastAPI project | DONE |
 | D2 Typed config | DONE |
-| D3 Structured logging/correlation IDs | DONE |
+| D3 Logging / correlation IDs | DONE |
 | D4 Internal API security | DONE |
-| D5 Health endpoint | DONE |
-| D6 Versioned DTO schemas | DONE |
+| D5 Health | DONE |
+| D6 Versioned DTOs | DONE |
 | D7 Structured exceptions | DONE |
-| D8 Deployment capabilities endpoint | DONE |
-| D9 Startup configuration validation | DONE |
-| D10 Base/cloud/local dependency split | DONE |
-| D11 Local runtime/device resolver + startup probe + resource telemetry | DONE |
+| D8 Capabilities contract | DONE |
+| D9 Startup validation | DONE |
+| D10 Dependency split | DONE |
+| D11 Local runtime / device probe / telemetry | DONE |
 
-**معيار انتهاء المرحلة:** Laravel يرى صحة FastAPI وقدرات البيئة، وCloud image لا يحمل Local AI dependencies، وLocal runtime يعلن Backend/dtype المقاسين بلا Fallback صامت.
-
----
-
-# 8. المرحلة E — Qdrant
+## E — Qdrant
 
 | المهمة | الحالة |
 |---|---|
-| E1 Local Qdrant + persistent volume | DONE |
-| E2 `rag_documents_cloud` collection | DONE |
-| E3 `rag_documents_hybrid_local` collection | DONE |
-| E4 Dense/sparse configs | DONE |
+| E1 Qdrant + persistent volume | DONE |
+| E2 Cloud collection | DONE |
+| E3 Hybrid Local collection | DONE |
+| E4 Dense / sparse configs | DONE |
 | E5 Payload indexes | DONE |
-| E6 Point builder مع run metadata | DONE |
-| E7 Idempotent upsert/count/delete | DONE |
+| E6 Point builder + deterministic run metadata | DONE |
+| E7 Idempotent upsert / count / delete | DONE |
 | E8 Cross-user leakage tests | DONE |
+| E9 Direct document indexer + persisted-count verification | DONE |
+| E10 Profile-to-collection resolver + Cloud/Local sparse boundary support | DONE |
 
-**معيار انتهاء المرحلة:** Collections منفصلة ودائمة وآمنة وقابلة للإدخال والاسترجاع والحذف.
-
----
-
-# 9. المرحلة F — Parsing and Normalization
+## F — Parsing and Normalization
 
 | المهمة | الحالة |
 |---|---|
@@ -194,15 +230,13 @@ Open Blockers: لا يوجد
 | F3 PDF loader | DONE |
 | F4 DOCX loader | DONE |
 | F5 TXT loader | DONE |
-| F6 Normalized page/section schema | DONE |
-| F7 Reuse parsed result in Compare | DONE |
-| F8 Loader tests | DONE |
+| F6 Normalized document/page/section contract + normalization | DONE |
+| F7 Loader and normalization tests | DONE |
 
-**معيار انتهاء المرحلة:** الملفات الثلاثة تتحول إلى تمثيل موحد ويمكن مشاركة Parsing في Compare.
+المعمارية الحالية لا تحتوي helper خاصاً بإعادة استخدام نفس parse result بين Cloud وHybrid Local.  
+كل ProcessingRun تنفذ Profile واحدة، بينما LlamaParse والـnormalization يبقيان عقوداً مشتركة بين الـProfiles.
 
----
-
-# 10. المرحلة G — Profile Processing
+## G — Profile Processing
 
 | المهمة | الحالة |
 |---|---|
@@ -213,853 +247,461 @@ Open Blockers: لا يوجد
 | G5 Hybrid Local chunking | DONE |
 | G6 Local BGE-M3 embeddings | DONE |
 | G7 Local BM25 | DONE |
-| G8 Batching / Retries / Rate Limits | DONE |
-| G9 Metrics/report بلا vectors/cost | DONE |
-| G10 Profile isolation tests | DONE |
-| G11 Single-active-model coordinator + lazy load/release-after-stage | DONE |
-
-**معيار انتهاء المرحلة:** كل Profile ينتج Chunks وVectors وتقريراً صحيحاً دون خلط Providers، ولا يوجد أكثر من Model ثقيل واحد في الذاكرة؛ يحمل Lazy ويحرر بعد انتهاء Stage قبل تحميل التالي.
+| G8 Batching / retries / rate limits | DONE |
+| G9 Processing metrics / report builder | DONE |
+| G10 Profile parity / isolation tests | DONE |
+| G11 Single-active-model coordinator + release-after-stage | DONE |
 
 ---
 
-# 11. المرحلة H — Temporary Artifacts and Promotion
+# 6. خريطة التنفيذ المتبقية — الترقيم المعتمد الجديد
+
+## H — Processing Orchestration
 
 | المهمة | الحالة |
 |---|---|
-| H1 Private artifact store/opaque refs | DONE |
-| H2 Configurable 24h TTL | DONE |
-| H3 Temporary retrieval index | N/A |
-| H4 Winner promotion | TODO |
-| H5 Count verification | TODO |
-| H6 Loser cleanup | TODO |
-| H7 Scheduled expiration cleanup | TODO |
-| H8 Idempotency/failure recovery tests | TODO |
+| H1 AiServiceClient | TODO |
+| H2 Processing DTOs and contract alignment | TODO |
+| H3 FastAPI single-profile Process Document API / application orchestration | TODO |
+| H4 ProcessDocumentJob + queue dispatch | TODO |
+| H5 Processing metrics / report persistence | TODO |
+| H6 Active-run transaction after successful indexing | TODO |
+| H7 Safe reprocessing replacement | TODO |
+| H8 Aggregate status projector | TODO |
+| H9 Queue retries / timeouts / idempotency | TODO |
+| H10 Serialized `ai-local` queue + global heavy-resource lock | TODO |
 
-**معيار انتهاء المرحلة:** لا تدخل Qdrant الدائمة إلا نتيجة فائزة متحقق منها. H3 ملغاة لأن Compare لا ينفذ Retrieval قبل اختيار الفائز؛ H4 يستهلك artifact الفائز مباشرة.
+**معيار انتهاء المرحلة:**
 
----
+```text
+one file
+→ one trusted profile
+→ one ProcessingRun
+→ FastAPI processing
+→ persistent Qdrant indexing through E9/E10
+→ exact count verification
+→ Laravel persists report
+→ active_processing_run_id switches only after success
+→ document ready
+```
 
-# 12. المرحلة I — Laravel Processing Orchestration
-
-| المهمة | الحالة |
-|---|---|
-| I1 AiServiceClient | TODO |
-| I2 Processing DTOs | TODO |
-| I3 ProcessDocumentJob | TODO |
-| I4 Single-profile flow | TODO |
-| I5 Compare flow وإنشاء Runين | TODO |
-| I6 Report persistence | TODO |
-| I7 Trial-question flow | N/A |
-| I8 Winner selection transaction | TODO |
-| I9 Aggregate status projector | TODO |
-| I10 Queue retries/timeouts | TODO |
-| I11 Laravel serialized `ai-local` queue + global Redis lock shared with `security-scan` for full FastAPI call | TODO |
-
-**معيار انتهاء المرحلة:** Single أو Compare يكتملان بحالة متسقة بين Laravel وFastAPI وQdrant، وكل عمل Local AI ثقيل يمر عبر Queue واحدة ذات concurrency=1، ولا يبدأ قبل انتهاء Security scan وتحرير Process الفحص. لا يوجد pre-selection retrieval endpoint.
-
----
-
-# 13. المرحلة J — Blade Documents Experience
+## I — Blade Documents Experience
 
 | المهمة | الحالة |
 |---|---|
-| J1 Responsive authenticated app shell/sidebar | TODO |
-| J2 Workspace dashboard | TODO |
-| J3 Documents list/cards/filters | TODO |
-| J4 One-file upload + capability-aware options | TODO |
-| J5 Document details/timeline | TODO |
-| J6 Comparison screen | TODO |
-| J7 Trial-question interaction | N/A |
-| J8 Select-winner confirmation/states | TODO |
-| J9 Accessibility/responsive/error states | TODO |
+| I1 Responsive app shell / sidebar | TODO |
+| I2 Workspace dashboard | TODO |
+| I3 Documents list / cards / filters | TODO |
+| I4 One-file upload + capability-aware Cloud/Hybrid Local choice | TODO |
+| I5 Document details / processing timeline | TODO |
+| I6 Accessibility / responsive / error states | TODO |
 
-**معيار انتهاء المرحلة:** المستخدم يرفع ويتابع ويقارن عبر Processing Report + Chunk Samples ويعتمد النتيجة من واجهة RTL واضحة، بلا Trial Question.
+الواجهة تعرض فقط Processing Profiles المتاحة فعلياً من Capabilities.
 
----
-
-# 14. المرحلة K — Conversations Database
+## J — Conversations Database
 
 | المهمة | الحالة |
 |---|---|
-| K1 Conversations migration/model | TODO |
-| K2 conversation_document unique pivot | TODO |
-| K3 Messages + document-target snapshots/metrics | TODO |
-| K4 message_sources + run/profile | TODO |
-| K5 Policies | TODO |
-| K6 Create/list conversations | TODO |
-| K7 Multi-document selection | TODO |
-| K8 Ready/indexed/runtime-capable filtering | TODO |
+| J1 Conversations migration / model | TODO |
+| J2 conversation_document pivot | TODO |
+| J3 Messages + snapshots / metrics | TODO |
+| J4 message_sources + processing run / profile provenance | TODO |
+| J5 Conversation policies | TODO |
+| J6 Create / list conversations | TODO |
+| J7 Multi-document selection | TODO |
+| J8 Ready / indexed / runtime-capable document filtering | TODO |
 
-**معيار انتهاء المرحلة:** المحادثة تختار ملفاً أو عدة ملفات يملكها المستخدم ومفهرسة فعلياً، وتحفظ الرسائل وSnapshot الوثائق لأغراض Audit من دون جدول ذاكرة أو Extractor أو Stream lifecycle.
+كل Document جاهزة تشير إلى `active_processing_run_id`.
 
----
-
-# 15. المرحلة L — Retrieval and Reranking
+## K — Retrieval and Reranking
 
 | المهمة | الحالة |
 |---|---|
-| L1 Trusted document_targets contract | TODO |
-| L2 Cloud query embeddings/retrieval | TODO |
-| L3 Hybrid Local query embeddings/retrieval | TODO |
-| L4 Mandatory user/document/run filters | TODO |
-| L5 Per-profile Dense + BM25 + RRF | TODO |
-| L6 Cloud Jina reranker | TODO |
-| L7 Local BGE reranker | TODO |
-| L8 Cross-profile rank fusion | TODO |
-| L9 Metadata/source preservation | TODO |
-| L10 Retrieval quality/security tests | TODO |
+| K1 Trusted document_targets | TODO |
+| K2 Cloud query embedding / retrieval | TODO |
+| K3 Hybrid Local query embedding / retrieval | TODO |
+| K4 user / document / run filters | TODO |
+| K5 Per-profile Dense + BM25 + RRF | TODO |
+| K6 Cloud Jina reranker | TODO |
+| K7 Local BGE reranker | TODO |
+| K8 Cross-profile rank fusion | TODO |
+| K9 Metadata / source preservation | TODO |
+| K10 Retrieval quality / security tests | TODO |
 
-**معيار انتهاء المرحلة:** الاسترجاع يقتصر على الملفات المختارة ويدعم Profiles مختلطة دون مقارنة raw scores. هذه هي بداية Retrieval الحقيقي بعد اعتماد وفهرسة selected runs.
+Cross-profile هنا يعني دمج نتائج وثائق مفهرسة مسبقاً بProfiles مختلفة داخل المحادثة، وليس Upload comparison workflow.
 
----
-
-# 16. المرحلة M — Generation
+## L — Generation
 
 | المهمة | الحالة |
 |---|---|
-| M1 ContextService + آخر تبادلين مكتملين كسياق إحالة محدود | TODO |
-| M2 Prompt/insufficient-context | TODO |
-| M3 LLMProvider interface/registry keyed by trusted processing profile/capabilities | TODO |
-| M4 HF `Qwen/Qwen3.5-9B` | TODO |
-| M5 Ollama `qwen3.5:4b` | TODO |
-| M6 No-fallback/provider validation | TODO |
-| M7 Answer/sources/timings response | TODO |
-| M8 Provider contract tests | TODO |
-| M9 Ollama/FastAPI release-after-stage + `keep_alive=0` coordination | TODO |
-| M10 Local lifecycle/pressure recovery/concurrency/no-leak tests | TODO |
+| L1 ContextService + آخر تبادلين مكتملين | TODO |
+| L2 Prompt / insufficient-context behavior | TODO |
+| L3 LLMProvider registry by trusted profile / capability | TODO |
+| L4 Hugging Face Qwen3.5-9B | TODO |
+| L5 Ollama qwen3.5:4b | TODO |
+| L6 No-fallback / provider validation | TODO |
+| L7 Answer / sources / timings contract | TODO |
+| L8 Provider tests | TODO |
+| L9 Ollama release / `keep_alive=0` | TODO |
+| L10 Local lifecycle / pressure / no-leak tests | TODO |
 
-**معيار انتهاء المرحلة:** التوليد يعمل بالعقد نفسه في Cloud وLocal دون تحميل Local LLM في Online، ويحرر Qwen بعد Generation عبر `keep_alive=0` بلا Fallback صامت. يسمح بآخر تبادلين مكتملين لفهم الإحالات فقط، وتبقى Chunks المسترجعة مصدر الحقائق، ولا يوجد Streaming backend.
-
----
-
-# 17. المرحلة N — Chat Experience
+## M — Chat Experience
 
 | المهمة | الحالة |
 |---|---|
-| N1 Chat layout/list | TODO |
-| N2 Top document multi-selector | TODO |
-| N3 Selected chips/authorization | TODO |
-| N4 AskConversationJob | TODO |
-| N5 Save document-target snapshots/answer/metrics | TODO |
-| N6 Sources drawer/relevance score | TODO |
-| N7 Timings display | TODO |
-| N8 Pending/failure/retry + `جاري التفكير` نابضة + completed-answer reveal | TODO |
-| N9 Mixed-profile/context-limit/progressive-reveal accessibility E2E | TODO |
+| M1 Chat layout / list | TODO |
+| M2 Top document selector | TODO |
+| M3 Selected chips / authorization | TODO |
+| M4 AskConversationJob | TODO |
+| M5 Save snapshots / answer / metrics | TODO |
+| M6 Sources drawer / relevance score | TODO |
+| M7 Timings | TODO |
+| M8 Pending / failure / retry + visual completed-answer reveal | TODO |
+| M9 Mixed-profile / context / accessibility E2E | TODO |
 
-**معيار انتهاء المرحلة:** المستخدم يحادث وثيقة أو عدة وثائق ويشاهد المصادر والأزمنة ودرجة صلة كل مصدر. أثناء الانتظار تظهر `جاري التفكير` بنبض هادئ، وبعد حفظ الإجابة المكتملة يكشفها Frontend تدريجياً كتأثير بصري فقط، مع reduced-motion وإظهار كامل ومن دون NDJSON أو Redis relay أو Replay.
+v1 يستخدم polling + visual completed-answer reveal، بدون Streaming backend.
 
----
-
-# 18. المرحلة O — Filament
+## N — Filament
 
 | المهمة | الحالة |
 |---|---|
-| O1 Core Resources | TODO |
-| O2 ProcessingRuns/Comparisons Resources | TODO |
-| O3 Dashboard widgets | TODO |
-| O4 Failed/infected/expired filters | TODO |
-| O5 Safe retry actions | TODO |
-| O6 FastAPI admin chunks endpoint/client | TODO |
-| O7 Read-only paginated Qdrant Chunks | TODO |
-| O8 Admin audit logging | TODO |
-| O9 Authorization/no-vectors tests | TODO |
+| N1 Core resources | TODO |
+| N2 ProcessingRuns resource | TODO |
+| N3 Dashboard widgets | TODO |
+| N4 Failed / infected filters | TODO |
+| N5 Safe retry actions | TODO |
+| N6 FastAPI admin chunks endpoint / client | TODO |
+| N7 Read-only Qdrant Chunks | TODO |
+| N8 Admin audit logging | TODO |
+| N9 Authorization / no-vectors tests | TODO |
 
-**معيار انتهاء المرحلة:** المشرف يراقب النظام ويشاهد Chunks بأمان دون وصول Laravel مباشر إلى Qdrant.
-
----
-
-# 19. المرحلة P — Security and Operations
+## O — Security and Operations
 
 | المهمة | الحالة |
 |---|---|
-| P1 Ownership/IDOR | TODO |
-| P2 Qdrant leakage by user/document/run | TODO |
-| P3 MIME/size/malware | TODO |
-| P4 FastAPI authentication | TODO |
-| P5 Private download/chunk authorization | TODO |
-| P6 Artifact TTL/permissions | TODO |
-| P7 Secret/log redaction | TODO |
-| P8 Deletion/reprocessing consistency | TODO |
+| O1 Ownership / IDOR | TODO |
+| O2 Qdrant leakage: user / document / run | TODO |
+| O3 MIME / size / malware | TODO |
+| O4 FastAPI authentication | TODO |
+| O5 Private download / chunk authorization | TODO |
+| O6 Secret / log redaction | TODO |
+| O7 Deletion / reprocessing consistency | TODO |
 
-**معيار انتهاء المرحلة:** لا تسرب بين المستخدمين أو الوثائق أو Runs، ولا تبقى artifacts أو Points يتيمة.
-
----
-
-# 20. المرحلة Q — Final Validation
+## P — Final Validation
 
 | المهمة | الحالة |
 |---|---|
-| Q1 PDF/DOCX/TXT E2E | TODO |
-| Q2 Cloud profile E2E | TODO |
-| Q3 Hybrid Local profile E2E | TODO |
-| Q4 Compare/select E2E | TODO |
-| Q5 Multi-document/mixed-profile chat E2E | TODO |
-| Q6 Queue/restart/Qdrant persistence | TODO |
-| Q7 RAG quality/source correctness | TODO |
-| Q8 Security-scan/AI stage memory-performance-quality calibration على الجهازين | TODO |
-| Q9 Cloud-only lightweight image verification | TODO |
-| Q10 Local Ollama backend/loaded-model/`keep_alive=0` verification | TODO |
-| Q11 Backup/restore | TODO |
-| Q12 Final documentation including non-streaming visual reveal disclosure | TODO |
+| P1 PDF / DOCX / TXT E2E | TODO |
+| P2 Cloud profile E2E | TODO |
+| P3 Hybrid Local profile E2E | TODO |
+| P4 Multi-document / mixed-profile chat E2E | TODO |
+| P5 Queue / restart / Qdrant persistence | TODO |
+| P6 RAG quality / source correctness | TODO |
+| P7 Security-scan + AI memory / performance / quality calibration | TODO |
+| P8 Cloud-only lightweight image verification | TODO |
+| P9 Local Ollama backend / load / release verification | TODO |
+| P10 Backup / restore | TODO |
+| P11 Final documentation | TODO |
 
-**معيار انتهاء المرحلة:** المساران والمقارنة والمحادثة متعددة الملفات يعملون End-to-End بأمان وبعد Restart؛ ClamAV وBGE/Reranker/Qwen لا يتداخلون في RAM، والسياق لا يتجاوز آخر تبادلين مكتملين، والعرض التدريجي Frontend-only بعد اكتمال الإجابة. Compare/select لا يتطلب Trial Question.
+**معيار انتهاء المرحلة:**
+
+Cloud وHybrid Local يعملان كلٌ كمسار مستقل End-to-End، والمحادثة المختلطة تعمل بأمان، وتطابق المصادر والـownership والـQdrant isolation متحقق.
 
 ---
 
-# 21. Deployment — DPL
+# 7. Deployment — DPL
 
 | المهمة | الحالة |
 |---|---|
 | DPL-1 Oracle Account | TODO |
-| DPL-2 إنشاء Oracle ARM64 VM بموارد 2 OCPU/12 GB والتحقق من Free eligibility | TODO |
-| DPL-3 إعداد الشبكة وفتح 22/80/443 فقط | TODO |
-| DPL-4 تحديث Ubuntu وSSH hardening | TODO |
-| DPL-5 تثبيت Docker/Buildx/Compose والتحقق من ARM64 images | TODO |
-| DPL-6 Clone المشروع | TODO |
-| DPL-7 إعداد Cloud-only `.env` وSecrets permissions | TODO |
-| DPL-8 إنشاء Volumes واختبار permissions/free disk | TODO |
-| DPL-9 تشغيل MySQL/Redis/Qdrant وتحديث تواقيع ClamAV one-shot مع Health readiness | TODO |
-| DPL-10 تشغيل FastAPI Cloud-only image وHealth/Capabilities | TODO |
-| DPL-11 تشغيل Laravel PHP-FPM والمigrations/cache | TODO |
-| DPL-12 تشغيل Queue Worker وSecurity Scan Worker مع scheduled signature-update job على Queue نفسها | TODO |
-| DPL-13 تشغيل Nginx مع upload/timeouts/forwarded headers/log rotation | TODO |
-| DPL-14 HTTPS وتجديد تلقائي وHTTP→HTTPS | TODO |
-| DPL-15 اختبار PDF مع Clean/infected/fail-closed scan | TODO |
-| DPL-16 اختبار DOCX مع حدود ZIP bomb | TODO |
-| DPL-17 اختبار TXT والمسار الكامل | TODO |
-| DPL-18 Cloud-only capability/UI/API test | TODO |
-| DPL-19 التحقق أن Online image بلا Torch/Transformers/Ollama/models | TODO |
-| DPL-20 HF `Qwen/Qwen3.5-9B` provider smoke/error/budget test | TODO |
-| DPL-21 Security/ownership/private ports/profile rejection test | TODO |
-| DPL-22 Encrypted off-VM backup + isolated restore test | TODO |
-| DPL-23 Restart/persistence/readiness/startup-race test | TODO |
-| DPL-24 Mac/ASUS Local topology: Docker infrastructure + on-demand scan worker + global heavy-resource lock + Host-native FastAPI/Ollama | TODO |
-| DPL-25 Compare flow المتسلسل على الجهاز المحلي فقط | TODO |
-
-**قاعدة النشر:** النسخة Online تستخدم `RAG_DEPLOYMENT_MODE=cloud` ولا تشغّل أو تنزّل أي Local embedding/reranker/LLM. في Local demo تبقى البنية الأساسية داخل Docker وتعمل FastAPI/Ollama على Host؛ ينفذ ClamAV عند الطلب كـProcess قصيرة العمر، ويعمل Local AI بModel واحد وconcurrency=1. MySQL مصدر الحقيقة للرسائل، ولا يوجد Redis Stream أو NDJSON أو Chat streaming؛ `جاري التفكير` وProgressive reveal تأثيران بصريان بعد اكتمال الإجابة وفق 174.20.
+| DPL-2 Oracle ARM64 VM / eligibility verification | TODO |
+| DPL-3 Network 22 / 80 / 443 | TODO |
+| DPL-4 Ubuntu / SSH hardening | TODO |
+| DPL-5 Docker / Buildx / Compose ARM64 | TODO |
+| DPL-6 Clone | TODO |
+| DPL-7 Cloud-only env / secrets | TODO |
+| DPL-8 Volumes / permissions / free disk | TODO |
+| DPL-9 MySQL / Redis / Qdrant / signatures readiness | TODO |
+| DPL-10 FastAPI Cloud-only image / health / capabilities | TODO |
+| DPL-11 Laravel PHP-FPM / migrations / cache | TODO |
+| DPL-12 Queue + Security Scan workers | TODO |
+| DPL-13 Nginx | TODO |
+| DPL-14 HTTPS | TODO |
+| DPL-15 PDF clean / infected / fail-closed E2E | TODO |
+| DPL-16 DOCX / ZIP limits E2E | TODO |
+| DPL-17 TXT E2E | TODO |
+| DPL-18 Cloud-only capability / UI / API | TODO |
+| DPL-19 No Local AI packages / weights online | TODO |
+| DPL-20 HF Qwen smoke / error / budget | TODO |
+| DPL-21 Security / ownership / private ports / profile rejection | TODO |
+| DPL-22 Encrypted off-VM backup / restore | TODO |
+| DPL-23 Restart / persistence / readiness | TODO |
+| DPL-24 Mac / ASUS Local topology verification | TODO |
+| DPL-25 Hybrid Local end-to-end processing / chat verification | TODO |
 
 ---
 
-# 22. الحالة التنفيذية الحالية
+# 8. الـSchema الفعلي بعد ARC-1
 
-هذا القسم لا يكرر الـMaster Plan؛ يحتفظ فقط بالمعلومات التنفيذية التي تحتاجها المهام القريبة.
+## 8.1 documents
 
-## 22.1 Schema / Domain Snapshot
-
-تم التحقق من الـSchema على MySQL 8.4.11 بعد B12.
-
-### `documents`
-
-- يمثل ملكية الوثيقة وبيانات الملف والحالة التجميعية.
-- `user_id` مرتبط بـ`users.id` مع `ON DELETE RESTRICT`.
-- `sha256` هو `NOT NULL`.
-- منع duplicate يتم على مستوى التطبيق ضمن `(user_id, sha256)` ولا يوجد Unique constraint.
-- `selected_processing_run_id` nullable ويرتبط بـ`document_processing_runs.id` مع `ON DELETE RESTRICT`.
-- الـForeign Key وحده لا يضمن أن الـselected Run تعود لنفس الوثيقة أو أن حالتها `indexed`؛ هذه Invariants تبقى مسؤولية Domain/Orchestration logic.
-
-### `document_processing_runs`
-
-- يمثل كل Processing Run بصورة مستقلة عن `documents`.
-- يحتوي Profile/Status/Snapshot والعدادات والتوقيتات والتحذيرات والأخطاء وTemporary Artifact/Qdrant metadata.
-- `total_chunks` و`vector_count` يبدأان من `0`.
-- `total_pages` و`vector_dimension` nullable.
-
-### `document_processing_comparisons`
-
-- منفذ وفق القسم `174.7.4`.
-- يربط الوثيقة والمستخدم وCloud/Hybrid Runs والـselected Run الاختياري.
-- جميع Foreign Keys تستخدم `ON DELETE RESTRICT`.
-- الحالات: `processing`, `ready`, `decided`, `expired`, `failed`.
-- تطابق جميع الـRuns مع نفس الوثيقة والمستخدم يبقى مسؤولية Domain/Orchestration logic.
-- العمود `trial_question` موجود فعلياً من B12 كـnullable legacy field، لكنه غير مستخدم بعد قرار التبسيط ولا تنشأ له API أو UI أو Task؛ لا نضيف Migration جديدة فقط لحذفه.
-
-## 22.2 Document Components المنفذة
-
-Routes الحالية:
+الـbaseline الحالي:
 
 ```text
-index
-show
-store
-download
+id
+user_id
+active_processing_run_id nullable
+original_name
+stored_name
+title nullable
+file_path
+file_type
+mime_type
+file_size
+sha256 char(64) NOT NULL
+status default pending
+created_at
+updated_at
 ```
-المكونات المهمة للمسار الحالي:
+
+`active_processing_run_id` هو pointer للـProcessingRun الحالية التي تم فهرستها بنجاح.
+
+في baseline التطوير الحالي لا يوجد FK مباشر من `documents.active_processing_run_id` إلى `document_processing_runs.id` بسبب اعتماد ترتيب إنشاء الجدولين.  
+Domain/orchestration يجب أن يفرض:
+
+- الـRun تخص نفس Document.
+- حالة الـRun = `indexed`.
+- التحويل للـRun الجديدة لا يتم قبل نجاح الفهرسة والتحقق.
+
+## 8.2 document_processing_runs
+
+الـbaseline الحالي:
 
 ```text
-UploadDocumentRequest
-SecureDocumentUpload
-DocumentStorageService
-DocumentUploadService
-ScanDocumentSecurityJob
-DocumentSecurityService
-DocumentSecurityScanStatus
-LocalHeavyResourceLock
+id
+document_id
+profile
+status
+profile_snapshot
+total_pages nullable
+total_chunks default 0
+vector_count default 0
+vector_dimension nullable
+stage_timings_ms
+warnings nullable
+error_code nullable
+failure_reason nullable
+qdrant_collection nullable
+indexed_at nullable
+created_at
+updated_at
 ```
 
-## 22.3 مسار الرفع المثبت بعد C8
+لا توجد حقول خاصة بالمقارنة أو الـtemporary artifacts.
+
+## 8.3 DocumentStatus
+
+```text
+pending
+scanning
+infected
+queued
+processing
+indexing
+ready
+failed
+```
+
+## 8.4 ProcessingRunStatus
+
+```text
+pending
+processing
+indexing
+indexed
+failed
+```
+
+## 8.5 ProcessingProfile
+
+```text
+cloud
+hybrid_local
+```
+
+---
+
+# 9. FastAPI baseline بعد ARC-1
+
+## 9.1 ProcessDocumentResponse
+
+العقد الحالي:
+
+```text
+document_id
+processing_run_id
+profile
+status
+total_pages
+total_chunks
+vector_count
+vector_dimension
+```
+
+لا يوجد artifact reference في response.
+
+## 9.2 Capabilities
+
+Capabilities تصف:
+
+- deployment mode.
+- supported profiles.
+- available profiles.
+- provider capabilities.
+- local runtime عند الحاجة.
+
+لا يوجد Compare capability.
+
+## 9.3 Direct Qdrant indexing foundation
+
+الموجود حالياً:
+
+```text
+PointPayload
+build_point_id()
+build_point()
+PointScope
+upsert_points()
+count_points()
+delete_points()
+QdrantDocumentIndexer
+resolve_qdrant_collection()
+```
+
+Sparse boundary:
+
+```text
+cloud
+→ qdrant_client.models.Document
+
+hybrid_local
+→ qdrant_client.models.SparseVector
+```
+
+الـindexer:
+
+1. يتحقق من توافق counts قبل الكتابة.
+2. يبني deterministic points.
+3. ينفذ persistent upsert.
+4. يعد النقاط exact ضمن user/document/run scope.
+5. يفشل إذا persisted count لا يطابق عدد chunks.
+
+لا يوجد production Process Document endpoint/orchestrator بعد؛ سيبنى ضمن H3.
+
+---
+
+# 10. Baseline التنفيذي المعتمد
 
 ```text
 Upload
-  ↓
-Validation
-  ↓
-DocumentController
-  ↓
-DocumentUploadService
-  ├── Security Scan enabled/default
-  │     ↓
-  │   DocumentStorageService::storeQuarantined()
-  │     ↓
-  │   DocumentStatus::Pending
-  │     ↓
-  │   dispatch ScanDocumentSecurityJob
-  │     ↓
-  │   security-scan queue
-  │     ↓
-  │   Job starts → DocumentStatus::Scanning
-  │     ↓
-  │   DocumentSecurityService::scan()
-  │     ├── clean
-  │     │     ↓
-  │     │   DocumentUploadService::promoteAfterCleanScan()
-  │     │     ↓
-  │     │   DocumentStorageService::promoteQuarantined()
-  │     │     ↓
-  │     │   Permanent Private Storage (`documents`)
-  │     │     ↓
-  │     │   DocumentStatus::Pending
-  │     │
-  │     ├── infected
-  │     │     ↓
-  │     │   DocumentUploadService::rejectAfterUnsafeScan()
-  │     │     ↓
-  │     │   DocumentStatus::Infected + quarantine retained
-  │     │
-  │     └── scan_failed
-  │           ↓
-  │         DocumentUploadService::rejectAfterUnsafeScan()
-  │           ↓
-  │         DocumentStatus::Failed + quarantine retained
-  │
-  │   unexpected exception after scan starts
-  │     ↓
-  │   DocumentStatus::Failed + exception rethrown
-  │
-  └── Security Scan disabled explicitly
-        ↓
-      DocumentStorageService::storePermanent()
-        ↓
-      Permanent Private Storage (`documents`)
-        ↓
-      DocumentStatus::Pending
+→ Validation
+→ Security Gate
+→ Permanent Private Storage
+→ user chooses one trusted profile
+→ one ProcessingRun
+→ LlamaParse
+→ normalization
+→ chunking
+→ profile-specific dense representation
+→ profile-specific sparse representation
+→ direct persistent Qdrant indexing
+→ exact count verification
+→ run indexed
+→ active_processing_run_id
+→ document ready
 ```
 
-الحالة المعتمدة والمثبتة بعد C8:
-
-- `DOCUMENT_SECURITY_SCAN_ENABLED=true` هو الوضع الافتراضي.
-- اختيار مسار التخزين بقي مركزياً داخل `DocumentUploadService`.
-- عند التفعيل/الوضع الافتراضي يخزن الملف أولاً في `document_quarantine` بحالة `pending`، ثم يرسل `ScanDocumentSecurityJob` إلى Queue `security-scan`.
-- لا تتحول الوثيقة إلى `scanning` عند مجرد التخزين أو الانتظار في Queue؛ تتحول عند بدء تنفيذ Job فعلياً.
-- `clean` وحدها تسمح بالـpromotion إلى `documents`، وبعد نجاح الـpromotion تعود الوثيقة إلى `pending` لأن Processing Job لم يُرسل بعد.
-- `infected` يبقى Fail-Closed ويحوّل نفس `Document` إلى `DocumentStatus::Infected` مع إبقاء الملف في quarantine.
-- `scan_failed` يبقى Fail-Closed ويحوّل نفس `Document` إلى `DocumentStatus::Failed` مع إبقاء الملف في quarantine.
-- أي Exception غير متوقع بعد دخول Job إلى `scanning` يحوّل الوثيقة إلى `failed` ثم يعاد رمي الاستثناء حتى تبقى Queue على علم بالفشل.
-- لا يوجد fallback تلقائي من `infected` أو `scan_failed` أو Exception إلى التخزين الدائم.
-- عند التعطيل الصريح فقط (`false`) يخزن الملف مباشرة في `documents` بعد Validation ولا يرسل `ScanDocumentSecurityJob`؛ تبقى الحالة `pending`.
-- `queued` محجوز لوقت dispatch الفعلي لـProcessing Job المستقبلي (`I3 — ProcessDocumentJob`) ولا يستخدم لمجرد أن الملف أصبح آمناً أو مخزناً دائماً.
-- `DocumentStorageService` بقي مسؤولاً عن Storage/SHA-256/Duplicate/Cleanup primitives فقط ولا يقرر Security policy أو Aggregate status workflow.
-- لا يصل Upload إلى FastAPI أو Qdrant أو AI Pipeline ضمن مرحلة C.
-
-## 22.4 Security Runtime المنفذ
-
-- ClamAV يعمل عبر `clamscan` كـProcess قصيرة العمر؛ لا يوجد `clamd` دائم.
-- Queue الأمنية `security-scan` تعمل بتزامن `1`.
-- تواقيع ClamAV محفوظة بشكل دائم ويتم تحديثها مجدولاً.
-- `DocumentSecurityService` يعيد:
-  - `clean`
-  - `infected`
-  - `scan_failed`
-- أي Failure/Timeout/Exception يطبق Fail-closed ولا يتحول إلى `clean`.
-- `LocalHeavyResourceLock` موجود ويعاد استخدامه للأعمال الثقيلة المحلية؛ لا ينشأ Lock موازٍ.
-
----
-
-## 22.5 Configurable security-scan routing المنفذ في C6
-
-تم تنفيذ قرار C6 وفق العقد المعماري المعتمد:
+Oracle:
 
 ```text
-DOCUMENT_SECURITY_SCAN_ENABLED=true   # default
-
-Enabled/default:
-Validation
-  → storeQuarantined()
-  → Security Scan
-  → clean → promoteQuarantined() → documents
-  → infected / scan_failed → Fail-Closed
-
-Disabled explicitly:
-Validation
-  → storePermanent()
-  → documents
+cloud only
 ```
 
-تفاصيل التنفيذ المهمة للمهام اللاحقة:
-
-- أضيف الإعداد `security.document_security_scan.enabled` بقيمة افتراضية `true`.
-- أضيف `DOCUMENT_SECURITY_SCAN_ENABLED=true` إلى `.env.example`.
-- `DocumentUploadService` هو المسؤول الوحيد عن اختيار مسار التخزين.
-- direct permanent storage يعمل فقط عندما تكون قيمة الإعداد `false` صراحةً؛ أي قيمة أخرى تبقي المسار الآمن عبر quarantine.
-- أعيدت تسمية `DocumentStorageService::store()` إلى `storePermanent()` بعد التحقق من عدم وجود callers مباشرين للاسم القديم.
-- `DocumentStorageService` لم يكتسب أي Security policy logic.
-- مسارا C4/C5 بقيا دون تغيير وظيفي: Clean promotion محفوظ و`infected`/`scan_failed` يبقيان Fail-Closed.
-- التحقق المركز في C6 نجح: `6 tests / 25 assertions`، وPint على الملفات المعدلة و`git diff --check` ناجحان.
-- العقود النهائية لـdefault/fail-closed/no-auto-bypass أصبحت مثبتة ضمن C8.
-
-## 22.6 Aggregate status transitions المنفذة في C7
-
-تم تنفيذ C7 من دون إدخال State Machine عامة أو توسيع نطاق Processing:
+Local Demo:
 
 ```text
-Security enabled/default:
-pending
-  → dispatch security job
-  → scanning عند بدء Job فعلياً
-  → clean      → promotion → pending
-  → infected   → infected
-  → scan_failed / unexpected failure → failed
-
-Security disabled explicitly:
-pending
-  → permanent storage
-  → pending
+cloud | hybrid_local
 ```
 
-تفاصيل التنفيذ:
-
-- أضيف `ScanDocumentSecurityJob` كطبقة orchestration للفحص الأمني، ويعمل على Queue المعرفة في `security.clamav.queue` مع default `security-scan`.
-- `DocumentUploadService` يرسل الـJob فقط للمسار enabled/default بعد نجاح التخزين في quarantine.
-- الـJob يثبت `scanning` عند بداية التنفيذ قبل استدعاء `DocumentSecurityService`.
-- Clean path يعيد استخدام C4 كما هو، وUnsafe path يعيد استخدام C5 كما هو.
-- بعد clean promotion تعود الحالة إلى `pending` انتظاراً لـProcessing dispatch الفعلي لاحقاً.
-- المسار disabled لا يرسل Security Job ويبقى `pending` بعد التخزين الدائم.
-- تم عزل اختبارات C4/C5 عن Queue الفعلية باستخدام `Queue::fake()` بعد أن أصبح `DocumentUploadService::store()` يرسل Job عند تفعيل الفحص.
-- أضيف اختبار مركز يثبت `pending → scanning → clean → pending` مع انتقال الملف من quarantine إلى permanent storage.
-- التحقق النهائي في C7 نجح: `7 tests / 33 assertions`، و`git diff --check` ناجح.
-- Security matrix الأشمل أغلقت في C8 من دون تغيير production semantics.
-
-## 22.7 Security tests المنفذة في C8
-
-أغلقت C8 بأقل توسع اختباري ممكن، مع إعادة استخدام اختبارات C3–C7 وعدم إنشاء Matrix مكررة:
-
-- عُدل اختبار explicit bypass الموجود ليثبت أن `DOCUMENT_SECURITY_SCAN_ENABLED=false`:
-  - لا يرسل `ScanDocumentSecurityJob`.
-  - لا يستخدم quarantine.
-  - يخزن مباشرة في permanent storage.
-  - يبقي `DocumentStatus::Pending`.
-- أضيف اختبار Job مركّز لـ`scan_failed` يثبت:
-  - الحالة النهائية `failed`.
-  - بقاء الملف في `document_quarantine`.
-  - غياب الملف عن `documents`.
-  - عدم وجود automatic fallback إلى permanent storage.
-- بقيت عقود clean وinfected والتفعيل الافتراضي مغطاة بالاختبارات القائمة، لذلك لم تُكرر.
-- لم يتغير أي production code في C8.
-- مجموعة Security المركزة نجحت بعد Pint: `8 tests / 39 assertions`.
-- Pint على الملفين المعدلين نجح، و`git diff --check` نجح.
-
-## 22.8 FastAPI Typed Configuration المنفذة في D2
-
-تم تنفيذ D2 كطبقة إعدادات مركزية صغيرة ومنفصلة دون إدخال مسؤوليات D3 وما بعدها:
-
-- أضيف `app/core/config.py` مع `Settings` مبنية على `pydantic-settings`.
-- أضيف `DeploymentMode` كـ`StrEnum` بقيمتي `cloud` و`local`.
-- أضيف دعم القراءة من Environment Variables وملف `.env` مع تجاهل المفاتيح الإضافية غير المعروفة في هذه المرحلة.
-- `app_name` و`app_version` أصبحا مصدرهما `Settings` بدلاً من hardcoding داخل `app/main.py`.
-- أضيف `get_settings()` مع `lru_cache` لتوفير instance مركزية للإعدادات.
-- أضيف الاعتماد `pydantic-settings==2.12.0` إلى `pyproject.toml`.
-- لم تدخل Structured Logging أو Correlation IDs أو Internal API Security أو Health أو AI/Qdrant/Parsing/Providers ضمن D2.
-- التحقق من القيمة الافتراضية أعاد `RAG_DEPLOYMENT_MODE=local` بنجاح.
-- override عبر `RAG_DEPLOYMENT_MODE=cloud` نجح.
-- القيمة غير الصالحة `banana` رُفضت بـPydantic `ValidationError` مع exit code `1`.
-- FastAPI app import أعاد `RAG AI Service 0.1.0` بنجاح.
-- `pip check` أعاد `No broken requirements found.` و`git diff --check` نجح.
-- D2 تم التحقق منها باستخدام Python `3.12.13` داخل `fastapi-app/.venv`؛ بعد إعداد بيئة D3 أصبحت `.venv` الحالية Python `3.12.14`. يبقى القيد المعتمد للمشروع `>=3.12,<3.13`، ولا يستخدم Python العام من Miniconda `3.13.13`.
-
-## 22.9 Structured Logging/Correlation IDs المنفذة في D3
-
-تم تنفيذ D3 كطبقة Logging مركزية ومستقلة، دون إدخال Security أو Health أو DTOs أو AI:
-
-- أضيف `app/core/logging.py` ويحتوي:
-  - `ContextVar` لحفظ `correlation_id` ضمن سياق الطلب بصورة async-safe.
-  - دوال `get_correlation_id()` و`set_correlation_id()` و`reset_correlation_id()`.
-  - `JsonFormatter` لإخراج Application logs بصيغة JSON.
-  - `configure_logging()` لتجهيز Root logger بصورة مركزية.
-- الحقول الأساسية في Structured JSON log هي:
-  - `timestamp`
-  - `level`
-  - `logger`
-  - `message`
-  - `correlation_id`
-  - `exception` عند وجود Exception info.
-- أضيف `app/middleware/correlation_id.py` كـPure ASGI middleware:
-  - يطبق فقط على HTTP requests.
-  - يعيد استخدام `X-Correlation-ID` القادم إذا كان ASCII صالحاً وغير فارغ وطوله لا يتجاوز 128 حرفاً.
-  - يولد UUID4 جديداً عند غياب المعرّف أو عدم صلاحيته.
-  - يضع نفس المعرّف في ContextVar أثناء تنفيذ الطلب.
-  - يضيف نفس `x-correlation-id` إلى response headers.
-  - يعيد ContextVar إلى حالته السابقة داخل `finally`.
-- أضيف logger باسم `app.request` ويسجل `Request completed` بينما correlation context ما زال فعالاً.
-- تم ربط `configure_logging()` و`CorrelationIdMiddleware` داخل `create_app()` في `app/main.py`.
-- Uvicorn startup/access logs بقيت ضمن logging الخاص بـUvicorn؛ Structured JSON المضاف في D3 يخص Application logs ولم يتم توسيع المهمة لإعادة تصميم Uvicorn logging.
-- تم التحقق Runtime عبر `/docs` دون إنشاء Health endpoint قبل D5:
-  - correlation ID المرسل من العميل ظهر نفسه في response header وStructured JSON log.
-  - عند غياب header تم توليد UUID وظهر نفسه في response header وStructured JSON log.
-- `pip check` و`compileall` و`git diff --check` نجحت.
-- بيئة التحقق الحالية لـFastAPI هي `fastapi-app/.venv` مع Python `3.12.14`.
-- لم تدخل Internal API Security أو Health أو DTOs أو Structured Exceptions الكامل أو AI/Qdrant/Parsing/Providers ضمن D3.
-
-## 22.10 Internal API Security المنفذة في D4
-
-تم تنفيذ D4 كطبقة مصادقة داخلية مركزية وصغيرة تحمي FastAPI من الوصول المباشر، مع الحفاظ على D3 وعدم إدخال مسؤوليات D5 وما بعدها:
-
-- أضيف `internal_api_key` إلى `Settings` كـ`SecretStr | None` ويقرأ من Environment Variable باسم `INTERNAL_API_KEY` دون hardcoding للقيمة.
-- كانت القيمة `None` مسموحة ضمن D4 لأن Startup Configuration Validation كان مؤجلاً إلى D9؛ بعد D9 أصبح Startup يرفض `INTERNAL_API_KEY` المفقود أو الفارغ قبل استقبال الطلبات.
-- أضيف `app/middleware/internal_api_auth.py` كـPure ASGI middleware مركزي:
-  - يطبق فقط على HTTP requests.
-  - يقرأ `X-Internal-API-Key` من request headers.
-  - missing/empty key يرفض بـ`401 Unauthorized`.
-  - invalid key يرفض بـ`401 Unauthorized`.
-  - valid key يسمح للطلب بالمرور إلى FastAPI.
-  - يقارن المفتاح باستخدام `secrets.compare_digest` على bytes بدلاً من مقارنة عادية للقيم السرية.
-  - لا يسجل قيمة المفتاح ولا يعيدها في response body.
-- رُبط `InternalApiAuthMiddleware` داخل `create_app()`، ثم بقي `CorrelationIdMiddleware` هو الغلاف الخارجي للطلبات، لذلك الطلبات المرفوضة أمنياً تستمر بالحصول على Correlation ID وتبقى Structured Application Logging من D3 فعالة.
-- لم يُضف أي استثناء عام لمسارات HTTP؛ FastAPI بقيت Internal API وليست Browser-facing API.
-- أضيف أقل اختبار مطلوب فقط في `tests/test_internal_api_security.py`:
-  - missing key → `401`.
-  - invalid key → `401`.
-  - valid key → يصل إلى FastAPI؛ استخدم `/` وأثبت الوصول عبر `404` الطبيعي لعدم وجود endpoint في هذه المرحلة، من دون إنشاء Health endpoint قبل D5.
-- أضيفت test dependencies كـoptional dependencies فقط في `pyproject.toml`: `pytest==9.1.1` و`httpx2==2.12.0`، ولم تضاف إلى Runtime dependencies.
-- التحقق النهائي تم داخل `fastapi-app/.venv` باستخدام Python `3.12.14`: `compileall` نجح، واختبارات D4 الثلاثة أعادت `3 passed`، و`pip check` أعاد `No broken requirements found.`، و`git diff --cached --check` نجح.
-- لم تدخل Health endpoint أو Versioned DTO schemas أو Structured Exceptions framework الكامل أو Deployment capabilities أو AI/Qdrant/Parsing/Providers أو أي تعديل Laravel ضمن D4.
-
-## 22.11 Deployment Capabilities المنفذة في D8
-
-تم تنفيذ D8 كعقد Capabilities داخلي صغير ومفصول عن الـRoute والإعدادات، من دون إدخال Startup validation أو provider probes أو AI/Qdrant:
-
-- أضيف `GET /api/v1/capabilities` ويخضع تلقائياً لـInternal API Security وCorrelation ID الموجودين مسبقاً.
-- أضيف `DeploymentCapabilitiesResponse` ويعرض:
-  - `deployment_mode`
-  - `supported_profiles`
-  - `available_profiles`
-  - `compare_available`
-  - `providers`
-- `supported_profiles` تعني ما تسمح به بيئة النشر معمارياً، أما `available_profiles` فتعني ما ثبتت جاهزيته فعلياً؛ لا يتم الخلط بين المفهومين.
-- في `cloud` تكون الـProfiles المدعومة `cloud` فقط.
-- في `local` تكون الـProfiles المدعومة `cloud` و`hybrid_local`.
-- `compare` بقي Orchestration مشتقة وليس Processing Profile ثالثة؛ لذلك يمثلها الحقل `compare_available` فقط.
-- LlamaParse ممثل كـProvider مشترك للمسارين لأن Parsing في Cloud وHybrid Local يعتمد LlamaParse Cloud وفق الخطة الحالية.
-- Cloud-specific providers الحالية: Jina embeddings + Jina reranker + Hugging Face LLM.
-- Hybrid-local-specific providers الحالية: BGE-M3 embeddings + BGE reranker + Ollama LLM.
-- حالات Provider المعرفة في العقد: `available`, `unavailable`, `not_checked`.
-- ضمن D8 لا توجد فحوص جاهزية فعلية، لذلك تبقى جميع Providers بحالة `not_checked`، و`available_profiles=[]`، و`compare_available=false` بدلاً من ادعاء جاهزية غير متحققة.
-- `CapabilitiesService` يحوي منطق بناء القدرات، بينما `capabilities_routes.py` مسؤول عن HTTP فقط، و`schemas/capabilities.py` مسؤول عن DTOs؛ بقيت المسؤوليات منفصلة.
-- لا يعرض endpoint أي Secrets.
-- التحقق المركز لـD8 نجح بحالتي Cloud وLocal: `2 passed` داخل `fastapi-app/.venv` على Python `3.12.14`، و`git diff --cached --check` نجح.
-- D9 أُنجز لاحقاً كطبقة Startup configuration validation، بينما D11 يبقى مسؤولاً عن Local runtime/device probe.
-
-## 22.12 Startup Configuration Validation المنفذة في D9
-
-تم تنفيذ D9 كطبقة تحقق مركزية تعمل عند FastAPI startup دون إدخال مسؤوليات D10 أو D11:
-
-- أضيف `validate_startup_configuration()` داخل `app/core/config.py` فوق نفس Typed Settings الموجودة منذ D2، دون إنشاء نظام إعدادات موازٍ.
-- أصبح `RAG_DEPLOYMENT_MODE` مطلوباً بشكل صريح عند Startup، مع بقاء القيم المقبولة Typed إلى `cloud` أو `local`.
-- أصبح `INTERNAL_API_KEY` مطلوباً وغير فارغ عند Startup، ولا تظهر قيمته في رسائل الخطأ.
-- أضيف `LOCAL_AI_TOPOLOGY` كإعداد Typed، والقيمة المدعومة حالياً هي `host_native`.
-- عند `RAG_DEPLOYMENT_MODE=local` يجب تحديد `LOCAL_AI_TOPOLOGY=host_native`.
-- عند `RAG_DEPLOYMENT_MODE=cloud` يجب ألا يكون `LOCAL_AI_TOPOLOGY` مضبوطاً، لمنع Configuration تعلن Cloud مع Local AI runtime.
-- رُبط التحقق بـFastAPI `lifespan` بحيث يفشل Startup قبل استقبال Requests، من دون كسر import/application factory.
-- أضيف `fastapi-app/.env.example` للإعدادات المطلوبة فعلياً في هذه المرحلة فقط.
-- لم تدخل فحوص Ollama أو Models أو GPU/MPS أو Qdrant أو Provider credentials/readiness؛ تبقى هذه المسؤوليات للمراحل اللاحقة.
-- التحقق النهائي نجح داخل `fastapi-app/.venv` باستخدام Python `3.12.13`: اختبارات D9 المركزة `4 passed`، وكامل FastAPI regression `13 passed`.
-
-## 22.13 Local Runtime/Device Resolver المنفذ في D11
-
-تم تنفيذ D11 كطبقة Runtime مستقلة داخل FastAPI مع الحفاظ على فصل Cloud/Local المنفذ في D10 وعدم تحميل أي Model weights:
-
-- أضيفت إعدادات `LOCAL_DEVICE` و`LOCAL_DTYPE`، والقيمة المعتمدة افتراضياً لكليهما هي `auto`.
-- backends المدعومة في resolver:
-  - `cuda`
-  - `rocm`
-  - `xpu`
-  - `mps`
-  - `cpu`
-- ترتيب `LOCAL_DEVICE=auto` الحتمي هو:
-  `CUDA → ROCm → XPU → MPS → CPU`.
-- لا يكفي اكتشاف اسم الجهاز أو وجود package؛ ينجح backend فقط بعد **actual capability probe** ينشئ Tensor صغيراً، ينفذ عملية حسابية، يتحقق من النتيجة، ثم يزامن الـbackend وينظف الـcache.
-- ROCm يستخدم PyTorch `torch.cuda` API surface كما هو متوقع، ويُميّز عن CUDA عبر `torch.version.hip` مقابل `torch.version.cuda`.
-- سياسة dtype الحالية:
-  - Accelerator → `fp16`
-  - CPU → `fp32`
-- عند طلب backend صريح وفشله لا يوجد silent CPU fallback؛ تعاد Local runtime بحالة `ready=false` وسبب آمن.
-- `initialize_local_runtime()` يعمل فقط في `RAG_DEPLOYMENT_MODE=local`; في Cloud يخرج قبل استيراد Local runtime adapters.
-- تم التحقق عملياً أن Cloud startup و`/health` و`/capabilities` تعمل في Base venv لا تحتوي `torch` ولا `psutil`.
-- `/api/v1/health` و`/api/v1/capabilities` يعرضان `local_runtime` مع requested/selected backend وdtype وprobe status وfailure reason الآمن، بينما يبقى `status=ok` خاصاً بصحة خدمة FastAPI نفسها.
-- Provider readiness لم يُستنتج من نجاح الجهاز: بقيت Providers بحالة `not_checked`، و`available_profiles=[]` و`compare_available=false` حتى مراحل Providers/Processing اللاحقة.
-- أضيف `ResourceSnapshot` لقياس:
-  - FastAPI process RSS.
-  - system available memory.
-  - accelerator allocated memory.
-  - accelerator cached/reserved memory.
-- `psutil` بقي ضمن `local-native` فقط، وغيابه لا يسقط Startup؛ تعاد telemetry بقيم `None`.
-- لم تُحمّل BGE أو Reranker أو Qwen أو أي model weights، ولم يدخل Qdrant أو Parsing أو Provider implementation ضمن D11.
-- ضمن نفس PR #49 تم تحسين D10 Host bootstrap ليصبح accelerator-aware:
-  - macOS Apple Silicon → MPS مع PyTorch standard install.
-  - Windows NVIDIA → CUDA.
-  - Windows Intel → XPU.
-  - Windows بدون accelerator مدعوم → CPU.
-  - Windows AMD → رفض ROCm صريح لأن مسار ROCm المعتمد للمشروع Linux.
-  - Linux NVIDIA → CUDA.
-  - Linux AMD → ROCm.
-  - Linux Intel → XPU.
-  - Linux بدون accelerator مدعوم → CPU.
-- اكتشاف الـbootstrap يحدد توزيع PyTorch المناسب للتثبيت فقط؛ **D11 runtime probe هو المرجع النهائي لجاهزية backend الفعلية**.
-- التحقق النهائي:
-  - D10 installer coverage: `14 passed`.
-  - D11 focused regression بعد التعديلات النهائية: `11 passed`.
-  - Full FastAPI regression: `31 passed`.
-  - Cloud isolation smoke وLocal API contract smoke نجحا.
-  - `git diff --check` / staged diff checks نجحت.
-
-## 22.14 Local Qdrant Infrastructure المنفذة في E1
-
-تم تنفيذ E1 كبنية Infrastructure مستقلة فقط، من دون إدخال Collections أو Vector configuration أو Qdrant client داخل FastAPI:
-
-- أضيفت خدمة `qdrant` إلى `laravel-app/compose.yaml` باستخدام الصورة المثبتة `qdrant/qdrant:v1.19.0`.
-- REST port `6333` منشور على Host loopback فقط عبر `127.0.0.1:${QDRANT_FORWARD_PORT:-6333}:6333`، ولا يوجد نشر Host لمنفذ gRPC `6334`.
-- أضيف named volume باسم `qdrant_data` مربوطاً إلى `/qdrant/storage`.
-- أضيف `QDRANT_FORWARD_PORT=6333` إلى `laravel-app/.env.example` لتوثيق منفذ البنية المحلية؛ لم يضف `QDRANT_URL` أو إعداد Collections ضمن E1.
-- تحقق `docker compose config --quiet` بنجاح، وعملت Qdrant بصورة مستقرة مع نجاح `/healthz`.
-- تم إثبات الـpersistence عملياً بوضع marker داخل `/qdrant/storage` ثم إيقاف وحذف Qdrant container وإعادة إنشائه؛ بقيت البيانات موجودة عبر `qdrant_data` ثم أزيل marker الاختباري.
-- `git diff --check` وstaged diff checks نجحت، ولم يتغير سوى `laravel-app/compose.yaml` و`laravel-app/.env.example` في Implementation commit.
-- لا يوجد ربط Laravel مباشر بـQdrant، ولا FastAPI Qdrant client، ولا Collections أو Dense/Sparse configs أو Payload indexes أو Point builders ضمن E1؛ تبدأ هذه المسؤوليات من E2 وما بعدها حسب خريطة المهام.
-
-## 22.15 Cloud Qdrant Collection المنفذة في E2
-
-تم تنفيذ E2 كطبقة FastAPI Infrastructure مسؤولة عن تهيئة Collection الخاصة بمسار Cloud فقط، دون إدخال Vector schema أو Hybrid Local collection:
-
-- أضيف `qdrant-client==1.19.0` إلى اعتماديات FastAPI الأساسية.
-- أضيف الإعدادان `QDRANT_URL` و`QDRANT_CLOUD_COLLECTION` إلى Typed Settings و`.env.example`، والاسم المعتمد هو `rag_documents_cloud`.
-- أضيفت طبقة `app/infrastructure/qdrant` بفصل واضح للمسؤوليات:
-  - `client.py` لبناء `QdrantClient` من Settings.
-  - `collections.py` لضمان وجود Collection بصورة idempotent.
-  - `startup.py` لتهيئة Qdrant وإغلاق الـclient بأمان.
-- رُبط `initialize_qdrant()` بـFastAPI lifespan بعد Configuration validation وقبل Local runtime initialization، من دون تعديل `app/runtime/startup.py` الخاص بـD11.
-- إنشاء `rag_documents_cloud` يتم فقط عند غيابها، بينما Startup اللاحق يكتفي بفحص الوجود ولا يعيد إنشاءها.
-- تم التحقق عملياً من حذف Collection ثم تشغيل FastAPI؛ نفذ Startup `PUT /collections/rag_documents_cloud` بنجاح وأعاد إنشاءها تلقائياً.
-- تم التحقق أن Collection بقيت بلا Vector schema ضمن E2: `vectors={}` و`sparse_vectors=None`، لذلك Dense/Sparse configs تبقى لـE4.
-- لم تُنشأ `rag_documents_hybrid_local` ضمن E2؛ تبقى مسؤولية E3.
-- لا توجد Payload indexes أو Points أو upsert/count/delete أو Retrieval/Embeddings/Parsing/Providers ضمن E2.
-- Laravel لا يتصل مباشرة بـQdrant؛ الوصول بقي داخل FastAPI Infrastructure.
-- التحقق النهائي شمل Startup smoke حقيقي ضد Qdrant و`6 passed` لاختبارات Startup configuration وDependency split المرتبطة بالتغييرات.
-
-## 22.16 Hybrid Local Qdrant Collection المنفذة في E3
-
-تم تنفيذ E3 كتوسعة محدودة لطبقة Qdrant المشتركة المنفذة في E2، لإضافة Collection مستقلة لمسار Hybrid Local:
-
-- أضيف `QDRANT_HYBRID_LOCAL_COLLECTION=rag_documents_hybrid_local` إلى إعدادات FastAPI الموثقة في `.env.example`.
-- أضيف Typed Setting باسم `qdrant_hybrid_local_collection` وبالقيمة الافتراضية `rag_documents_hybrid_local`.
-- أصبحت طبقة Startup المشتركة تهيئ `rag_documents_cloud` و`rag_documents_hybrid_local` عبر `initialize_qdrant()` وإعادة استخدام `ensure_collection_exists()`.
-- بقيت التهيئة idempotent: تتحقق من وجود كل Collection ولا تنشئها إلا عند غيابها.
-- لم تدخل E3 أي Dense/Sparse configs أو Payload indexes أو Points أو خدمات E4–E7.
-
-## 22.17 Payload Indexes المنفذة في E5
-
-تم تنفيذ E5 ضمن طبقة Qdrant المشتركة بإضافة Payload Indexes مركزية للـCollections `rag_documents_cloud` و`rag_documents_hybrid_local`:
-
-- يعتمد المخطط المركزي `PAYLOAD_INDEX_SCHEMA` الأنواع التالية:
-  - `user_id` → `INTEGER`
-  - `document_id` → `INTEGER`
-  - `processing_run_id` → `INTEGER`
-  - `processing_profile` → `KEYWORD`
-- تمر كلتا الـCollections عبر `initialize_qdrant()` و`ensure_collection_exists()`، ثم يفحص التنفيذ `payload_schema` الموجود قبل أي إنشاء.
-- تنشأ الـindexes الناقصة فقط، بينما تتجاوز الـindexes الموجودة والمتوافقة من دون duplication.
-- تدعم التهيئة Collections الموجودة من دون حذفها أو إعادة إنشائها، وتحافظ على idempotent Qdrant startup.
-- إذا وُجد Payload Index بالاسم نفسه ونوع غير متوافق، يفشل Startup بوضوح عبر `RuntimeError` يبيّن الحقل والنوع المتوقع والموجود؛ ولا يغير التعارض بصمت.
-- تحقق تشغيلياً أن كلتا الـCollections تحتويان `user_id: integer` و`document_id: integer` و`processing_run_id: integer` و`processing_profile: keyword`.
-- نجح تشغيل `initialize_qdrant()` مرة ثانية بلا duplication أو error.
-- أثبت اختبار conflict على Collection مؤقتة أن وجود `user_id` بنوع `KEYWORD` بدلاً من `INTEGER` يؤدي إلى `RuntimeError` واضح.
-- لم تُنشأ أي Points دائمة، ولم تدخل E5 بناء Points أو metadata الخاص بـE6، ولا Retrieval أو Embeddings أو Parsing، ولم يستخدم التنفيذ `RESET_COLLECTION`.
-
----
-
-# 23. Baseline معماري تنفيذي
-
-> التفاصيل الكاملة موجودة في `PROJECT_RAG_MASTER_PLAN.md`. هذه القائمة فقط لمنع فقدان القرارات التي تؤثر مباشرة على التنفيذ القادم.
-
-- Processing Profiles الفعلية: `cloud` و`hybrid_local`؛ أما `compare` فهو Orchestration وليس Profile ثالثة.
-- Oracle Online = Cloud-only بلا Local AI weights/dependencies.
-- Local Demo = Docker للبنية الأساسية وFastAPI/Ollama على Host.
-- Local heavy work = concurrency `1` + global Redis lock + single-active-model + release-after-stage.
-- Security scan = ClamAV on-demand افتراضياً (`DOCUMENT_SECURITY_SCAN_ENABLED=true`) مع Fail-Closed؛ التعطيل مسموح فقط بإعداد صريح ويؤدي إلى direct permanent storage بعد Validation، بلا fallback تلقائي عند فشل الفاحص. `scanning` يبدأ عند تشغيل Security Job فعلياً، و`queued` لا يستخدم قبل dispatch حقيقي لـProcessing Job.
-- Qdrant runtime بعد E5 = `qdrant/qdrant:v1.19.0` داخل `laravel-app/compose.yaml` مع persistent `qdrant_data`، وFastAPI تملك `qdrant-client==1.19.0` وتهيئ `rag_documents_cloud` و`rag_documents_hybrid_local` تلقائياً بمخطط Vector مركزي: `dense_vector` بحجم `1024` و`COSINE`، و`bm25_sparse_vector` مع `IDF`؛ كما تطبق Payload Indexes مركزية: `user_id` و`document_id` و`processing_run_id` من نوع `INTEGER`، و`processing_profile` من نوع `KEYWORD`؛ تدعم Collections الموجودة بلا حذف أو إعادة إنشاء، وتفشل بوضوح عند تعارض المخطط، مع Startup idempotent؛ لا توجد Points بعد.
-- Qdrant = Collection منفصلة لكل Processing Profile مع mandatory user/document/run filters.
-- Persistent Qdrant يحتفظ بالـselected winner فقط بعد التحقق.
-- Compare قبل الاختيار = Processing Report + Chunk Samples فقط؛ لا Trial Question ولا Temporary Retrieval Index ولا Query embedding/RRF/Reranking. H4 يقرأ artifact الفائز مباشرة ويعمل Promotion، ثم يبدأ Retrieval الحقيقي في المرحلة L.
-- Laravel/MySQL هو مصدر الحقيقة للتطبيق؛ لا توجد DB علائقية مستقلة لـFastAPI في v1.
-- المحادثة تستخدم آخر تبادلين مكتملين فقط لفهم الإحالات؛ لا توجد ذاكرة مستخرجة في v1.
-- لا يوجد True Streaming/NDJSON/Redis Stream في v1؛ `جاري التفكير` وProgressive Reveal تأثيران Frontend-only.
-- LLM Provider يحدد من Processing Profile موثوقة/Capabilities عبر Registry، بلا global `LLM_PROVIDER` switch وبلا Fallback صامت.
-- تشغيل أوامر FastAPI محلياً يعتمد `fastapi-app/.venv` وPython 3.12.x، وليس Python العام على النظام إذا كان خارج النطاق `>=3.12,<3.13`.
-- FastAPI ليس API عاماً للمستخدم النهائي؛ المسار المعتمد هو `Browser → Laravel → FastAPI`. المصادقة الداخلية تستخدم `X-Internal-API-Key`؛ D9 يرفض Startup إذا كان `INTERNAL_API_KEY` مفقوداً/فارغاً، بينما المفتاح المفقود أو غير الصالح في Request يرفض بـ`401`، وCorrelation ID يبقى فعالاً حول طبقة المصادقة.
-- أخطاء التطبيق المنظمة في FastAPI تستخدم `ApplicationException` مع Handler مركزي يعيد `error.code` و`error.message` و`correlation_id` ويحافظ على Structured Logging؛ أي أخطاء Application جديدة لاحقاً تبنى فوق هذا العقد بدلاً من إنشاء JSON أخطاء خاص بكل Route.
-- عقد D8 يفصل بين `supported_profiles` كقدرة مسموحة معمارياً و`available_profiles` كجاهزية مؤكدة؛ `compare_available` مشتقة ولا يمثل Profile ثالثة، وProvider readiness لا يفترض قبل التحقق الفعلي.
-- عقد D9 يفرض Configuration صريحة ومتوافقة: `cloud` يمنع `LOCAL_AI_TOPOLOGY`، و`local` يتطلب `LOCAL_AI_TOPOLOGY=host_native`؛ لا يتضمن ذلك أي Runtime/provider/device probe.
-- عقد D10 يفصل Base/Cloud عن Local Native: تبقى الاعتماديات الأساسية خفيفة بلا `torch` أو `transformers` أو `ollama`، وتضاف Local AI dependencies عبر `local-native` فقط؛ Host bootstrap أصبح accelerator-aware في PR #49 ويختار PyTorch distribution حسب المنصة/العائلة المدعومة، بينما يبقى Ollama خدمة Host-native مستقلة.
-- عقد D11 يفصل **bootstrap detection** عن **runtime verification**: ترتيب `auto` هو `CUDA → ROCm → XPU → MPS → CPU`، ولا تعتمد الجاهزية إلا بعد Tensor probe فعلي؛ Accelerators تستخدم FP16 وCPU يستخدم FP32، والطلب الصريح لا يعمل له silent fallback.
-- نجاح Local runtime لا يعني جاهزية Processing Profile أو Provider؛ `/health` و`/capabilities` يعرضان runtime capability فقط، بينما Provider statuses تبقى `not_checked` حتى مراحلها.
-- Cloud startup لا يستورد أو يتطلب Torch/psutil/Local AI runtime، وقد تم التحقق من ذلك عملياً على Base venv خفيفة.
-
----
-
-# 24. سجل الإنجاز المختصر
-
-> **القاعدة الجديدة:** سطر واحد لكل Task منجزة. التفاصيل الكاملة محفوظة في Git commits وPull Requests.
-
-| Task | PR | ملخص الإنجاز |
-|---|---:|---|
-| A1 — Laravel Application | #2 | Laravel 13 + Livewire/Flux + Vite؛ tests/build PASS |
-| A2 — Authentication | #3 | Fortify + auth/email verification/settings RTL؛ tests/build PASS |
-| A3 — MySQL | #5 | MySQL 8.4 + persistent volume + migrations/tests PASS |
-| A4 — Redis | #7 | Redis 8.10 AOF + health/persistence؛ tests PASS |
-| A5 — Queue | #9 | Redis default queue + worker smoke test؛ tests PASS |
-| B1 — documents migration | #10 | Documents schema + ownership/indexes |
-| B2 — Document model | #11 | Document/User relations + mass-assignment boundaries |
-| B3 — Enums/casts | #12 | `FileType` + `DocumentStatus` |
-| B4 — DocumentPolicy | #13 | Ownership policy + minimal tests |
-| B5 — Documents pages | #14 | index/show Blade + authorization |
-| B6 — Upload validation | #15 | PDF/DOCX/TXT validation + MIME/content/name/size/ZIP safeguards |
-| B7 — Private storage/download | #16 | private `documents` disk + ULID names + authorized download |
-| B8 — SHA-256/duplicate | #18 | Server-side SHA-256 + per-user duplicate policy |
-| B9 — Processing runs schema | #19 | `document_processing_runs` migration |
-| B10 — ProcessingRun domain | #21 | Model/enums/casts/relations |
-| B11 — Selected processing run | #23 | nullable FK + relation؛ cross-table invariants deferred to Domain logic |
-| B12 — Processing comparisons | #24 | comparison schema/model/status/relations |
-| C1 — ClamAV runtime | #25 | on-demand scan worker + persistent signatures + shared heavy-resource lock |
-| C2 — DocumentSecurityService | #26 | clean/infected/scan_failed contract + fail-closed + sanitized logging |
-| C3 — Temporary upload flow | #28 | quarantine + `DocumentUploadService`; 9 tests / 60 assertions; Pint/diff-check PASS |
-| C4 — Clean path | #30 | ترقية آمنة من quarantine إلى `documents` مع clean-only gate والحفاظ على نفس `Document`؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
-| C5 — Infected/fail-closed path | #32 | `infected` → `infected` و`scan_failed` → `failed` مع إبقاء الملف في quarantine ومنع promotion؛ 2 tests / 8 assertions؛ Pint/diff-check PASS |
-| C6 — Configurable security-scan routing | #33 | enabled افتراضياً → quarantine؛ disabled صراحةً → permanent storage؛ 6 tests / 25 assertions؛ Pint/diff-check PASS |
-| C7 — Aggregate status transitions | #34 | Security Job orchestration + `pending → scanning → clean → pending`؛ disabled يبقى `pending`؛ 7 tests / 33 assertions؛ Pint/diff-check PASS |
-| C8 — Security tests | #35 | explicit bypass + scan_failed no-fallback coverage؛ 8 tests / 39 assertions؛ Pint/diff-check PASS |
-| D1 — FastAPI project | #37 | FastAPI foundation + Python 3.12 baseline + application factory؛ runtime verification PASS |
-| D2 — Typed config | #39 | `pydantic-settings` + typed deployment mode + centralized app settings؛ env/validation/import/pip/diff checks PASS |
-| D3 — Structured logging/correlation IDs | #40 | Central JSON logging + async-safe ContextVar correlation IDs + request/response propagation; supplied/generated ID verification + compileall/diff-check PASS |
-| D4 — Internal API security | #41 | `X-Internal-API-Key` + `SecretStr` + centralized ASGI auth; missing/invalid/valid coverage؛ 3 tests + compileall/pip/diff-check PASS |
-| D5 — Health endpoint | #42 | `GET /api/v1/health` + internal auth + Correlation ID preserved؛ 1 focused test + D4/D5 regression + compileall/pip/diff-check PASS |
-| D6 — Versioned DTO schemas | #43 | Pydantic DTOs لعقود document processing وRAG؛ nullable `total_pages`؛ 2 focused tests + D4–D6 regression + compileall/pip/diff-check PASS |
-| D7 — Structured exceptions | #44 | `ApplicationException` + ErrorResponse + handler مركزي مع Correlation ID؛ 1 focused test + D4–D7 regression + compileall/pip PASS |
-| D8 — Deployment capabilities | #46 | `GET /api/v1/capabilities` + Cloud/Local supported profiles + truthful `not_checked` readiness؛ 2 tests + diff-check PASS |
-| D9 — Startup configuration validation | #47 | Startup validation مركزية لـdeployment mode وInternal API key وLocal AI topology؛ 4 focused tests + 13 FastAPI regression tests PASS |
-| D10 — Base/cloud/local dependency split | #48 | Base/Cloud خفيف + `local-native` extra + PyTorch Host bootstrap؛ 4 focused tests + 17 FastAPI regression + packaging/diff-check PASS |
-| D11 — Local runtime/device resolver | #49 | CUDA/ROCm/XPU/MPS/CPU resolver + Tensor startup probe + telemetry + health/capabilities؛ D10 bootstrap صار accelerator-aware؛ 31 FastAPI tests PASS |
-| E1 — Local Qdrant + persistent volume | #50 | Qdrant v1.19.0 + loopback REST + `qdrant_data`؛ health/persistence/config/diff checks PASS |
-| E2 — rag_documents_cloud collection | #51 | FastAPI Qdrant client/bootstrap + idempotent `rag_documents_cloud`; no vector schema؛ startup smoke + 6 focused tests PASS |
-| E3 — rag_documents_hybrid_local collection | #52 | إعداد مستقل + Typed Setting؛ Startup يهيئ Collections الاثنتين عبر `ensure_collection_exists()`؛ بلا Dense/Sparse configs أو Payload indexes أو Points |
-| E4 — Dense/sparse configs | #53 | مخطط مركزي: `dense_vector` (`1024`/`COSINE`) و`bm25_sparse_vector` (`IDF`) لـ`rag_documents_cloud` و`rag_documents_hybrid_local`؛ دعم الموجود والتحقق من التوافق بلا حذف أو إعادة إنشاء؛ Startup idempotent؛ تحقق تشغيلي + `2 passed` |
-| E5 — Payload indexes | #54 | `PAYLOAD_INDEX_SCHEMA` مركزية للـCollectionين؛ إنشاء الناقص والتحقق من التعارض؛ Startup idempotent؛ تحقق تشغيلي بلا Points |
-| E6 — Point builder + payload metadata | #55 | `PointPayload` للحقول المعتمدة: `user_id` و`document_id` و`processing_run_id` و`processing_profile` و`file_type` و`source` و`page` و`section` و`chunk_index` و`text`؛ UUIDv5 حتمي؛ `models.PointStruct` بـ`dense_vector` و`bm25_sparse_vector`؛ بلا Qdrant I/O أو upsert/count/delete؛ Smoke Check للـID والـpayload وأسماء الـvectors PASS |
-| E7 — Idempotent upsert/count/delete | #56 | طبقة Qdrant persistence مركزية؛ `PointScope` مقيد بالمستخدم والوثيقة وProcessing Run؛ upsert يعيد استخدام `PointStruct` وIDs الحتمية من E6؛ count دقيق وحذف مفلتر؛ implementation مشتركة للـCollectionين؛ `4 passed` |
-| E8 — Cross-user leakage tests | #57 | اختبارات أمنية فعلية بـ`QdrantLocal` in-memory؛ عزل `count_points()` و`delete_points()` حسب `user_id + document_id + processing_run_id` مع اختلاف المستخدم والوثيقة وProcessing Run؛ بلا تعديل Production Code؛ E7 + E8: `6 passed` |
-| F1 — Loader interface | #58 | `BaseDocumentLoader` بعقد `load(Path)` وoutput عام عمدًا حتى F6؛ بلا provider أو Chunking أو Embeddings أو Qdrant؛ `tests/test_loader_contract.py`: `1 passed` |
-| F2 — LlamaParse provider | #59 | `BaseParsingProvider` + `LlamaParseProvider` + `LlamaParsePage`؛ `LLAMA_CLOUD_API_KEY` + `llama-cloud==2.14.1`؛ Agentic parsing وMarkdown tables وOCR عربي/إنجليزي؛ Fake/Mock بلا network calls؛ `40 passed` |
-| F3 — PDF loader | #60 | `PdfDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider` بلا اعتماد مباشر على LlamaParse SDK؛ يعيد `LlamaParsePage` الحالية دون F6؛ delegation test بلا network؛ `41 passed` |
-| F4 — DOCX loader | #61 | `DocxDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider`؛ بلا dependency جديدة وبلا تنفيذ F6؛ اختبار F4 المباشر `1 passed`، واختبارات F1–F4 المباشرة `5 passed`، وجميع اختبارات FastAPI `42 passed` |
-| F5 — TXT loader | #62 | `TxtDocumentLoader` متوافق مع `BaseDocumentLoader` ويفوض Parsing إلى `BaseParsingProvider`؛ بلا coupling مباشر مع LlamaParse SDK ويستخدم `LlamaParsePage` كنتيجة provider-level فقط دون F6؛ بلا dependency جديدة؛ Implementation `293f2a79e4c7fa01e9cc2be26b98674dcbc60e95`، Merge `402ea0bd524bdcd18fee1a15d2a5a2ec7a261d74`؛ F5 `1 passed`، وF1–F5 `6 passed`، وجميع FastAPI `43 passed` |
-| F6 — Normalized page/section schema | #63 | `NormalizedDocument` immutable وLlamaParse normalization boundary مع page semantics موثوقة بلا section مخترع؛ بلا Chunking أو F7 أو dependencies جديدة؛ Implementation `3ab4d8b39b067686ec59632b108d625a3fd95096`، Merge `392eadb252e7f9700b6028677bdc008b5e27e7f2`؛ F6 `3 passed`، وF1–F6 `9 passed`، وجميع FastAPI `46 passed` |
-| F7 — Shared parse result reuse for Compare | #64 | shared normalized parse result؛ Parsing مرة واحدة وإعادة استخدام الناتج في Compare؛ `1 direct / 10 parsing regression / 47 full FastAPI` |
-| F8 — Loader tests | #65 | Tests-only: delegation لـPDF/DOCX/TXT مع `parse()` مرة واحدة وتمرير نتيجة الـProvider وأخطائه كما هي؛ `7 direct / 13 Phase F regression / 50 full FastAPI` |
-| G1 — ProcessingProfile registry | #66 | القيم الرسمية فقط + contract ضيق + registry موثوق بلا raw strings أو silent fallback؛ Fakes للاختبارات |
-| G2 — Cloud chunking | #67 | `CloudChunker` + `SentenceSplitter` مع metadata وbaseline قابل للضبط؛ Implementation `23b55768c6ba9f8371efac5657d431adadd5ca7d`؛ focused G2 tests: `4 passed`؛ full FastAPI suite: `59 passed` |
-| G3 — Cloud Jina embeddings | #68 | Jina AI `jina-embeddings-v3` بـ`retrieval.passage` وdense vectors ببعد `1024` مع تحقق العدد/البعد و`ApplicationException` منظمة بلا fallback؛ focused G3 tests: `6 passed`؛ full FastAPI suite: `65 passed` |
-| G4 — Cloud sparse representation | #69 | تحويل `NormalizedChunk` إلى Qdrant `Document` بـ`Qdrant/bm25` و`multilingual` مع ترتيب 1:1؛ BM25 الفعلي داخل Qdrant؛ بلا dependencies أو تعديل schema/env؛ focused test: `1 passed`؛ full FastAPI suite: `66 passed` |
-| G5 — Hybrid Local chunking | #70 | `HybridLocalChunker` مستقل باستخدام `SentenceSplitter 800/80` وshared `NormalizedChunk` مع metadata propagation لـ`page` و`section` والحفاظ على ترتيب الوثائق والـchunks؛ focused tests: `7 passed`؛ full FastAPI suite: `69 passed` |
-| G6 — Local BGE-M3 embeddings | #71 | `LocalBgeM3Embedder` بـ`BAAI/bge-m3` وCLS pooling؛ ترتيب 1:1 وDense Vector ثابت `1024` مع تحقق العدد/البعد؛ runtime D11 بلا silent fallback وlazy imports بلا dependencies جديدة؛ focused regression: `17 passed in 0.75s`؛ full FastAPI: `78 passed in 1.55s` |
-| G7 — Local BM25 | #72 | `LocalBm25Representer` بـ`Qdrant/bm25` وArabic sparse vectors بترتيب 1:1؛ تحقق count و`indices`/`values` وتوافق `build_point()`/`bm25_sparse_vector`؛ `fastembed==0.8.0` داخل `local-native` فقط مع Cloud isolation وlazy import؛ `8 passed in 0.72s` focused، و`11 passed in 1.32s` regression، و`84 passed in 1.82s` full، وreal Arabic smoke test بـ`exit_code=0` |
-| G8 — Batching / Retries / Rate Limits | #73 | batching قابل للضبط لمسار Cloud Jina مع ترتيب chunks/vectors بنسبة 1:1 ومن دون sleep بعد آخر batch؛ retry محدود لـ`429` و`500/502/503/504` فقط، وفشل مباشر لـ`400/401/403/422`؛ `JinaEmbeddingProvider` مع HTTP status classification وexception chaining وsleeper قابل للحقن وعدم إعادة batches المكتملة؛ defaults: `6/3/30/5`؛ بلا dependencies جديدة أو تعديل Local embeddings/BM25/Qdrant/G9–G11؛ `14 passed` focused، و`6 passed` provider، و`16 passed` regression/isolation، و`98 passed` full |
-| G9 — Metrics/report بلا vectors/cost | #74 | `ProcessingReportBuilder` + typed processing/profile snapshots لأعداد الصفحات/chunks/vectors والتحقق من vector dimension وstructured stage timings/warnings وإعدادات profile آمنة allowlisted، مع Cloud batching/retry الآمنة ضمن snapshot؛ Implementation `065e4e2b14a2b5453a7567cd3d33868bb4c2ee87`، Merge `79bab31b66ae6af1b267e519fc77bbbf02435a46`؛ `10 passed` focused، و`48 passed` related regression، و`108 passed` full FastAPI؛ بلا raw vector values أو cost/provider billing |
-| G10 — Profile parity and isolation tests | #75 | Tests-only parity/isolation coverage بين Cloud وHybrid Local؛ dependency/runtime isolation؛ Full FastAPI suite: `114 passed` |
-| G11 — Single-active-model coordinator + lazy load/release-after-stage | #76 | `LocalModelCoordinator` واحد يفرض single-active heavy Local model؛ Lazy loading لـBGE-M3 داخل Stage lease والتحرير بعد النجاح أو الاستثناء مع memory gate وlifecycle/resource metrics؛ Local startup فقط مع Cloud isolation؛ Implementation `be7ac0a6daa6979a0ef20f55886b087b78b7c7eb`، Merge `e9d31deb247e7c30ccf20dddc7634104613ba46c`؛ `28 passed` focused و`123 passed` full FastAPI |
-| H1 — Private artifact store/opaque references | #78 | مخزن artifacts خاص مع opaque references وmanifest داخلي وحماية traversal؛ `12 passed` focused و`135 passed` full FastAPI |
-| H2 — Configurable 24h TTL | #79 | TTL قابل للتهيئة بقيمة افتراضية 24h مع UTC manifest timestamps ورفض القراءة بعد الانتهاء دون حذف؛ `20 passed` focused و`30 passed` related و`143 passed` full FastAPI |
-
-## ملاحظات تنفيذية تاريخية تستحق الاحتفاظ
-
-- B12 Schema تم التحقق منه فعلياً على MySQL 8.4.11 مع rollback وإعادة migration.
-- البيانات الخاصة بالمعالجة بقيت في Processing Runs وليست داخل `documents`.
-- 2026-08-22: أعيد تنظيم ملف التقدم نفسه ليبقى خفيفاً بين المحادثات: جداول المهام بقيت كاملة، بينما اختُصر سجل الإنجاز واعتمد Git/PRs للتاريخ التفصيلي.
-- C8 أغلقت من دون تعديل production code؛ اقتصرت على سد فجوات الاختبارات الأمنية المتبقية.
-- D1 أنشأت FastAPI foundation مستقلاً داخل `fastapi-app` مع Python 3.12 baseline وApplication Factory.
-- D2 أضافت Typed Configuration مركزية باستخدام `pydantic-settings` وربطت metadata التطبيق بها، مع إبقاء Logging/Security/Health/AI خارج النطاق.
-- D3 أضافت Structured JSON logging مركزية وCorrelation IDs عبر Pure ASGI middleware وContextVar، مع الحفاظ على Security وHealth خارج النطاق.
-- D4 أضافت Internal API authentication مركزية باستخدام `X-Internal-API-Key` و`SecretStr` و`compare_digest`، مع Fail-Closed للمفتاح المفقود/غير الصالح والحفاظ على Correlation ID حول طبقة المصادقة.
-- بيئة FastAPI الرسمية محلياً هي `fastapi-app/.venv` ضمن Python 3.12.x؛ D2 تم التحقق منها على `3.12.13`، وD3–D8 على `3.12.14`، وD9 على `3.12.13`، وD11 full regression على Python `3.12.14`. Python العام من Miniconda `3.13.13` خارج قيد المشروع ولا يستخدم.
-- D7 أضافت عقد Structured Exceptions مركزي مع `ApplicationException` و`ErrorResponse` وCorrelation ID، دون إدخال D8 أو AI/Qdrant/Parsing/Providers.
-- D8 أضافت Capabilities endpoint داخلياً بعقد يفصل supported عن available ويترك readiness بحالة `not_checked` حتى الفحص الفعلي، من دون Provider calls.
-- D9 أضافت Startup validation مركزية عبر FastAPI lifespan، مع إلزام deployment mode وInternal API key ورفض Cloud/Local topology المتعارضة، دون Runtime/provider/device probes.
-- D10 ثبتت فصل الاعتماديات بحيث يبقى Base/Cloud بلا Local AI packages؛ وفي PR #49 صارت أداة Host bootstrap accelerator-aware لـNVIDIA/AMD-Linux/Intel/Apple/CPU قبل أن يتولى D11 التحقق الفعلي.
-- D11 أضافت Local runtime layer منفصلة وTensor capability probe وسياسة dtype وresource telemetry ونشرت النتيجة عبر health/capabilities دون استنتاج Provider readiness، مع إثبات أن Cloud يعمل بلا Torch/psutil.
-- E2 أضافت FastAPI Qdrant infrastructure وتهيئة `rag_documents_cloud` عند Startup بصورة idempotent، مع إبقاء Hybrid Local collection لـE3 وVector schema لـE4.
-- E3 أضافت إعداد Hybrid Local ووسعت Startup المشتركة لتهيئة `rag_documents_cloud` و`rag_documents_hybrid_local` عبر `ensure_collection_exists()`، مع إبقاء Dense/Sparse configs لـE4 وPayload indexes لـE5.
-- 2026-08-30: اعتمد قرار تبسيط Compare: إلغاء Trial Question وTemporary Retrieval Index وأي pre-selection Query embedding/RRF/Reranking؛ أصبحت H3 وI7 وJ7 `N/A` من دون إعادة ترقيم بقية المهام. يعتمد الاختيار على Processing Report + Chunk Samples، ويصبح H4 المهمة التالية. يبقى `trial_question` في B12 كحقل nullable legacy غير مستخدم ولا تنشأ Migration جديدة فقط لحذفه.
-- لا توجد عوائق حالية.
-
----
-
-# 25. المهمة الحالية
+Qdrant:
 
 ```text
-H4 — Winner promotion
-Status: TODO
-Expected Branch: task/H4-winner-promotion
-Next: H5 — Count verification
+rag_documents_cloud
+rag_documents_hybrid_local
 ```
 
-> تبدأ H4 مباشرة بعد H2 لأن H3 أصبحت `N/A` بقرار التبسيط المعتمد في `PROJECT_RAG_MASTER_PLAN.md` القسم 174.20. يقرأ H4 الـartifact الفائز مباشرة ويعمل Promotion إلى Qdrant الدائمة؛ لا توجد طبقة Temporary Retrieval Index بينهما.
+كل Retrieval/Delete/Admin access يجب أن يطبق server-side user/document/run isolation.
 
----
-
-# 26. العوائق والملاحظات
-
-- لا توجد عوائق حالية.
-- توجد ملاحظة تنسيق Pint قديمة في `laravel-app/bootstrap/providers.php` خارج نطاق المهام الحالية؛ غير حاجبة.
-- عند تنفيذ مهام FastAPI استخدم `fastapi-app/.venv` الرسمية مع Python 3.12.x؛ بيئة D11 الحالية تحققت على Python `3.12.14`، ولا تستخدم Miniconda Python `3.13.13`.
-
----
-
-# 27. قالب إغلاق أي Task
-
-من الآن فصاعداً لا نضيف سجلاً طويلاً. يكفي:
-
-```markdown
-| [Task ID] — [Task Name] | #[PR] | [3–12 كلمة تلخص المنجز]؛ tests/Pint PASS |
-```
-
-ثم:
-
-1. تغيير حالة المهمة في جدول مرحلتها إلى `DONE`.
-2. تحديث `CURRENT HANDOFF`.
-3. استبدال قسم `# 25. المهمة الحالية` بالمهمة التالية.
-4. تسجيل أي Invariant أو قرار تنفيذي جديد فقط إذا كان سيؤثر على المهام اللاحقة.
-
----
-
-# 28. بدء Chat جديد
-
-ارفع آخر نسخة من هذا الملف واكتب:
+Local AI:
 
 ```text
-نكمل مشروع RAG حسب ملف التقدم المرفق. نفذ المهمة الحالية فقط، وبعد نجاحها حدّث ملف التقدم باختصار وحدد المهمة التالية.
+single active heavy model
+lazy load
+release after stage
+worker concurrency = 1
+shared heavy-resource lock with ClamAV
+Ollama keep_alive = 0
 ```
 
-ارفع `PROJECT_RAG_MASTER_PLAN.md` أيضاً عندما تحتاج المهمة تفاصيل معمارية أو عقوداً غير موجودة في هذا الـhandoff.
+Conversation context:
+
+```text
+آخر تبادلين مكتملين فقط
+```
+
+Answer delivery في v1:
+
+```text
+polling + completed-answer visual reveal
+```
+
+---
+
+# 11. نقطة الاستلام التالية
+
+قبل بدء المرحلة H:
+
+1. راجع ملفات التوثيق النهائية.
+2. Commit / Push / PR / Merge لفرع:
+   ```text
+   task/remove-compare-winner-flow
+   ```
+   ينفذها المستخدم بعد المراجعة.
+3. بعد تأكيد Merge إلى `main`، يبدأ Chat جديد للمهمة:
+
+```text
+H1 — AiServiceClient
+```
+
+Baseline المهمة الجديدة:
+
+```text
+Document has active_processing_run_id.
+ProcessingRun lifecycle = pending → processing → indexing → indexed | failed.
+FastAPI has persistent Qdrant indexing primitives but no Process Document endpoint/orchestrator yet.
+No Compare/Winner/temporary artifact lifecycle exists in the target architecture.
+```
+
+---
+
+# 12. التتبع التاريخي
+
+التصاميم والمهام التي أزيلت من الخريطة النشطة لا تحفظ هنا كمهام ملغاة.
+
+للتدقيق التاريخي يرجع إلى Git / Pull Requests، وبشكل خاص baseline السابق:
+
+```text
+main@a1f28097b398b9bb277f85990a55e489bd54d880
+```
+
+هذا يحافظ على التاريخ بدون تلويث خريطة التنفيذ الحالية بمهام لم تعد جزءاً من النظام المستهدف.

@@ -36,7 +36,6 @@ class CapabilitiesService:
                 deployment_mode=deployment_mode,
                 supported_profiles=["cloud"],
                 available_profiles=[],
-                compare_available=False,
                 providers=self._providers(
                     SHARED_PROVIDERS + CLOUD_PROFILE_PROVIDERS,
                 ),
@@ -47,7 +46,6 @@ class CapabilitiesService:
             deployment_mode=deployment_mode,
             supported_profiles=["cloud", "hybrid_local"],
             available_profiles=[],
-            compare_available=False,
             providers=self._providers(
                 SHARED_PROVIDERS
                 + CLOUD_PROFILE_PROVIDERS

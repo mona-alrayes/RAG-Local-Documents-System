@@ -116,3 +116,24 @@ def test_cloud_configuration_rejects_local_ai_topology() -> None:
     ):
         with TestClient(create_app()):
             pass
+
+
+@pytest.fixture(autouse=True)
+def isolate_startup_tests_from_project_dotenv(
+    tmp_path,
+    monkeypatch,
+):
+    """
+    Prevent startup configuration tests from reading the developer's
+    project-level .env file.
+
+    These tests must be driven exclusively by the environment variables
+    they configure themselves.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    get_settings.cache_clear()
+
+    yield
+
+    get_settings.cache_clear()

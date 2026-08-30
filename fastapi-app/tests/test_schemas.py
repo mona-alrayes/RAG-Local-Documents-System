@@ -7,12 +7,11 @@ def test_process_document_response_contract() -> None:
         document_id=152,
         processing_run_id=901,
         profile="cloud",
-        status="ready_for_comparison",
+        status="indexed",
         total_pages=None,
         total_chunks=184,
         vector_count=184,
         vector_dimension=1024,
-        temporary_artifact_ref="opaque-token",
     )
 
     assert response.document_id == 152

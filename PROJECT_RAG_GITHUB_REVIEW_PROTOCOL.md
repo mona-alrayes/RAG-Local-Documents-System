@@ -2,11 +2,13 @@
 
 > **Project:** Cloud / Local RAG System  
 > **Purpose:** بروتوكول ثابت لتنظيم العمل على GitHub ومراجعة كل مهمة قبل اعتمادها كمنجزة.  
-> **Applies to:** جميع مراحل المشروع من `A1` حتى `Q` ثم مراحل النشر `DPL-*`.  
+> **Applies to:** جميع مراحل المشروع النشطة من `A1` حتى `P11` ثم مراحل النشر `DPL-*`.  
+> **Roadmap baseline:** Profile واحد لكل `ProcessingRun`، فهرسة Qdrant دائمة مباشرة، و`active_processing_run_id` للـRun الحالية المفهرسة.  
 > **Primary references:**
 > - `PROJECT_RAG_MASTER_PLAN.md`
 > - `PROJECT_RAG_EXECUTION_PROGRESS.md`
 > - `PROJECT_RAG_GITHUB_REVIEW_PROTOCOL.md`
+> - `PROJECT_RAG_MENTOR_WORKFLOW.md`
 
 ---
 
@@ -44,13 +46,15 @@ What should be built?
 ويحتوي على:
 
 - المعمارية.
-- المراحل.
+- المراحل والـTask IDs النشطة.
 - المسؤوليات.
 - متطلبات الأمان.
 - معايير انتهاء كل مرحلة.
 - قرارات التصميم الرئيسية.
 
-لا يتم تعديله بسبب تقدم التنفيذ اليومي إلا عند وجود قرار معماري فعلي يغيّر الخطة.
+لا يتم تعديله بسبب تقدم التنفيذ اليومي إلا عند وجود قرار معماري فعلي يغير الخطة.
+
+إذا تغيرت الخريطة المعمارية أو أعيد ترقيم المهام، فالـMaster Plan هو المرجع الأعلى للترقيم الجديد.
 
 ---
 
@@ -60,11 +64,12 @@ What should be built?
 
 ```text
 What has actually been completed?
+Where should execution resume?
 ```
 
 ويحتوي على:
 
-- آخر مهمة منجزة.
+- آخر مهمة أو مبادرة منجزة.
 - المهمة الحالية.
 - المهام `TODO`.
 - المهام `DONE`.
@@ -75,7 +80,7 @@ What has actually been completed?
 
 هذا الملف هو:
 
-> **Single Source of Truth لحالة تنفيذ المشروع.**
+> **Single Source of Truth لحالة تنفيذ المشروع ونقطة الاستلام.**
 
 ---
 
@@ -100,6 +105,23 @@ How should every task be reviewed?
 
 ---
 
+## 2.4 `PROJECT_RAG_MENTOR_WORKFLOW.md`
+
+يمثل:
+
+```text
+How should the technical mentor guide execution?
+```
+
+ويحدد:
+
+- أسلوب العمل خطوة بخطوة.
+- الفصل بين التنفيذ والمراجعة.
+- قواعد الانتقال بين المهام.
+- مستوى الدليل المطلوب قبل اعتبار المهمة منجزة.
+
+---
+
 # 3. الاستراتيجية العامة للعمل على GitHub
 
 لكل مهمة:
@@ -111,7 +133,7 @@ Create Branch
   ↓
 Implementation
   ↓
-Local Tests
+Local Verification
   ↓
 Commit(s)
   ↓
@@ -127,7 +149,7 @@ Re-review
   ↓
 Acceptance Criteria Verification
   ↓
-Task DONE
+APPROVED
   ↓
 Update PROJECT_RAG_EXECUTION_PROGRESS.md
   ↓
@@ -136,21 +158,24 @@ Merge
 Next Task
 ```
 
+لا يعتبر وجود PR أو CI أخضر وحده دليلاً كافياً على صحة المهمة.
+
 ---
 
 # 4. قاعدة أساسية: مهمة واحدة لكل Branch
 
 يجب أن يمثل كل Branch مهمة واحدة فقط قدر الإمكان.
 
-أمثلة صحيحة:
+أمثلة صحيحة وفق الـroadmap الحالي:
 
 ```text
 task/A1-laravel-foundation
-task/A2-authentication
-task/B1-documents-migration
 task/B6-upload-validation
 task/C2-document-security-service
-task/K2-qdrant-security-filter
+task/E9-direct-document-indexer
+task/H1-ai-service-client
+task/M4-ask-conversation-job
+task/O2-qdrant-leakage
 ```
 
 مثال غير مرغوب:
@@ -159,13 +184,32 @@ task/K2-qdrant-security-filter
 task/laravel-fastapi-chat-all
 ```
 
-لأنه يجمع عدة مسؤوليات ومراحل في Branch واحد.
+لأنه يجمع عدة مسؤوليات ومراحل.
+
+## 4.1 استثناء المبادرات المعمارية الموثقة
+
+يجوز لقرار معماري Cross-cutting أن ينفذ في Branch واحد إذا كان موثقاً صراحةً في الـMaster Plan والـExecution Progress ويحتاج Cleanup متماسكاً عبر أكثر من طبقة.
+
+مثال:
+
+```text
+task/remove-compare-winner-flow
+```
+
+في هذه الحالة يجب:
+
+- تحديد Scope المبادرة قبل التنفيذ.
+- إجراء Impact/Reference Audit.
+- منع Scope creep خارج القرار.
+- مراجعة جميع الطبقات المتأثرة.
+- تشغيل regression/full verification قبل الدمج.
+- تحديث الوثائق النهائية قبل إغلاق المبادرة.
 
 ---
 
 # 5. Branch Naming Convention
 
-الصيغة الرسمية:
+الصيغة الرسمية للمهام المخططة:
 
 ```text
 <type>/<task-id>-<short-description>
@@ -180,8 +224,9 @@ task/laravel-fastapi-chat-all
 ```text
 task/A1-laravel-foundation
 task/B3-document-status-enum
-task/E3-create-rag-collection
-task/N4-ask-conversation-job
+task/E9-direct-document-indexer
+task/H1-ai-service-client
+task/M4-ask-conversation-job
 ```
 
 ### Fix
@@ -190,15 +235,15 @@ task/N4-ask-conversation-job
 
 ```text
 fix/B6-mime-validation
-fix/K2-user-filter-leak
+fix/O2-user-filter-leak
 ```
 
 ### Refactor
 
-لإعادة هيكلة بدون تغيير السلوك:
+لإعادة هيكلة بدون توسيع السلوك:
 
 ```text
-refactor/I1-ai-service-client
+refactor/H1-ai-service-client-boundary
 ```
 
 ### Test
@@ -206,7 +251,8 @@ refactor/I1-ai-service-client
 للاختبارات فقط:
 
 ```text
-test/P3-qdrant-leakage
+test/O2-qdrant-leakage
+test/P4-mixed-profile-chat-e2e
 ```
 
 ### Docs
@@ -234,18 +280,21 @@ chore/ci-setup
 - استخدام الأحرف الإنجليزية في الوصف.
 - استخدام `-` بين الكلمات.
 - عدم استخدام spaces.
-- الحفاظ على Task ID كما هو في الخطة:
+- الحفاظ على Task ID كما هو في الخطة النشطة:
   - `A1`
   - `B6`
-  - `K2`
+  - `H1`
+  - `O2`
+  - `P4`
   - `DPL-5`
 - الوصف قصير وواضح.
 - لا يوضع اسم المطور في اسم الـBranch.
+- لا يعاد استخدام Task ID قديم أزيل من الـroadmap لمهمة جديدة بدون قرار معماري صريح.
 
 مثال:
 
 ```text
-task/DPL-5-install-docker
+task/DPL-5-docker-buildx-compose
 ```
 
 ---
@@ -266,11 +315,13 @@ main
 
 كل Task تبدأ من أحدث نسخة مستقرة من `main`.
 
+قبل بدء المهمة أو قبل Push/PR بعد عمل طويل، يجب التأكد من أن الـbaseline المحلي لم يتأخر عن `main` بصورة قد تسبب conflict أو مراجعة على أساس قديم.
+
 ---
 
 # 8. Commit Message Convention
 
-الصيغة:
+الصيغة المفضلة للمهام المخططة:
 
 ```text
 <type>(<task-id>): <short description>
@@ -293,9 +344,24 @@ chore
 feat(A1): create laravel application foundation
 feat(B1): add documents migration
 fix(B6): reject invalid mime types
-test(C7): add clamav failure scenarios
-refactor(I1): isolate ai service response mapping
-docs(A1): update execution progress
+test(C8): cover security pipeline failures
+feat(E9): add direct qdrant document indexer
+refactor(H1): isolate ai service client boundary
+docs(H1): update execution progress
+```
+
+## 8.1 المبادرات المعمارية Cross-cutting
+
+إذا كان التغيير مبادرة معمارية موثقة وليس Task عادية، يجوز:
+
+```text
+refactor(ARC-1): remove obsolete lifecycle
+```
+
+أو Conventional Commit بدون Task ID عندما يكون اسم الـBranch والـPR والوثائق يحدد Scope المبادرة بوضوح:
+
+```text
+refactor: remove obsolete lifecycle
 ```
 
 القواعد:
@@ -306,12 +372,13 @@ docs(A1): update execution progress
   - `changes`
   - `fix stuff`
 - لا تجمع تغييرات غير مرتبطة في Commit واحد.
+- لا تستخدم Task ID لم يعد موجوداً في الخطة النشطة.
 
 ---
 
 # 9. Pull Request Naming Convention
 
-الصيغة:
+للمهام العادية:
 
 ```text
 [<task-id>] <task title>
@@ -321,10 +388,24 @@ docs(A1): update execution progress
 
 ```text
 [A1] Laravel Application Foundation
-[A2] Authentication Setup
 [B1] Documents Migration
-[K2] Qdrant User and Document Security Filters
+[H1] AI Service Client
+[O2] Qdrant Leakage Verification
 ```
+
+للمبادرات المعمارية الموثقة يجوز:
+
+```text
+[ARC-1] Remove obsolete processing lifecycle
+```
+
+أو Conventional PR title واضح:
+
+```text
+refactor: remove obsolete processing lifecycle
+```
+
+الأهم أن يكون Scope الـPR واضحاً ويمكن ربطه بالـExecution Progress.
 
 ---
 
@@ -336,7 +417,14 @@ docs(A1): update execution progress
 
 ```text
 Task ID:
-A1
+H1
+```
+
+أو عند مبادرة معمارية:
+
+```text
+Initiative:
+ARC-1
 ```
 
 ## Goal
@@ -349,7 +437,7 @@ A1
 
 ## Tests
 
-ما الاختبارات التي تم تشغيلها؟
+ما الاختبارات التي تم تشغيلها فعلياً؟
 
 ## Acceptance Criteria
 
@@ -358,6 +446,8 @@ A1
 ## Notes
 
 أي قرار أو trade-off أو مشكلة معروفة.
+
+عند وجود Schema أو Contract change يجب توضيحه صراحةً.
 
 ---
 
@@ -370,15 +460,18 @@ A1
 - هل التنفيذ يحقق المطلوب؟
 - هل توجد أخطاء منطقية؟
 - هل حالات الفشل معالجة؟
-- هل السلوك مطابق للخطة؟
+- هل السلوك مطابق للـMaster Plan؟
+- هل التطبيق يستخدم الـactive/current contracts وليس semantics تاريخية ألغيت؟
 
 ## 11.2 Architecture
 
 - هل المسؤوليات موزعة في الطبقة الصحيحة؟
 - هل Laravel يتجنب منطق AI؟
 - هل FastAPI يتجنب إدارة application state الخاصة بـLaravel؟
+- هل Qdrant infrastructure منفصلة عن Laravel business state؟
 - هل يوجد coupling غير ضروري؟
 - هل يوجد violation لـSeparation of Concerns؟
+- هل تم تجنب abstraction لا حاجة لها؟
 
 ## 11.3 Clean Code
 
@@ -389,6 +482,7 @@ A1
 - تجنب magic values.
 - configuration بدلاً من hardcoding.
 - dependency direction صحيحة.
+- contracts صريحة وقابلة للاختبار.
 
 ## 11.4 Security
 
@@ -406,21 +500,25 @@ A1
 - secrets.
 - logging.
 - user isolation.
+- trusted profile/run/collection routing.
 
 ## 11.5 Data Integrity
 
 - العلاقات صحيحة.
 - القيود والفهارس مناسبة.
 - status transitions صحيحة.
+- `active_processing_run_id` لا يشير إلا إلى Run تخص نفس الوثيقة وحالتها `indexed`.
 - لا توجد duplicates غير مقصودة.
 - الحذف وإعادة المعالجة يحافظان على الاتساق.
+- لا يتم حذف الـactive run القديمة قبل نجاح البديل في reprocessing.
 
 ## 11.6 Error Handling
 
 - Exceptions واضحة.
-- الأخطاء المؤقتة والدائمة مميزة.
+- الأخطاء المؤقتة والدائمة مميزة عند الحاجة.
 - رسائل المستخدم لا تكشف تفاصيل حساسة.
 - Logs مفيدة للتشخيص.
+- الفشل لا يؤدي إلى unsafe fallback.
 
 ## 11.7 Tests
 
@@ -429,6 +527,8 @@ A1
 - هل تغطي failure path؟
 - هل تغطي security boundaries عند الحاجة؟
 - هل الاختبارات مستقلة وقابلة للتكرار؟
+- هل test isolation صحيح بالنسبة لـ`.env` والـruntime configuration؟
+- هل regression tests تحمي العقود التي تم حذفها أو تبسيطها عند الحاجة؟
 
 ## 11.8 Maintainability
 
@@ -436,6 +536,8 @@ A1
 - هل يمكن توسيعه لاحقاً؟
 - هل API contract واضح؟
 - هل التعديلات المستقبلية محصورة في طبقات مناسبة؟
+- هل يوجد dead code أو abstraction غير مستخدمة؟
+- هل أسماء الحقول والعلاقات تعكس semantics الحالية؟
 
 ## 11.9 Performance
 
@@ -448,6 +550,9 @@ A1
 - retries.
 - timeouts.
 - concurrent workloads.
+- local heavy-model lifecycle.
+- worker concurrency.
+- memory release after local AI stages.
 
 ---
 
@@ -465,6 +570,8 @@ A1
 - اختبارات أساسية فاشلة.
 - API contract غير صحيح.
 - تنفيذ لا يحقق Acceptance Criteria.
+- تغيير schema يترك التطبيق في حالة غير قابلة للإقلاع.
+- bypass أمني غير مقصود.
 
 النتيجة:
 
@@ -485,6 +592,9 @@ NEEDS CHANGES
 - منطق أعمال داخل Controller بشكل كبير.
 - coupling مرتفع.
 - failure scenario أساسي غير مغطى.
+- status transition غير صحيح.
+- Qdrant scope ناقص.
+- contract لا يطابق الخطة الحالية.
 
 النتيجة غالباً:
 
@@ -545,8 +655,9 @@ NEEDS CHANGES
 مثال:
 
 - خدمة ClamAV غير متاحة في بيئة المراجعة.
-- Integration يحتاج Docker runtime.
+- Integration يحتاج Docker/runtime فعلي.
 - Provider خارجي يحتاج secret غير متاح.
+- Local AI يحتاج جهازاً فعلياً لإثبات load/release behavior.
 
 تبقى المهمة:
 
@@ -568,6 +679,7 @@ VERIFY
 - الاختبارات المطلوبة ناجحة.
 - التنفيذ مطابق للخطة.
 - لا يوجد خرق أمني معروف.
+- الـbranch مبني على baseline صالح للمراجعة.
 
 بعدها يمكن اعتبار المهمة:
 
@@ -575,21 +687,27 @@ VERIFY
 DONE
 ```
 
+حسب قواعد تحديث الـExecution Progress.
+
 ---
 
 # 14. Definition of Review Done
 
-لا تعتبر المراجعة منتهية حتى يتم فحص:
+لا تعتبر المراجعة منتهية حتى يتم فحص ما ينطبق من:
 
 - PR metadata.
+- base/head refs.
 - changed files.
-- diff.
+- diff أو patches.
 - الملفات المهمة كاملة عند الحاجة.
 - tests / CI.
+- migrations/schema عند وجود تغيير بيانات.
 - العلاقات مع الكود المحيط.
+- API/DTO contracts.
 - Acceptance Criteria.
 - security implications.
 - open review threads إن وجدت.
+- documentation consistency عندما يغير PR المعمارية أو Task IDs.
 
 ---
 
@@ -608,11 +726,15 @@ DONE
 - Policies.
 - routes.
 - API schemas.
+- infrastructure boundaries.
 - الملفات التي يعتمد عليها الكود الجديد.
+- Git history للمكونات عندما يكون أصلها مهم لفهم هل هي legacy أم لازمة.
 
 الهدف:
 
 > مراجعة السلوك الفعلي، لا مجرد الأسطر الجديدة.
+
+وفي Cleanup/Refactor معماري يجب مراجعة **ما بقي** بعد الحذف، وليس فقط الملفات المحذوفة.
 
 ---
 
@@ -639,6 +761,8 @@ build
 
 المراجعة اليدوية للمعمارية والأمان تبقى مطلوبة.
 
+إذا لم يوجد CI يغطي المهمة، تستخدم نتائج الاختبارات المحلية التي أرسل المستخدم ناتجها صراحةً، ولا يفترض نجاحها بدون دليل.
+
 ---
 
 # 17. حالات لا تعتبر فيها المهمة DONE
@@ -646,19 +770,21 @@ build
 لا تعتمد المهمة إذا كان أي مما يلي صحيحاً:
 
 - الكود غير مختبر عندما تكون الاختبارات ضرورية.
-- يوجد failing CI.
+- يوجد failing CI مطلوب.
 - يوجد security issue معروف.
 - يوجد TODO أساسي داخل نفس Scope.
 - Acceptance Criteria غير مكتملة.
 - تم تنفيذ جزء فقط من Task.
 - يوجد workaround مؤقت غير موثق.
-- توجد migrations غير آمنة أو غير قابلة للتطبيق.
+- توجد migrations غير قابلة للتطبيق على الـbaseline المعتمد.
 - يوجد hardcoded secret.
 - توجد بيانات مستخدم بدون ownership filtering.
-- Qdrant query بدون `user_id`.
+- Qdrant operation متعددة المستخدمين بدون scope موثوق.
 - FastAPI endpoint عام بدون الحماية المطلوبة.
 - الملفات الخاصة مخزنة public.
 - ClamAV تم تجاوزه في مسار upload حيث هو مطلوب.
+- تم تغيير active run قبل اكتمال الفهرسة والتحقق.
+- يوجد silent Cloud/CPU/provider fallback يخالف السياسة.
 
 ---
 
@@ -669,20 +795,20 @@ build
 مثال:
 
 ```text
-A1 — DONE
+H1 — DONE
 ```
 
-ويجب تسجيل:
+ويجب أن يحفظ ملف Progress ما يلزم لنقطة الاستلام، مثل:
 
 ```text
 Task:
-A1
+H1
 
 Status:
 DONE
 
 Branch:
-task/A1-laravel-foundation
+task/H1-ai-service-client
 
 Pull Request:
 #<number>
@@ -703,8 +829,10 @@ Open Issues:
 - None
 
 Next Task:
-A2 — Authentication
+H2 — Processing DTOs and contract alignment
 ```
+
+لا يجب نسخ تاريخ ضخم إلى Progress إذا كان محفوظاً في Git؛ الملف يجب أن يبقى مفيداً كنقطة استلام تنفيذية.
 
 ---
 
@@ -712,14 +840,15 @@ A2 — Authentication
 
 يجب الاحتفاظ بدليل قابل للتتبع.
 
-الحد الأدنى:
+الحد الأدنى حسب نوع المهمة:
 
-- Task ID.
+- Task ID أو Initiative ID.
 - Branch.
-- PR number.
+- PR number عند فتح PR.
 - reviewed commit SHA.
 - test result.
 - review status.
+- schema/migration verification عند الحاجة.
 
 هذا يجعل ملف Progress مفيداً لاحقاً في:
 
@@ -743,9 +872,16 @@ Scope Change
 Security Policy Change
 API Contract Strategy Change
 Deployment Strategy Change
+Roadmap/Task Renumbering
 ```
 
-وعندها يجب توثيق القرار أيضاً في Progress.
+وعندها يجب:
+
+1. تحديث الـMaster Plan.
+2. تحديث الـExecution Progress.
+3. التأكد أن Task IDs والأسماء متطابقة بينهما.
+4. مراجعة أي بروتوكولات أو docs أخرى تحتوي أمثلة IDs قديمة.
+5. عدم إبقاء مهام أزيلت من الـTarget Architecture كمهام نشطة تحت أسماء `CANCELLED` أو مشابه إذا كان القرار هو تنظيف الـroadmap.
 
 ---
 
@@ -782,10 +918,10 @@ Re-review
 مثال:
 
 ```text
-A2 Authentication
+H1 AiServiceClient
 ```
 
-وأثناءها ظهر تحسين كبير في Qdrant.
+وأثناءها ظهر تحسين كبير غير ضروري الآن في Retrieval.
 
 لا يتم إدخاله داخل نفس PR.
 
@@ -797,18 +933,28 @@ Follow-up Task
 
 ويؤجل إلى مرحلته المناسبة.
 
+إذا كانت المشكلة BLOCKER لصحة المهمة الحالية، تعالج فقط بالحد اللازم لرفع الـBlocker وتوثق بوضوح.
+
 ---
 
 # 23. حجم Pull Request
 
 يفضل أن يكون PR:
 
-- صغيراً.
+- صغيراً قدر الإمكان.
 - له هدف واحد.
 - قابل للمراجعة.
 - لا يحتوي تغييرات unrelated.
 
 إذا أصبحت Task الأصلية كبيرة جداً، يجوز تقسيم التنفيذ إلى Subtasks بشرط توثيق ذلك في Progress وعدم تغيير الهدف الأصلي بدون قرار واضح.
+
+المبادرات المعمارية Cross-cutting قد تكون أكبر، لكن يجب تعويض ذلك بـ:
+
+- Impact Audit.
+- Scope واضح.
+- مراجعة طبقية.
+- regression/full verification.
+- توثيق نهائي متسق.
 
 ---
 
@@ -824,7 +970,7 @@ Squash Merge
 
 إذا كان ذلك أنسب لسجل `main`.
 
-القرار النهائي لطريقة الدمج يحدد لاحقاً عند إعداد قواعد الـRepository.
+لا يتم إعادة كتابة history أو force-push أثناء المراجعة بدون حاجة واضحة ومعرفة أثر ذلك على PR.
 
 ---
 
@@ -852,6 +998,7 @@ DB_PASSWORD
 HF_TOKEN
 JINAAI_API_KEY
 LLAMA_CLOUD_API_KEY
+INTERNAL_API_KEY
 AI_SERVICE_API_KEY
 QDRANT_API_KEY
 private keys
@@ -863,13 +1010,13 @@ private keys
 .env.example
 ```
 
-بدون قيم سرية.
+بدون قيم سرية حقيقية.
 
 ---
 
-# 27. الملفات المولدة
+# 27. الملفات المولدة والمؤقتة
 
-لا يتم Commit لملفات build/cache/dependencies غير المطلوبة.
+لا يتم Commit لملفات build/cache/dependencies أو audit outputs غير المطلوبة.
 
 أمثلة شائعة:
 
@@ -881,9 +1028,13 @@ storage/logs/*
 __pycache__/
 .pytest_cache/
 .venv/
+*.tmp
+local audit output files
 ```
 
-ويجب ضبط `.gitignore`.
+ويجب ضبط `.gitignore` حيث يكون ذلك مناسباً.
+
+قبل Commit كبير، تتم مراجعة `git status --short` للتأكد أن قائمة الملفات ضمن Scope.
 
 ---
 
@@ -907,6 +1058,19 @@ __pycache__/
 
 ويجب إبقاء Controllers وLivewire Components خفيفة قدر الإمكان.
 
+في processing orchestration يجب أن يبقى Laravel مصدر الحقيقة لـ:
+
+```text
+ownership
+document state
+processing run state
+active_processing_run_id
+transactions
+queue orchestration
+```
+
+ولا ينفذ Parsing/Embeddings/Retrieval داخله.
+
 ---
 
 # 29. قاعدة مراجعة FastAPI
@@ -917,14 +1081,18 @@ __pycache__/
 - validation.
 - configuration.
 - clients.
-- loaders.
-- services.
+- parsing/loaders.
+- processing services.
+- Qdrant infrastructure.
 - exceptions.
 - logging.
+- runtime/resource lifecycle.
 - async/sync boundaries عند الحاجة.
 - tests.
 
 Endpoints يجب ألا تحمل منطق RAG كبيراً مباشرة.
+
+FastAPI لا يصبح مصدر الحقيقة لـLaravel business state.
 
 ---
 
@@ -934,7 +1102,7 @@ Endpoints يجب ألا تحمل منطق RAG كبيراً مباشرة.
 
 - document normalization.
 - chunk metadata.
-- passage/query embedding separation.
+- passage/query embedding separation عند الحاجة.
 - dense retrieval.
 - sparse retrieval.
 - RRF.
@@ -943,43 +1111,70 @@ Endpoints يجب ألا تحمل منطق RAG كبيراً مباشرة.
 - prompt behavior.
 - source preservation.
 - insufficient-context behavior.
+- profile-specific provider routing.
+- عدم مقارنة raw scores عبر embedding spaces مختلفة.
+
+Cloud وHybrid Local مساران مستقلان، وجودهما معاً في محادثة يعني mixed-profile retrieval لDocuments مفهرسة مسبقاً، وليس إنشاء workflow اختيار بين نتيجتي معالجة للـUpload.
 
 ---
 
 # 31. قاعدة مراجعة Qdrant
 
-لا يمر أي retrieval في التطبيق متعدد المستخدمين بدون:
+## 31.1 الكتابة والفهرسة
+
+كل Point يجب أن تحمل metadata اللازمة لعزلها وتتبعها:
 
 ```text
 user_id
+document_id
+processing_run_id
+processing_profile
 ```
 
-وعند السؤال يجب أيضاً تقييد:
+الفهرسة الدائمة تستخدم:
+
+- deterministic Point IDs.
+- idempotent upsert.
+- Collection مشتقة Server-side من Processing Profile موثوقة.
+- count verification ضمن نطاق الـRun قبل اعتبارها indexed.
+
+## 31.2 Retrieval
+
+لا يمر أي Retrieval متعدد المستخدمين بدون filters موثوقة:
 
 ```text
-document_ids
+user_id = current user
+AND
+document_id = authorized document
+AND
+processing_run_id = active indexed run
 ```
 
-ويتم التحقق من ذلك في:
+وعند عدة وثائق تبنى الـtargets Server-side من MySQL بعد التحقق من ownership والحالة.
 
-- dense search.
-- sparse search.
-- hybrid search.
+## 31.3 Delete / Reprocess / Admin
+
+يطبق العزل نفسه على:
+
 - delete.
-- reprocess.
-- maintenance queries ذات العلاقة بالمستخدم.
+- reprocess cleanup.
+- admin chunk browsing.
+- maintenance queries المرتبطة بالمستخدم.
+
+Browser لا يختار Collection أو Run موثوقة بمفرده.
 
 ---
 
 # 32. قاعدة مراجعة ClamAV
 
-يجب التأكد أن:
+الـflow الافتراضي عند تفعيل الفحص:
 
 ```text
 Upload
-→ Temporary private storage
-→ Scan
+→ Private security quarantine
+→ Security Scan
 → Clean
+→ Permanent private storage
 → Processing
 ```
 
@@ -987,69 +1182,102 @@ Upload
 
 ```text
 Upload
-→ FastAPI
+→ FastAPI processing
 → Scan later
 ```
 
-وعند تعطل ClamAV:
+عند اكتشاف ملف مصاب:
+
+```text
+infected
+→ no processing
+```
+
+وعند تعطل ClamAV بينما الفحص مفعّل:
 
 ```text
 Fail Closed
 ```
 
+يجوز تعطيل الفحص فقط عبر trusted server-side configuration صريحة حسب الخطة.
+
+الـquarantine الأمنية ليست processing artifact ولا vector staging layer.
+
 ---
 
 # 33. قاعدة مراجعة المصادر
 
-المصدر المعروض يجب أن يكون قابلاً للتتبع إلى:
+المصدر المعروض يجب أن يكون قابلاً للتتبع إلى ما ينطبق من:
 
 ```text
 document_id
+processing_run_id
+processing_profile
 page / section
 chunk_index
 qdrant_point_id
 source_number
 ```
 
-بحسب نوع الملف.
+بحسب نوع الملف والعقد النهائي للرسائل.
 
-لا يتم اختراع page لـDOCX/TXT.
+لا يتم اختراع page لـDOCX/TXT عندما لا توجد page metadata موثوقة.
 
 ---
 
 # 34. قاعدة مراجعة LLM Providers
 
-يجب ألا يعرف بقية RAG أي Provider مستخدم.
+Routing لا يعتمد على Browser أو global provider switch غير موثوق.
 
-المطلوب:
+المطلوب مفاهيمياً:
 
 ```text
-GenerationService
+Authorized document targets
   ↓
-LLMProvider abstraction
+trusted active ProcessingRun/profile
   ↓
-Cloud / Local
+LLMProvider registry/routing
+  ↓
+Cloud or Local provider
+```
+
+Cloud active run:
+
+```text
+Hugging Face Router
+→ Qwen/Qwen3.5-9B
+```
+
+Hybrid Local active run:
+
+```text
+Ollama
+→ qwen3.5:4b
 ```
 
 لا يسمح بتسريب تفاصيل مزود واحد عبر باقي النظام.
 
 ---
 
-# 35. قاعدة Fallback
+# 35. قاعدة Fallback والـLocal Resources
 
-إذا كان:
+لا يوجد silent fallback من Local إلى Cloud عند الفشل.
 
-```text
-LLM_PROVIDER=local
-```
+ولا يوجد silent device/provider fallback يخالف configuration الموثوقة.
 
-فلا يتم إرسال السياق إلى Cloud تلقائياً عند الفشل.
-
-الوضع الافتراضي:
+للمسار المحلي يجب احترام:
 
 ```text
-ALLOW_CLOUD_FALLBACK=false
+single active heavy model
+worker concurrency = 1
+lazy load
+release after stage
+OLLAMA_KEEP_ALIVE=0
 ```
+
+وعند مشاركة الموارد مع ClamAV يجب احترام global heavy-resource lock حسب الخطة.
+
+إذا فشل Local provider، يعاد خطأ واضح بدلاً من إرسال المحتوى إلى Cloud تلقائياً.
 
 ---
 
@@ -1064,8 +1292,8 @@ owner/repository
 Pull Request:
 #N
 
-Task:
-A1
+Task or Initiative:
+H1
 ```
 
 ثم تتم قراءة:
@@ -1078,7 +1306,7 @@ PROJECT_RAG_GITHUB_REVIEW_PROTOCOL.md
 
 من GitHub عند الحاجة.
 
-بعد ذلك يتم تنفيذ المراجعة وفق هذا الملف.
+لا يفترض Task ID أو next task من أمثلة ثابتة داخل هذا البروتوكول؛ تؤخذ الحالة الحالية دائماً من `PROJECT_RAG_EXECUTION_PROGRESS.md`.
 
 ---
 
@@ -1090,7 +1318,7 @@ PROJECT_RAG_GITHUB_REVIEW_PROTOCOL.md
 راجع PR رقم <N> لمهمة <TASK-ID> حسب GitHub Review Protocol.
 تحقق من الكود والاختبارات ومعيار الإنجاز.
 إذا كانت هناك مشاكل أعطني NEEDS CHANGES مع التفاصيل.
-إذا نجحت المهمة اعتبرها DONE وحدّث PROJECT_RAG_EXECUTION_PROGRESS.md.
+إذا نجحت المهمة أعطني APPROVED وحدد تحديث Progress المطلوب.
 ```
 
 تحديث GitHub نفسه يتم فقط بعد وجود صلاحية وموافقة صريحة على عملية الكتابة المطلوبة.
@@ -1102,18 +1330,26 @@ PROJECT_RAG_GITHUB_REVIEW_PROTOCOL.md
 يجب أن يحتوي ملخص المراجعة على:
 
 ```text
-Task
+Task / Initiative
 PR
+Base / Head
 Review Result
 Critical Findings
 Major Findings
 Minor Findings
 Tests / CI
+Schema / Contract Verification عند الحاجة
 Acceptance Criteria
 Final Decision
 Progress Update
 Next Task
 ```
+
+يجب فصل:
+
+- ما تم التحقق منه فعلياً.
+- ما تم استنتاجه.
+- ما لم يمكن التحقق منه في البيئة الحالية.
 
 ---
 
@@ -1160,30 +1396,114 @@ DONE
 
 ---
 
-# 41. الحالة الحالية
+# 41. الحالة التنفيذية الحالية
 
-تم إنشاء GitHub Repository الرسمي للمشروع وتهيئته:
+هذا البروتوكول **لا يخزن Current Task ثابتة** حتى لا يصبح قديماً مع تقدم المشروع.
 
-```text
-Repository: mona-alrayes/RAG-Local-Documents-System
-Default Branch: main
-Repository Status: Initialized
-Current Task: A1 — إنشاء Laravel Application
-Current Task Status: TODO
-```
-
-الملفات المرجعية الموجودة في root:
-
-- `PROJECT_RAG_MASTER_PLAN.md`
-- `PROJECT_RAG_EXECUTION_PROGRESS.md`
-- `PROJECT_RAG_GITHUB_REVIEW_PROTOCOL.md`
-- `PROJECT_RAG_MENTOR_WORKFLOW.md`
-- `cloud_first_rag_colab_fixed_interactive.ipynb`
-
-أول Branch تنفيذي مخطط:
+الحالة الحالية دائماً تقرأ من:
 
 ```text
-task/A1-laravel-foundation
+PROJECT_RAG_EXECUTION_PROGRESS.md
 ```
 
-ولا يتم الانتقال إلى `A2` قبل اكتمال تنفيذ ومراجعة واعتماد `A1` وفق هذا البروتوكول.
+والـroadmap النشط الحالي يغطي:
+
+```text
+A — Foundation
+B — Documents Foundation
+C — Security Pipeline
+D — FastAPI Foundation
+E — Qdrant
+F — Parsing and Normalization
+G — Profile Processing
+H — Processing Orchestration
+I — Blade Documents Experience
+J — Conversations Database
+K — Retrieval and Reranking
+L — Generation
+M — Chat Experience
+N — Filament
+O — Security and Operations
+P — Final Validation
+DPL-* — Deployment
+```
+
+عند baseline توثيق هذا البروتوكول، المبادرة المعمارية `ARC-1` أنهت إزالة الـprocessing lifecycle القديم محلياً على Branch مخصص، والمهمة المخططة التالية بعد دمجها هي:
+
+```text
+H1 — AiServiceClient
+```
+
+لكن بعد أي Merge أو Progress update لا يعتمد هذا السطر كبديل عن `PROJECT_RAG_EXECUTION_PROGRESS.md`.
+
+---
+
+# 42. فحص الاتساق قبل دمج تغيير معماري
+
+إذا كان PR يغير Architecture أو roadmap أو naming/domain semantics، يجب قبل الدمج التحقق من:
+
+```text
+Master Plan
+Execution Progress
+GitHub Review Protocol
+Mentor Workflow عند تأثره
+code
+schema
+tests
+environment examples
+```
+
+ويجب التأكد من:
+
+- عدم وجود Task IDs قديمة توجه التنفيذ.
+- عدم وجود status/field/endpoint قديم ما زال Active بالخطأ.
+- عدم وجود dead code ناتج عن الـcleanup.
+- عدم وجود config/env values لميزة أزيلت.
+- عدم وجود test يختبر workflow أزيل، إلا إذا كان Negative Regression Guard واضحاً.
+- أن Git history وحده هو مكان التفاصيل التاريخية التي لم تعد جزءاً من الـTarget Architecture.
+
+---
+
+# 43. قاعدة Clean Baseline
+
+عند إعادة بناء baseline أثناء مرحلة تطوير مبكرة، يجوز Consolidate لمigrations أو schema فقط إذا:
+
+- لا توجد بيانات يجب الحفاظ عليها.
+- القرار موثق.
+- تم التحقق من `migrate:fresh` أو ما يعادله.
+- تم تشغيل regression المناسب.
+
+بعد وجود بيانات يجب الحفاظ عليها أو اعتماد release baseline، تستخدم Forward Migrations بدلاً من إعادة كتابة history التنفيذي المعتمد.
+
+هذه القاعدة لا تعني حذف Git history؛ Git يبقى المرجع التاريخي للتغييرات السابقة.
+
+---
+
+# 44. الخلاصة
+
+البروتوكول يهدف إلى أن تكون كل مهمة:
+
+```text
+Scoped
+→ Implemented
+→ Verified
+→ Reviewed
+→ Traceable
+→ Documented
+→ Mergeable
+```
+
+مع المحافظة على:
+
+```text
+Clean Code
+Separation of Concerns
+Security
+User Isolation
+Data Integrity
+Explicit Contracts
+Maintainability
+Evidence-based Review
+```
+
+وأي قرار معماري جديد يجب أن يظهر أولاً في الـMaster Plan والـExecution Progress، ثم ينعكس على التنفيذ والمراجعة بدون إبقاء توجيهات قديمة في الوثائق النشطة.

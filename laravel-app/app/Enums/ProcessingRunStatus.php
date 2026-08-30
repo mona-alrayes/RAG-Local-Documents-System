@@ -11,11 +11,7 @@ enum ProcessingRunStatus: string
 {
     case Pending = 'pending';
     case Processing = 'processing';
-    case ReadyForComparison = 'ready_for_comparison';
-    case Selected = 'selected';
     case Indexing = 'indexing';
     case Indexed = 'indexed';
-    case Discarded = 'discarded';
     case Failed = 'failed';
-    case Expired = 'expired';
 }

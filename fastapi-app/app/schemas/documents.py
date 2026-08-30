@@ -10,4 +10,3 @@ class ProcessDocumentResponse(BaseModel):
     total_chunks: int
     vector_count: int
     vector_dimension: int
-    temporary_artifact_ref: str
