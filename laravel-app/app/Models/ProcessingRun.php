@@ -20,14 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'warnings',
     'error_code',
     'failure_reason',
-    'comparison_report',
-    'temporary_artifact_ref',
-    'temporary_expires_at',
     'qdrant_collection',
     'indexed_at',
-    'selected_at',
-    'discarded_at',
-    'expired_at',
 ])]
 class ProcessingRun extends Model
 {
@@ -46,12 +40,7 @@ class ProcessingRun extends Model
             'profile_snapshot' => 'array',
             'stage_timings_ms' => 'array',
             'warnings' => 'array',
-            'comparison_report' => 'array',
-            'temporary_expires_at' => 'datetime',
             'indexed_at' => 'datetime',
-            'selected_at' => 'datetime',
-            'discarded_at' => 'datetime',
-            'expired_at' => 'datetime',
         ];
     }
 

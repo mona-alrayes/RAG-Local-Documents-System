@@ -14,9 +14,7 @@ enum DocumentStatus: string
     case Infected = 'infected';
     case Queued = 'queued';
     case Processing = 'processing';
-    case AwaitingSelection = 'awaiting_selection';
     case Indexing = 'indexing';
     case Ready = 'ready';
     case Failed = 'failed';
-    case SelectionExpired = 'selection_expired';
 }

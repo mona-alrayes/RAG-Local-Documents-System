@@ -61,16 +61,15 @@ class Document extends Model
         return $this->hasMany(ProcessingRun::class);
     }
 
+
     /**
-     * Get the processing run officially selected for this document.
-     *
-     * محاولة المعالجة الرسمية المعتمدة للوثيقة.
+     * Get the currently active indexed processing run for this document.
      */
-    public function selectedProcessingRun(): BelongsTo
+    public function activeProcessingRun(): BelongsTo
     {
         return $this->belongsTo(
             ProcessingRun::class,
-            'selected_processing_run_id',
+            'active_processing_run_id',
         );
     }
 }

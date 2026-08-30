@@ -163,7 +163,7 @@ def test_local_bm25_output_matches_qdrant_sparse_point_contract() -> None:
     point = build_point(
         payload=payload,
         dense_vector=[0.1, 0.2],
-        sparse_vector=sparse_vector,
+        sparse_representation=sparse_vector,
     )
 
     assert isinstance(point.vector, dict)

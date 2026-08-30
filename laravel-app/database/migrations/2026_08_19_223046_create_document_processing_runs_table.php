@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('document_processing_runs', function (Blueprint $table) {
@@ -16,7 +19,7 @@ return new class extends Migration
                 ->restrictOnDelete();
 
             $table->string('profile', 32);
-            $table->string('status', 32);
+            $table->string('status', 32)->default('pending');
 
             $table->json('profile_snapshot');
 
@@ -31,26 +34,19 @@ return new class extends Migration
             $table->string('error_code')->nullable();
             $table->text('failure_reason')->nullable();
 
-            $table->json('comparison_report')->nullable();
-
-            $table->string('temporary_artifact_ref')->nullable();
-            $table->timestamp('temporary_expires_at')->nullable();
-
             $table->string('qdrant_collection')->nullable();
-
             $table->timestamp('indexed_at')->nullable();
-            $table->timestamp('selected_at')->nullable();
-            $table->timestamp('discarded_at')->nullable();
-            $table->timestamp('expired_at')->nullable();
 
             $table->timestamps();
 
             $table->index(['document_id', 'status']);
             $table->index(['document_id', 'profile', 'created_at']);
-            $table->index(['status', 'temporary_expires_at']);
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('document_processing_runs');
