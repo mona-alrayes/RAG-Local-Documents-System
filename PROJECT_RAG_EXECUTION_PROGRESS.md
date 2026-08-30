@@ -17,19 +17,21 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: b8c1675c678d855098f3043f7d1667f430b1bbf0
+Verified Main Commit: c697a90e339bd754d73fc5c8f1aebef69bf01acf
 Last Merged PR: #79 — feat(H2): add configurable temporary artifact TTL
 Latest Task PR: #79
 H2 Implementation Commit: e076bd93fb064ea60747b8cc2c72d5c210f3bea2
 H2 Merge Commit: b8c1675c678d855098f3043f7d1667f430b1bbf0
+Compare Simplification Commit: c697a90e339bd754d73fc5c8f1aebef69bf01acf
+Compare Simplification Decision: إلغاء Trial Question وTemporary Retrieval Index وأي Retrieval قبل اختيار الفائز؛ H3/I7/J7 = N/A؛ الاختيار يعتمد على Processing Report + Chunk Samples ثم Promotion مباشرة
 H2 Scope: إضافة `TEMP_ARTIFACT_TTL_HOURS` بقيمة افتراضية 24 ساعة وقابلة للتهيئة؛ إضافة `created_at` و`expires_at` إلى artifact manifest كتوقيتات واعية بالمنطقة الزمنية ومحولة إلى UTC؛ يعتبر الـartifact منتهيًا عند `now >= expires_at`؛ إضافة `ArtifactExpiredError` ورفض `read()` للـartifact المنتهي دون حذفه؛ deterministic injected clock للاختبارات دون `sleep`؛ خارج النطاق: scheduled expiration cleanup وحذف الـartifacts المنتهية وtemporary retrieval index وQdrant promotion وLaravel orchestration وأي API endpoint جديد
 H2 Verification: Focused H2: `20 passed`؛ Related regression: `30 passed`؛ Full FastAPI suite: `143 passed`
 H2 Verification Note: احتاج تشغيل الـfull suite محليًا عزل `.env` بسبب `LOCAL_AI_TOPOLOGY=host_native`؛ كان ذلك تلوثًا من بيئة التطوير المحلية لا فشلًا في H2، ولم يتطلب تعديل production code
 Last Completed Task: H2 — Configurable 24h TTL
-Current Task: H3 — Temporary retrieval index
+Current Task: H4 — Winner promotion
 Current Task Status: TODO
-Expected Task Branch: task/H3-temporary-retrieval-index
-Next Task After Completion: H4 — Winner promotion
+Expected Task Branch: task/H4-winner-promotion
+Next Task After Completion: H5 — Count verification
 
 Schema Audit: 2026-08-21 — B12 migration up/down/up + MySQL 8.4.11 verified
 Live Tables: 13
@@ -226,14 +228,14 @@ Open Blockers: لا يوجد
 |---|---|
 | H1 Private artifact store/opaque refs | DONE |
 | H2 Configurable 24h TTL | DONE |
-| H3 Temporary retrieval index | TODO |
+| H3 Temporary retrieval index | N/A |
 | H4 Winner promotion | TODO |
 | H5 Count verification | TODO |
 | H6 Loser cleanup | TODO |
 | H7 Scheduled expiration cleanup | TODO |
 | H8 Idempotency/failure recovery tests | TODO |
 
-**معيار انتهاء المرحلة:** لا تدخل Qdrant الدائمة إلا نتيجة فائزة متحقق منها.
+**معيار انتهاء المرحلة:** لا تدخل Qdrant الدائمة إلا نتيجة فائزة متحقق منها. H3 ملغاة لأن Compare لا ينفذ Retrieval قبل اختيار الفائز؛ H4 يستهلك artifact الفائز مباشرة.
 
 ---
 
@@ -247,13 +249,13 @@ Open Blockers: لا يوجد
 | I4 Single-profile flow | TODO |
 | I5 Compare flow وإنشاء Runين | TODO |
 | I6 Report persistence | TODO |
-| I7 Trial-question flow | TODO |
+| I7 Trial-question flow | N/A |
 | I8 Winner selection transaction | TODO |
 | I9 Aggregate status projector | TODO |
 | I10 Queue retries/timeouts | TODO |
 | I11 Laravel serialized `ai-local` queue + global Redis lock shared with `security-scan` for full FastAPI call | TODO |
 
-**معيار انتهاء المرحلة:** Single أو Compare يكتملان بحالة متسقة بين Laravel وFastAPI وQdrant، وكل عمل Local AI ثقيل يمر عبر Queue واحدة ذات concurrency=1، ولا يبدأ قبل انتهاء Security scan وتحرير Process الفحص.
+**معيار انتهاء المرحلة:** Single أو Compare يكتملان بحالة متسقة بين Laravel وFastAPI وQdrant، وكل عمل Local AI ثقيل يمر عبر Queue واحدة ذات concurrency=1، ولا يبدأ قبل انتهاء Security scan وتحرير Process الفحص. لا يوجد pre-selection retrieval endpoint.
 
 ---
 
@@ -267,11 +269,11 @@ Open Blockers: لا يوجد
 | J4 One-file upload + capability-aware options | TODO |
 | J5 Document details/timeline | TODO |
 | J6 Comparison screen | TODO |
-| J7 Trial-question interaction | TODO |
+| J7 Trial-question interaction | N/A |
 | J8 Select-winner confirmation/states | TODO |
 | J9 Accessibility/responsive/error states | TODO |
 
-**معيار انتهاء المرحلة:** المستخدم يرفع ويتابع ويقارن ويعتمد النتيجة من واجهة RTL واضحة.
+**معيار انتهاء المرحلة:** المستخدم يرفع ويتابع ويقارن عبر Processing Report + Chunk Samples ويعتمد النتيجة من واجهة RTL واضحة، بلا Trial Question.
 
 ---
 
@@ -307,7 +309,7 @@ Open Blockers: لا يوجد
 | L9 Metadata/source preservation | TODO |
 | L10 Retrieval quality/security tests | TODO |
 
-**معيار انتهاء المرحلة:** الاسترجاع يقتصر على الملفات المختارة ويدعم Profiles مختلطة دون مقارنة raw scores.
+**معيار انتهاء المرحلة:** الاسترجاع يقتصر على الملفات المختارة ويدعم Profiles مختلطة دون مقارنة raw scores. هذه هي بداية Retrieval الحقيقي بعد اعتماد وفهرسة selected runs.
 
 ---
 
@@ -400,7 +402,7 @@ Open Blockers: لا يوجد
 | Q11 Backup/restore | TODO |
 | Q12 Final documentation including non-streaming visual reveal disclosure | TODO |
 
-**معيار انتهاء المرحلة:** المساران والمقارنة والمحادثة متعددة الملفات يعملون End-to-End بأمان وبعد Restart؛ ClamAV وBGE/Reranker/Qwen لا يتداخلون في RAM، والسياق لا يتجاوز آخر تبادلين مكتملين، والعرض التدريجي Frontend-only بعد اكتمال الإجابة.
+**معيار انتهاء المرحلة:** المساران والمقارنة والمحادثة متعددة الملفات يعملون End-to-End بأمان وبعد Restart؛ ClamAV وBGE/Reranker/Qwen لا يتداخلون في RAM، والسياق لا يتجاوز آخر تبادلين مكتملين، والعرض التدريجي Frontend-only بعد اكتمال الإجابة. Compare/select لا يتطلب Trial Question.
 
 ---
 
@@ -469,6 +471,7 @@ Open Blockers: لا يوجد
 - جميع Foreign Keys تستخدم `ON DELETE RESTRICT`.
 - الحالات: `processing`, `ready`, `decided`, `expired`, `failed`.
 - تطابق جميع الـRuns مع نفس الوثيقة والمستخدم يبقى مسؤولية Domain/Orchestration logic.
+- العمود `trial_question` موجود فعلياً من B12 كـnullable legacy field، لكنه غير مستخدم بعد قرار التبسيط ولا تنشأ له API أو UI أو Task؛ لا نضيف Migration جديدة فقط لحذفه.
 
 ## 22.2 Document Components المنفذة
 
@@ -901,6 +904,7 @@ pending
 - Qdrant runtime بعد E5 = `qdrant/qdrant:v1.19.0` داخل `laravel-app/compose.yaml` مع persistent `qdrant_data`، وFastAPI تملك `qdrant-client==1.19.0` وتهيئ `rag_documents_cloud` و`rag_documents_hybrid_local` تلقائياً بمخطط Vector مركزي: `dense_vector` بحجم `1024` و`COSINE`، و`bm25_sparse_vector` مع `IDF`؛ كما تطبق Payload Indexes مركزية: `user_id` و`document_id` و`processing_run_id` من نوع `INTEGER`، و`processing_profile` من نوع `KEYWORD`؛ تدعم Collections الموجودة بلا حذف أو إعادة إنشاء، وتفشل بوضوح عند تعارض المخطط، مع Startup idempotent؛ لا توجد Points بعد.
 - Qdrant = Collection منفصلة لكل Processing Profile مع mandatory user/document/run filters.
 - Persistent Qdrant يحتفظ بالـselected winner فقط بعد التحقق.
+- Compare قبل الاختيار = Processing Report + Chunk Samples فقط؛ لا Trial Question ولا Temporary Retrieval Index ولا Query embedding/RRF/Reranking. H4 يقرأ artifact الفائز مباشرة ويعمل Promotion، ثم يبدأ Retrieval الحقيقي في المرحلة L.
 - Laravel/MySQL هو مصدر الحقيقة للتطبيق؛ لا توجد DB علائقية مستقلة لـFastAPI في v1.
 - المحادثة تستخدم آخر تبادلين مكتملين فقط لفهم الإحالات؛ لا توجد ذاكرة مستخرجة في v1.
 - لا يوجد True Streaming/NDJSON/Redis Stream في v1؛ `جاري التفكير` وProgressive Reveal تأثيران Frontend-only.
@@ -1007,6 +1011,7 @@ pending
 - D11 أضافت Local runtime layer منفصلة وTensor capability probe وسياسة dtype وresource telemetry ونشرت النتيجة عبر health/capabilities دون استنتاج Provider readiness، مع إثبات أن Cloud يعمل بلا Torch/psutil.
 - E2 أضافت FastAPI Qdrant infrastructure وتهيئة `rag_documents_cloud` عند Startup بصورة idempotent، مع إبقاء Hybrid Local collection لـE3 وVector schema لـE4.
 - E3 أضافت إعداد Hybrid Local ووسعت Startup المشتركة لتهيئة `rag_documents_cloud` و`rag_documents_hybrid_local` عبر `ensure_collection_exists()`، مع إبقاء Dense/Sparse configs لـE4 وPayload indexes لـE5.
+- 2026-08-30: اعتمد قرار تبسيط Compare: إلغاء Trial Question وTemporary Retrieval Index وأي pre-selection Query embedding/RRF/Reranking؛ أصبحت H3 وI7 وJ7 `N/A` من دون إعادة ترقيم بقية المهام. يعتمد الاختيار على Processing Report + Chunk Samples، ويصبح H4 المهمة التالية. يبقى `trial_question` في B12 كحقل nullable legacy غير مستخدم ولا تنشأ Migration جديدة فقط لحذفه.
 - لا توجد عوائق حالية.
 
 ---
@@ -1014,13 +1019,13 @@ pending
 # 25. المهمة الحالية
 
 ```text
-H3 — Temporary retrieval index
+H4 — Winner promotion
 Status: TODO
-Expected Branch: task/H3-temporary-retrieval-index
-Next: H4 — Winner promotion
+Expected Branch: task/H4-winner-promotion
+Next: H5 — Count verification
 ```
 
-> تبدأ H3 بعد اكتمال H2 وفق `PROJECT_RAG_MASTER_PLAN.md` والخريطة التنفيذية النشطة، ولا تعني إضافتها كمهمة حالية بدء التنفيذ أو تغيير حالتها من `TODO`.
+> تبدأ H4 مباشرة بعد H2 لأن H3 أصبحت `N/A` بقرار التبسيط المعتمد في `PROJECT_RAG_MASTER_PLAN.md` القسم 174.20. يقرأ H4 الـartifact الفائز مباشرة ويعمل Promotion إلى Qdrant الدائمة؛ لا توجد طبقة Temporary Retrieval Index بينهما.
 
 ---
 
