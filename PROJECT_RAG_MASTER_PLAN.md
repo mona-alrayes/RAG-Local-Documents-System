@@ -14,8 +14,8 @@
 > **إستراتيجية المعالجة:** Cloud أو Hybrid Local أو Compare في البيئة المحلية، وCloud فقط في النشر Online
 > **إستراتيجية LLM:** `Qwen/Qwen3.5-9B` عبر Hugging Face Router في Cloud، و`qwen3.5:4b` عبر Ollama محلياً
 > **خطة النشر المرجعية:** Oracle Cloud Always Free + Docker Compose لمسار `cloud` فقط؛ الـLocal/Compare Demo يعمل منفصلاً على أجهزة المشروع
-> **آخر تحديث للخطة:** 2026-08-24
-> **مرجع المطابقة التنفيذية:** `main@6addaf1e50863543d02a29423ac04a5b3303f72b` + Laravel migrations + MySQL schema الفعلي؛ آخر مطابقة تنفيذية لمسار Documents/Security بتاريخ 2026-08-24
+> **آخر تحديث للخطة:** 2026-08-30
+> **مرجع المطابقة التنفيذية:** `main@fb32381e8a3672e0cfad3aca47f9ea8224ff33a3` + Laravel migrations + MySQL schema الفعلي؛ آخر قرار معماري محدث لمسار Compare بتاريخ 2026-08-30
 
 > [!IMPORTANT]
 > القسم **174 — التعديل المعماري المعتمد** هو المرجع الأحدث والملزم لكل ما يخص مسارات المعالجة، قواعد البيانات، Qdrant، المحادثة، صفحات Blade، Filament والنشر. داخل القسم 174 تكون الأولوية للقسم **174.20 — قرار التبسيط النهائي** عند أي تعارض مع 174.19 أو ما قبله. أبقينا الأقسام السابقة لحفظ سياق القرارات وعدم فقدان أي معلومة تاريخية.
@@ -30,6 +30,7 @@ Mac/ASUS Local Demo  = cloud | hybrid_local | compare
 Provider routing     = trusted processing profile + capabilities، بلا global LLM_PROVIDER switch
 Security scan        = configurable؛ enabled افتراضياً → on-demand clamscan + fail-closed، disabled صراحةً → direct permanent storage بعد Validation
 Local heavy work     = global Redis lock + single_active model + release after every stage
+Compare decision     = processing report + chunk samples فقط، بلا Trial Question أو Retrieval قبل اختيار الفائز
 Conversation context = آخر تبادلين مكتملين فقط، بلا ذاكرة مستخرجة
 Answer delivery      = polling + جاري التفكير + completed-answer visual reveal، بلا Streaming backend
 Deployment tasks     = DPL-1–23 Oracle Cloud-only، وDPL-24–25 Local Demo فقط
@@ -5720,7 +5721,7 @@ Expected Task Branch: task/B11-selected-processing-run
 |---|---|
 | `cloud` | LlamaParse Cloud ثم Jina Embeddings وJina Reranker عبر API، والتوليد بواسطة `Qwen/Qwen3.5-9B` عبر Hugging Face Router |
 | `hybrid_local` | LlamaParse Cloud فقط للـParsing، ثم Chunking وBGE-M3 وBM25 وBGE Reranker محلياً، والتوليد بواسطة Ollama `qwen3.5:4b` |
-| `compare` | تشغيل `cloud` و`hybrid_local` للملف نفسه، عرض تقرير مقارنة وسؤال اختبار، ثم اعتماد مسار واحد فقط |
+| `compare` | تشغيل `cloud` و`hybrid_local` للملف نفسه، عرض تقرير مقارنة وعينات Chunks، ثم اعتماد مسار واحد فقط بلا Retrieval قبل الاختيار |
 | selected run | نتيجة المعالجة التي اختارها المستخدم وأصبحت النسخة الرسمية للوثيقة |
 | temporary artifacts | Chunks وvectors ونتائج وسيطة خاصة غير دائمة تحفظ داخل FastAPI حتى الاختيار أو انتهاء TTL |
 | persistent index | الـPoints النهائية للـselected run داخل Qdrant |
@@ -5940,11 +5941,9 @@ Validation
    أي مراحل تستخدم BGE أو Ollama تمر عبر بوابة Local AI ذات `concurrency=1` وتُنفّذ تسلسلياً؛ لا تُحمّل أو تُشغّل النماذج المحلية الثقيلة بالتوازي.
 4. تحفظ النتائج مؤقتاً داخل FastAPI ولا ترفع بعد إلى Persistent Qdrant.
 5. ترسل FastAPI إلى Laravel تقريراً مضغوطاً لكل Run، دون قيم الـvectors.
-6. يكتب المستخدم سؤال اختبار اختياري لكنه موصى به قبل القرار.
-7. يعرض النظام أفضل المقاطع ومصادرها لكل Run.
-8. يضغط المستخدم `اعتماد هذا المسار`.
-9. ترفع FastAPI نتيجة الفائز فقط إلى Qdrant بشكل idempotent.
-10. بعد نجاح الرفع والتحقق تُحذف artifacts للخاسر، ويُحتفظ بتقرير Audit في MySQL.
+6. يعرض Laravel تقرير المقارنة وعينات الـchunks، ويختار المستخدم الفائز مباشرة عبر `اعتماد هذا المسار` دون تنفيذ Retrieval قبل الاختيار.
+7. ترفع FastAPI نتيجة الفائز فقط إلى Qdrant بشكل idempotent.
+8. بعد نجاح الرفع والتحقق تُحذف artifacts للخاسر، ويُحتفظ بتقرير Audit في MySQL.
 
 ### انتهاء المقارنة
 
@@ -5963,13 +5962,11 @@ Validation
 - عدد الصفحات عندما يكون قابلاً للتحديد.
 - عدد الـchunks.
 - عينات محدودة من الـchunks مع `chunk_index` وبدايات ونهايات التقسيم.
-- زمن Parsing وChunking وEmbedding وبناء Sparse index والاختبار والإجمالي.
+- زمن Parsing وChunking وEmbedding وبناء Sparse representation والإجمالي.
 - الأخطاء والتحذيرات.
 - أبعاد الـvectors وعددها، من دون إرسال قيم vectors إلى Laravel.
-- سؤال الاختبار.
-- أفضل المقاطع المسترجعة ومصادرها ودرجات الصلة.
 
-لا يحتوي التقرير ولا شاشة المقارنة على تقدير تكلفة Cloud.
+لا يحتوي التقرير ولا شاشة المقارنة على تقدير تكلفة Cloud، ولا ينفذان سؤالاً تجريبياً أو Retrieval قبل اختيار الفائز.
 
 ## 174.6 حدود المسؤوليات
 
@@ -5990,7 +5987,7 @@ Validation
 - Capability validation.
 - Parsing وChunking وEmbedding وSparse representation.
 - Temporary artifact lifecycle.
-- Retrieval وRRF وReranking وContext وGeneration.
+- Retrieval وRRF وReranking وContext وGeneration للمحادثة بعد اعتماد الـselected run.
 - Promotion idempotent إلى Qdrant والتحقق من count.
 - حذف Points.
 - إرجاع تقارير ومصادر وtimings منظمة.
@@ -6145,12 +6142,12 @@ INDEX
 | `hybrid_local_run_id` | Run الثاني |
 | `selected_run_id` nullable | الفائز |
 | `status` | `processing/ready/decided/expired/failed` |
-| `trial_question` TEXT nullable | سؤال المقارنة |
+| `trial_question` TEXT nullable | Legacy nullable column أضيف في B12 قبل قرار التبسيط؛ لا يستخدم في التدفق المعتمد ولا تنشأ له API/UI/Task |
 | `decided_at` nullable | وقت الاعتماد |
 | `expires_at` | نهاية TTL |
 | timestamps | Audit |
 
-تفرض Services أن جميع Runs تعود إلى Document وUser نفسيهما. لا تحفظ Cloud cost.
+تفرض Services أن جميع Runs تعود إلى Document وUser نفسيهما. لا تحفظ Cloud cost. لا نضيف Migration جديدة فقط لحذف `trial_question` من Schema المنفذ؛ يبقى غير مستخدم ويمكن تنظيفه لاحقاً بقرار Schema مستقل إذا وجدت حاجة.
 
 ### 174.7.5 حالات Document التجميعية
 
@@ -6368,7 +6365,6 @@ AND processing_run_id = selected run for each document
 GET  /api/v1/capabilities
 GET  /api/v1/health
 POST /api/v1/documents/process
-POST /api/v1/document-comparisons/{comparison_id}/query
 POST /api/v1/document-comparisons/{comparison_id}/select
 DELETE /api/v1/documents/{document_id}
 POST /api/v1/rag/ask
@@ -6377,9 +6373,10 @@ GET  /api/v1/admin/documents/{document_id}/chunks
 
 - `capabilities` يعيد Deployment mode وProfiles المتاحة وصحة Providers دون Secrets.
 - `process` يستقبل Run IDs صادرة من Laravel ولا ينشئ ملكية جديدة.
-- `query` يعيد Top chunks للتجربة دون نقل vectors.
 - `select` ينفذ Promotion idempotent ويعيد count verification.
 - Admin chunks endpoint داخلي، paginated، ويتطلب API authentication وبيانات فلترة موثوقة.
+
+لا يوجد Endpoint لاسترجاع مؤقت قبل اختيار الفائز. كل Retrieval للمستخدم النهائي يبدأ لاحقاً من `rag/ask` على selected runs المفهرسة في Qdrant الدائمة.
 
 كل endpoint يحمل Correlation ID ويدعم أخطاء منظمة وtimeouts وidempotency keys حيث يلزم.
 
@@ -6471,15 +6468,11 @@ Top bar:
 - الصفحات والـchunks وأبعاد/عدد vectors.
 - Chunk samples وحدود التقسيم.
 - Errors/Warnings.
-- حقل `سؤال اختبار`.
-- زر تشغيل الاختبار.
-- أفضل المقاطع والمصادر لكل مسار.
-- `reranker_score` بعنوان `درجة صلة المصدر`.
 - زر `اعتماد هذا المسار` لكل طرف مع Confirmation واضح.
 - Countdown/تاريخ انتهاء artifacts.
 - لا يوجد Cost field.
 
-سؤال الاختبار موصى به وليس إلزامياً تقنياً؛ يجوز الاعتماد بدونه بعد Confirmation يوضح أن المقارنة النوعية لم تُجر.
+يعتمد قرار الفائز على تقرير المعالجة، عينات الـchunks، التحذيرات، والأزمنة/العدادات. لا يوجد Trial Question أو Retrieval أو Reranking قبل الاختيار؛ بعد اعتماد الفائز فقط تتم Promotion إلى Qdrant، ثم يصبح Retrieval الحقيقي جزءاً من المحادثة.
 
 ### قائمة المحادثات `/conversations`
 
@@ -6592,7 +6585,8 @@ Widgets:
 
 - ينشأ Runان فقط للوثيقة نفسها.
 - التقرير لا يحتوي vector values ولا cost.
-- سؤال الاختبار يعيد مصادر صحيحة لكل مسار.
+- التقرير يتضمن عينات chunks كافية للمقارنة اليدوية، ولا ينفذ Retrieval قبل الاختيار.
+- يمكن اعتماد الفائز مباشرة من شاشة المقارنة دون Trial Question.
 - اختيار الفائز idempotent.
 - لا يُحذف الخاسر قبل نجاح الفائز.
 - Cleanup يعلّم expired ويحذف artifacts بعد TTL.
@@ -6638,7 +6632,7 @@ Widgets:
 - Upload ملف واحد.
 - عند duplicate upload لنفس المستخدم تظهر رسالة قابلة للتصرف تذكر `original_name` للوثيقة الأصلية وتتيح الانتقال إليها عبر `duplicate_document.id`، دون كشف `sha256` أو `stored_name` أو `file_path`.
 - حالة duplicate متوافقة مع RTL وAccessibility والشاشات الصغيرة، ولا تعرض كرسالة خطأ عامة فقط.
-- Comparison responsive وبحالات loading/error/expired.
+- Comparison responsive وبحالات loading/error/expired، ويعتمد على التقرير وعينات chunks دون Trial Question.
 - اختيار عدة وثائق من أعلى المحادثة.
 - Sources وtimings ظاهرة ويمكن الوصول إليها بلوحة المفاتيح.
 - `جاري التفكير` مرئية ومفهومة لقارئ الشاشة من دون إعلان متكرر مزعج، والتأثير التدريجي لا يغير النص المحفوظ ولا يؤخر إتاحته للمستخدم الذي يفضل تقليل الحركة.
@@ -6727,7 +6721,7 @@ Widgets:
 
 - `H1` private artifact store/opaque references.
 - `H2` 24-hour TTL configuration.
-- `H3` temporary retrieval index.
+- `H3` **N/A — temporary retrieval index ملغاة بقرار التبسيط؛ لا يوجد Retrieval قبل اختيار الفائز.**
 - `H4` winner promotion.
 - `H5` count verification.
 - `H6` loser cleanup.
@@ -6742,7 +6736,7 @@ Widgets:
 - `I4` single-profile flow.
 - `I5` compare flow وإنشاء Runين.
 - `I6` report persistence.
-- `I7` test-question endpoint flow.
+- `I7` **N/A — test-question endpoint flow ملغاة؛ لا Endpoint للاسترجاع المؤقت قبل الاختيار.**
 - `I8` winner selection transaction.
 - `I9` aggregate status projector.
 - `I10` queue retries/timeouts.
@@ -6755,8 +6749,8 @@ Widgets:
 - `J3` documents list/cards/filters.
 - `J4` one-file upload page, capability-aware options, and duplicate-document UX linking to the original document.
 - `J5` document details/timeline.
-- `J6` comparison screen.
-- `J7` trial-question interaction.
+- `J6` comparison screen المبنية على report + chunk samples.
+- `J7` **N/A — trial-question interaction ملغاة.**
 - `J8` select-winner confirmation/states.
 - `J9` accessibility/responsive/error states, including actionable duplicate-upload states.
 
@@ -6861,7 +6855,7 @@ Widgets:
 ### Compare decided
 
 - التقرير للطرفين محفوظ بلا vectors أو cost.
-- سؤال الاختبار، إن استخدم، ومصادره محفوظة.
+- التقرير وعينات الـchunks متاحة للمستخدم قبل القرار، بلا Retrieval قبل الاختيار.
 - الفائز رُفع وتحقق count.
 - Transaction حدّث selected run والحالات.
 - الخاسر حُذف من التخزين المؤقت بعد النجاح.
@@ -6898,6 +6892,7 @@ Widgets:
 19. لا يوجد Fallback صامت بين الأجهزة أو الدقة أو Providers؛ الفشل يعاد كخطأ منظم وقابل للتشخيص.
 20. `DOCUMENT_SECURITY_SCAN_ENABLED=true` هو Default. عند التفعيل لا يبدأ AI إلا بعد Clean موثق وانتهاء Process الفحص؛ عند التعطيل الصريح يمكن المتابعة بعد Validation والتخزين الدائم. فشل ClamAV لا يغيّر القيمة ولا يفعّل bypass.
 21. NPU/OpenVINO وQuantization لنماذج BGE ليسا Baseline للنسخة الأولى، ولا يضافان إلا بقرار لاحق مدعوم بقياسات Q8.
+22. Compare لا ينفذ Query embedding أو Retrieval أو Reranking قبل اختيار الفائز؛ القرار يعتمد على Processing report وعينات الـchunks، ثم يبدأ Retrieval الحقيقي بعد Promotion في مرحلة المحادثة.
 
 ## 174.19 إدارة الموارد المحلية الموحّدة
 
@@ -7179,11 +7174,11 @@ scan_process_peak_rss_bytes
 
 ---
 
-## 174.20 قرار التبسيط النهائي — الفحص عند الطلب، نموذج واحد، سياق محدود، وعرض تدريجي بصري
+## 174.20 قرار التبسيط النهائي — الفحص عند الطلب، نموذج واحد، سياق محدود، عرض تدريجي بصري، ومقارنة بلا سؤال اختبار
 
 ### 174.20.1 السلطة والغاية
 
-هذا القسم قرار نهائي معتمد ومحدّث بتاريخ 2026-08-24، وهو المرجع الأعلى عند أي تعارض مع 174.19 أو الأقسام الأقدم. غايته إبقاء المشروع قابلاً للتنفيذ والفهم على جهازي 16 GB مع جعل Security Scan قابلاً للضبط من دون تحويل أعطال الفاحص إلى تجاوز أمني صامت.
+هذا القسم قرار نهائي معتمد ومحدّث بتاريخ 2026-08-30، وهو المرجع الأعلى عند أي تعارض مع 174.19 أو الأقسام الأقدم. غايته إبقاء المشروع قابلاً للتنفيذ والفهم على جهازي 16 GB مع جعل Security Scan قابلاً للضبط وتخفيف مسار Compare بإلغاء أي Retrieval قبل اختيار الفائز.
 
 القرارات الأساسية:
 
@@ -7194,6 +7189,7 @@ scan_process_peak_rss_bytes
 5. لا نبني ذاكرة محادثة مستخرجة أو طويلة الأمد في v1.
 6. لا ننفذ Streaming حقيقياً ولا NDJSON ولا Redis Stream ولا Replay في v1.
 7. نحافظ على الشكل الجمالي بواسطة حالة `جاري التفكير` النابضة ثم Progressive reveal محلي لإجابة مكتملة ومحفوظة.
+8. Compare يعتمد على Processing report + chunk samples فقط؛ لا Trial Question ولا temporary retrieval index ولا Query embedding/Reranking قبل اختيار الفائز.
 
 ### 174.20.2 Security routing والفحص عند الطلب
 
@@ -7286,7 +7282,7 @@ Parse result ready
 - بعد Stage تزال references، ثم `gc.collect()` وBackend cleanup المناسب، ثم يعاد قياس RAM.
 - لا يبدأ Model ثقيل جديد قبل تحرير السابق والتحقق من الذاكرة.
 - إذا أثبت Q8 أن Python process لا يعيد الذاكرة بصورة كافية، ينقل Model runner إلى subprocess قصيرة العمر بقرار تحسين محدود؛ لا يدخل ذلك Baseline قبل القياس.
-- Compare يعيد استخدام Parse المشترك وينفذ مراحل Local بالتتابع، لذلك يزيد الزمن ولا يضاعف عدد النماذج المقيمة.
+- Compare يعيد استخدام Parse المشترك وينفذ مراحل Processing المحلية بالتتابع؛ لا ينفذ Query embedding/Reranking/Generation بغرض المقارنة قبل اختيار الفائز.
 - لا يوجد Fallback صامت إلى CPU أو Cloud أو Model آخر.
 
 الإعداد المرجعي:
@@ -7387,6 +7383,9 @@ partial assistant message persistence
 | `D8–D10` | Capabilities/validation/dependency split: Oracle يسجل Cloud فقط وCloud image بلا Local AI packages أو weights |
 | `D11` | Device resolver وmemory probes من دون Model load عند Startup |
 | `G11` | Single-active-model coordinator بدلاً من LRU/TTL registry متعددة entries |
+| `H3` | **N/A — Temporary retrieval index ملغاة؛ H4 يقرأ artifact الفائز مباشرة ويعمل Promotion** |
+| `I7` | **N/A — Test-question endpoint flow ملغاة؛ لا pre-selection retrieval endpoint** |
+| `J7` | **N/A — Trial-question interaction ملغاة؛ شاشة المقارنة تعرض report + chunk samples فقط** |
 | `I11` | Queue `ai-local` ذات Worker واحد وقفل Redis عالمي يمنع تداخل أي Security scan مع أي Local AI Stage عبر الوثائق |
 | `M1` | Retrieved context + آخر تبادلين مكتملين فقط، بلا ذاكرة مستخرجة |
 | `M3` | Provider Registry يختار من trusted Processing profile وCapabilities، بلا global `LLM_PROVIDER` switch |
@@ -7401,7 +7400,7 @@ partial assistant message persistence
 | `DPL-1–DPL-23` | Oracle Cloud-only deployment واختبار Security/Images/Provider/Backup/Restart |
 | `DPL-24–DPL-25` | Local topology وCompare على Mac/ASUS فقط، خارج Oracle |
 
-لا توجد المهام `K9/M11/M12/M13/N10/N11/N12/Q13/Q14/DPL-26` في الخطة المعتمدة؛ أي ذكر سابق لها ملغى بهذا القرار.
+المعرّفات `H3/I7/J7` محفوظة تاريخياً في الخريطة لكن حالتها `N/A` ولا يعاد ترقيم ما بعدها. لا توجد المهام `K9/M11/M12/M13/N10/N11/N12/Q13/Q14/DPL-26` في الخطة المعتمدة؛ أي ذكر سابق لها ملغى بهذا القرار.
 
 ### 174.20.8 معايير القبول
 
@@ -7421,6 +7420,14 @@ partial assistant message persistence
 - بعد كل Stage تسجل الذاكرة قبل Load وعند Peak وبعد Release.
 - ثلاث دورات كاملة لا تظهر نمواً تراكمياً غير مفسر يتجاوز الأكبر من 256 MiB أو 10% من Idle envelope.
 - فشل تحرير الذاكرة لا يمر بصمت؛ يظهر في Q8 ويمنع وصف الجهاز بأنه Local-ready حتى اتخاذ قرار subprocess أو تحسين آخر.
+
+#### Compare simplicity
+
+- لا يوجد Temporary Retrieval Index في مسار الاختيار.
+- لا يوجد Trial Question أو pre-selection Query embedding/RRF/Reranking endpoint أو UI.
+- تعرض المقارنة Processing report وعينات chunks فقط، ويستطيع المستخدم اعتماد الفائز مباشرة.
+- H4 Promotion يستهلك artifact الفائز مباشرة؛ لا يعتمد على H3.
+- Retrieval الحقيقي يبقى في المرحلة L ويعمل على selected runs المفهرسة دائماً بعد الاعتماد.
 
 #### Conversation simplicity
 
@@ -7470,3 +7477,4 @@ partial assistant message persistence
 12. `جاري التفكير` وProgressive reveal تأثيران بصريان فقط ولا يغيران عقد FastAPI المتزامن أو محتوى الرسالة المحفوظ.
 13. Oracle Online يشغّل `cloud` فقط ولا يحتوي أي Local AI dependencies أو weights؛ Local/Compare يعملان على Mac/ASUS فقط.
 14. في Local Demo، عندما يكون Security Scan مفعلاً، يمنع قفل Redis عالمي تداخل `clamscan` مع أي BGE/Reranker/Qwen Stage، وليس فقط للوثيقة نفسها.
+15. Compare لا ينفذ Trial Question أو Temporary Retrieval Index أو أي Retrieval قبل اختيار الفائز؛ الفائز يختار من التقرير وعينات chunks، ثم يروّج مباشرة إلى Qdrant قبل أي محادثة.
