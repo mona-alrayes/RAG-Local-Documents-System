@@ -1,18 +1,37 @@
 from collections.abc import Iterable
+from typing import Generic, TypeVar
 
 from app.core.exceptions import ApplicationException
 from app.processing.base import BaseProcessingProfile, ProcessingProfile
 
 
-class ProcessingProfileRegistry:
-    def __init__(self, profiles: Iterable[BaseProcessingProfile]) -> None:
-        self._profiles = {profile.profile: profile for profile in profiles}
+ProfileT = TypeVar(
+    "ProfileT",
+    bound=BaseProcessingProfile,
+)
 
-    def resolve(self, profile: ProcessingProfile) -> BaseProcessingProfile:
+
+class ProcessingProfileRegistry(Generic[ProfileT]):
+    def __init__(
+        self,
+        profiles: Iterable[ProfileT],
+    ) -> None:
+        self._profiles = {
+            profile.profile: profile
+            for profile in profiles
+        }
+
+    def resolve(
+        self,
+        profile: ProcessingProfile,
+    ) -> ProfileT:
         if not isinstance(profile, ProcessingProfile):
             raise ApplicationException(
                 code="invalid_processing_profile",
-                message="Processing profile must be a trusted ProcessingProfile value.",
+                message=(
+                    "Processing profile must be a trusted "
+                    "ProcessingProfile value."
+                ),
             )
 
         try:
@@ -20,5 +39,8 @@ class ProcessingProfileRegistry:
         except KeyError:
             raise ApplicationException(
                 code="processing_profile_not_registered",
-                message=f"Processing profile '{profile.value}' is not registered.",
+                message=(
+                    f"Processing profile '{profile.value}' "
+                    "is not registered."
+                ),
             ) from None

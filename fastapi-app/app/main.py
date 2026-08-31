@@ -5,6 +5,9 @@ from fastapi import FastAPI
 
 from app.api.exception_handler import application_exception_handler
 from app.api.v1.capabilities_routes import router as capabilities_router
+from app.api.v1.document_processing_routes import (
+    router as document_processing_router,
+)
 from app.api.v1.health import router as health_router
 from app.core.config import (
     get_settings,
@@ -43,6 +46,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(capabilities_router)
+    app.include_router(document_processing_router)
 
     app.add_middleware(
         InternalApiAuthMiddleware,
