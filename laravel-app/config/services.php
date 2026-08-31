@@ -34,5 +34,14 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'ai_service' => [
+        'base_url' => env(
+            'AI_SERVICE_BASE_URL',
+            'http://host.docker.internal:8000',
+        ),
+        'internal_api_key' => env('AI_SERVICE_INTERNAL_API_KEY'),
+        'connect_timeout' => (int) env('AI_SERVICE_CONNECT_TIMEOUT', 10),
+        'timeout' => (int) env('AI_SERVICE_TIMEOUT', 30),
+    ],
 
 ];
