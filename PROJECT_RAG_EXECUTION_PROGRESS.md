@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-08-31  
-> **الحالة العامة:** قيد التنفيذ — Compare/Winner lifecycle removed; roadmap renumbered
+> **الحالة العامة:** قيد التنفيذ — H1 merged; H2 is next
 
 ---
 
@@ -17,16 +17,19 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: a1f28097b398b9bb277f85990a55e489bd54d880
-Last Merged Feature PR on main: #79 — feat(H2): add configurable temporary artifact TTL
+Verified Main Commit: b5476cdb6ee0985f03e7b1b13f6a6c5c00fb38b7
+Last Merged Feature PR on main: #81 — refactor(H1): isolate AI service client boundary
 
-Current Working Branch: task/remove-compare-winner-flow
-Branch State:
-ARC-1 implementation and verification completed locally.
-The branch has not been assumed merged into main.
+Current Working Branch: main
 
-Latest Completed Initiative:
+Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
+
+Latest Completed Task:
+H1 — AiServiceClient
+
+Current Phase:
+H — Processing Orchestration
 
 Architectural Result:
 - One trusted Processing Profile per ProcessingRun: cloud | hybrid_local.
@@ -35,17 +38,14 @@ Architectural Result:
 - No temporary comparison artifacts or promotion flow.
 - Direct persistent Qdrant indexing is the target path.
 - active_processing_run_id is the document pointer to the current indexed run.
-- Shared parsing means common LlamaParse contracts, not a dual-profile parse-result reuse workflow.
 
 Latest Verification:
-Laravel: 43 passed (181 assertions)
-FastAPI: 129 passed
-MySQL: migrate:fresh succeeded on the cleaned development baseline
-Final code audit: no active Compare/Winner/temporary-artifact references;
-the remaining comparison_report mention is a negative regression assertion.
+H1 focused tests: 7 passed / 21 assertions
+Laravel full regression: 50 passed / 202 assertions
+Laravel Pint: passed
 
-Next Planned Task After ARC-1 Merge:
-H1 — AiServiceClient
+Next Planned Task:
+H2 — Processing DTOs and contract alignment
 
 Open Blockers: none
 ```
@@ -93,7 +93,7 @@ Open Blockers: none
 
 ## ARC-1 — Remove Compare/Winner lifecycle
 
-**الحالة:** `DONE` محلياً على `task/remove-compare-winner-flow`.
+**الحالة:** `DONE` ومندمج في `main` عبر PR #80 — `refactor: remove compare winner lifecycle` (merge commit `eb461885f62ef2fc315bc023c51a06a31aebf2c7`).
 
 تم تنفيذ:
 
@@ -260,7 +260,7 @@ assert "comparison_report" not in payload
 
 | المهمة | الحالة |
 |---|---|
-| H1 AiServiceClient | TODO |
+| H1 AiServiceClient | DONE |
 | H2 Processing DTOs and contract alignment | TODO |
 | H3 FastAPI single-profile Process Document API / application orchestration | TODO |
 | H4 ProcessDocumentJob + queue dispatch | TODO |
@@ -669,21 +669,38 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-قبل بدء المرحلة H:
+## آخر مهمة مكتملة — H1 AiServiceClient
 
-1. راجع ملفات التوثيق النهائية.
-2. Commit / Push / PR / Merge لفرع:
-   ```text
-   task/remove-compare-winner-flow
-   ```
-   ينفذها المستخدم بعد المراجعة.
-3. بعد تأكيد Merge إلى `main`، يبدأ Chat جديد للمهمة:
+**الحالة:** `DONE` ومندمجة في `main` عبر PR #81 — `refactor(H1): isolate AI service client boundary`.
+
+تم تنفيذ:
+
+- إنشاء Laravel `AiServiceClient` كـHTTP boundary موحدة مع FastAPI.
+- جعل base URL وinternal API key وconnect timeout وrequest timeout معتمدة على configuration.
+- إرسال `X-Internal-API-Key` و`X-Correlation-ID`.
+- إضافة `AiServiceException`.
+- عزل connection failures وremote HTTP failures وstructured FastAPI errors وinvalid JSON responses وmissing required configuration.
+- دعم الـendpoints الموجودة حالياً فقط:
+  - `GET /api/v1/health`
+  - `GET /api/v1/capabilities`
+- لم يُبنَ `processDocument()` ضمن H1.
+- لم تدخل DTOs أو Processing orchestration أو Queue/Qdrant logic ضمن H1.
+
+## Verification
 
 ```text
-H1 — AiServiceClient
+H1 focused tests: 7 passed / 21 assertions
+Laravel full regression: 50 passed / 202 assertions
+Laravel Pint: passed
 ```
 
-Baseline المهمة الجديدة:
+## المهمة التالية
+
+```text
+H2 — Processing DTOs and contract alignment
+```
+
+Baseline المهمة التالية:
 
 ```text
 Document has active_processing_run_id.
@@ -698,7 +715,7 @@ No Compare/Winner/temporary artifact lifecycle exists in the target architecture
 
 التصاميم والمهام التي أزيلت من الخريطة النشطة لا تحفظ هنا كمهام ملغاة.
 
-للتدقيق التاريخي يرجع إلى Git / Pull Requests، وبشكل خاص baseline السابق:
+للتدقيق التاريخي يرجع إلى Git / Pull Requests، وبشكل خاص الـbaseline التاريخي السابق (وليس حالة `main` الحالية):
 
 ```text
 main@a1f28097b398b9bb277f85990a55e489bd54d880
