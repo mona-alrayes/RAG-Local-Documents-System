@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-08-31  
-> **الحالة العامة:** قيد التنفيذ — H2 merged; H3 is next
+> **الحالة العامة:** قيد التنفيذ — H3 merged; H4 is next
 
 ---
 
@@ -17,8 +17,8 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 354c11e9195369d261000ff1c6d4f76e561e3940
-Last Merged Feature PR on main: #82 — refactor(H2): align processing DTO contracts
+Verified Main Commit: 0f42335252921ffc9fb547b1a8697b04a772bfb4
+Last Merged Feature PR on main: #83 — feat(H3): add single-profile document processing API
 
 Current Working Branch: main
 
@@ -26,7 +26,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H2 — Processing DTOs and Contract Alignment
+H3 — FastAPI single-profile Process Document API / application orchestration
 
 Current Phase:
 H — Processing Orchestration
@@ -40,14 +40,12 @@ Architectural Result:
 - active_processing_run_id is the document pointer to the current indexed run.
 
 Latest Verification:
-FastAPI focused tests: 4 passed
-Laravel DTO focused tests: 2 passed (8 assertions)
-FastAPI full regression: 131 passed
-Laravel full regression: 52 passed (210 assertions)
-Laravel Pint: PASS
+H3 focused FastAPI tests: 11 passed
+FastAPI full regression: 142 passed
+Python compileall: PASS
 
 Next Planned Task:
-H3 — FastAPI single-profile Process Document API / application orchestration
+H4 — ProcessDocumentJob + queue dispatch
 
 Open Blockers: none
 ```
@@ -264,7 +262,7 @@ assert "comparison_report" not in payload
 |---|---|
 | H1 AiServiceClient | DONE |
 | H2 Processing DTOs and contract alignment | DONE |
-| H3 FastAPI single-profile Process Document API / application orchestration | TODO |
+| H3 FastAPI single-profile Process Document API / application orchestration | DONE |
 | H4 ProcessDocumentJob + queue dispatch | TODO |
 | H5 Processing metrics / report persistence | TODO |
 | H6 Active-run transaction after successful indexing | TODO |
@@ -533,7 +531,7 @@ hybrid_local
 
 ---
 
-# 9. FastAPI baseline بعد ARC-1
+# 9. FastAPI baseline الحالي
 
 ## 9.1 Process Document DTOs
 
@@ -562,7 +560,7 @@ ProcessDocumentResponse
 - warnings
 ```
 
-لا يوجد artifact reference في response، ولم يُبنَ production Process Document endpoint بعد.
+لا يوجد artifact reference في response، والـproduction endpoint `POST /api/v1/documents/process` يستقبل `multipart/form-data` وينفذ Processing Profile موثوقة واحدة لكل request.
 
 ## 9.2 Capabilities
 
@@ -610,7 +608,7 @@ hybrid_local
 4. يعد النقاط exact ضمن user/document/run scope.
 5. يفشل إذا persisted count لا يطابق عدد chunks.
 
-لا يوجد production Process Document endpoint/orchestrator بعد؛ سيبنى ضمن H3.
+يستخدم production Process Document endpoint هذا الـindexer مباشرة ضمن H3، ولا يعيد `status="indexed"` إلا بعد نجاح الـindexing والتحقق من exact persisted count.
 
 ---
 
@@ -683,58 +681,47 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H2 Processing DTOs and Contract Alignment
+## آخر مهمة مكتملة — H3 FastAPI single-profile Process Document API / application orchestration
 
-**الحالة:** `DONE` ومندمجة في `main` عبر PR #82 — `refactor(H2): align processing DTO contracts`.
+**الحالة:** `DONE` ومندمجة في `main` عبر PR #83 — `feat(H3): add single-profile document processing API`.
 
 تم تنفيذ:
 
-- إضافة FastAPI `ProcessDocumentRequest` بعقد typed يقيّد `processing_profile` إلى `cloud | hybrid_local` و`file_type` إلى `pdf | docx | txt`.
-- تحديث `ProcessDocumentResponse` وتقييد successful response إلى `status = indexed`.
-- إضافة `qdrant_collection` و`profile_snapshot` و`stage_timings_ms` و`warnings` وحقول الصفحات والـchunks والـvectors.
-- جعل `vector_dimension` nullable، وإعادة استخدام `ProcessingProfile` و`ProcessingProfileSnapshot` و`ProcessingStage` و`ProcessingWarning`.
-- إضافة Laravel DTOs:
-  - `ProcessDocumentRequestData`
-  - `ProcessDocumentResult`
-- استخدام Enums الموجودة في Laravel، ومنها `ProcessingProfile` و`FileType` و`ProcessingRunStatus`، بدل strings حرة.
-- جعل `ProcessDocumentRequestData` يحوّل البيانات إلى مفاتيح عقد FastAPI: `user_id` و`document_id` و`processing_run_id` و`processing_profile` و`file_type`.
+- إضافة `POST /api/v1/documents/process` بعقد `multipart/form-data`.
+- معالجة Processing Profile واحدة موثوقة فقط لكل request: `cloud` أو `hybrid_local`.
+- عدم وجود Both / Compare / Winner، ومنع silent profile fallback.
+- إعادة استخدام parsing + normalization + chunking + dense embeddings + sparse representation + processing reporting.
+- تنفيذ direct persistent Qdrant indexing باستخدام E9/E10.
+- عدم إرجاع `status="indexed"` إلا بعد نجاح الـindexing والتحقق من exact persisted count.
+- استخدام temporary uploaded-file adapter مع تنظيف الملف بعد المعالجة.
+- عدم إرجاع raw vectors أو temporary filesystem paths ضمن response.
 
-لم يتم ضمن H2:
+لم يتم ضمن H3:
 
-- Process Document endpoint.
-- `AiServiceClient::processDocument()`.
-- Queue orchestration.
-- Parsing execution.
-- Chunking execution.
-- Embeddings execution.
-- Sparse generation execution.
-- Qdrant indexing orchestration.
-- ProcessingRun persistence/transitions.
-- `active_processing_run_id` switching.
+- Laravel `ProcessDocumentJob` أو queue dispatch.
+- Processing metrics / report persistence في Laravel.
+- تبديل `active_processing_run_id`.
 
 ## Verification
 
 ```text
-FastAPI focused tests: 4 passed
-Laravel DTO focused tests: 2 passed (8 assertions)
-FastAPI full regression: 131 passed
-Laravel full regression: 52 passed (210 assertions)
-Laravel Pint: PASS
+H3 focused FastAPI tests: 11 passed
+FastAPI full regression: 142 passed
+Python compileall: PASS
 ```
 
 ## المهمة الحالية/التالية
 
 ```text
-H3 — FastAPI single-profile Process Document API / application orchestration
+H4 — ProcessDocumentJob + queue dispatch
 ```
 
 Baseline المهمة التالية:
 
 ```text
-Processing DTO contracts are aligned between Laravel and FastAPI.
-FastAPI has persistent Qdrant indexing primitives but no production Process Document endpoint/orchestrator yet.
-AiServiceClient::processDocument(), Queue orchestration, ProcessingRun persistence/transitions,
-and active_processing_run_id switching remain for the tasks assigned to them in the Master Plan.
+FastAPI now exposes the production single-profile Process Document endpoint and indexes directly into persistent Qdrant.
+H4 adds ProcessDocumentJob and queue dispatch without reintroducing Compare/Winner behavior.
+Processing report persistence and active_processing_run_id switching remain assigned to H5 and H6.
 No Compare/Winner/temporary artifact lifecycle exists in the target architecture.
 ```
 
