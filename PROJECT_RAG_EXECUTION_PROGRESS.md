@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-08-31  
-> **الحالة العامة:** قيد التنفيذ — H1 merged; H2 is next
+> **الحالة العامة:** قيد التنفيذ — H2 merged; H3 is next
 
 ---
 
@@ -17,8 +17,8 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: b5476cdb6ee0985f03e7b1b13f6a6c5c00fb38b7
-Last Merged Feature PR on main: #81 — refactor(H1): isolate AI service client boundary
+Verified Main Commit: 354c11e9195369d261000ff1c6d4f76e561e3940
+Last Merged Feature PR on main: #82 — refactor(H2): align processing DTO contracts
 
 Current Working Branch: main
 
@@ -26,7 +26,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H1 — AiServiceClient
+H2 — Processing DTOs and Contract Alignment
 
 Current Phase:
 H — Processing Orchestration
@@ -40,12 +40,14 @@ Architectural Result:
 - active_processing_run_id is the document pointer to the current indexed run.
 
 Latest Verification:
-H1 focused tests: 7 passed / 21 assertions
-Laravel full regression: 50 passed / 202 assertions
-Laravel Pint: passed
+FastAPI focused tests: 4 passed
+Laravel DTO focused tests: 2 passed (8 assertions)
+FastAPI full regression: 131 passed
+Laravel full regression: 52 passed (210 assertions)
+Laravel Pint: PASS
 
 Next Planned Task:
-H2 — Processing DTOs and contract alignment
+H3 — FastAPI single-profile Process Document API / application orchestration
 
 Open Blockers: none
 ```
@@ -261,7 +263,7 @@ assert "comparison_report" not in payload
 | المهمة | الحالة |
 |---|---|
 | H1 AiServiceClient | DONE |
-| H2 Processing DTOs and contract alignment | TODO |
+| H2 Processing DTOs and contract alignment | DONE |
 | H3 FastAPI single-profile Process Document API / application orchestration | TODO |
 | H4 ProcessDocumentJob + queue dispatch | TODO |
 | H5 Processing metrics / report persistence | TODO |
@@ -533,22 +535,34 @@ hybrid_local
 
 # 9. FastAPI baseline بعد ARC-1
 
-## 9.1 ProcessDocumentResponse
+## 9.1 Process Document DTOs
 
-العقد الحالي:
+العقود الحالية المثبتة بين Laravel وFastAPI:
 
 ```text
-document_id
-processing_run_id
-profile
-status
-total_pages
-total_chunks
-vector_count
-vector_dimension
+ProcessDocumentRequest
+- user_id
+- document_id
+- processing_run_id
+- processing_profile: cloud | hybrid_local
+- file_type: pdf | docx | txt
+
+ProcessDocumentResponse
+- document_id
+- processing_run_id
+- profile
+- status: indexed
+- qdrant_collection
+- profile_snapshot
+- total_pages
+- total_chunks
+- vector_count
+- vector_dimension nullable
+- stage_timings_ms
+- warnings
 ```
 
-لا يوجد artifact reference في response.
+لا يوجد artifact reference في response، ولم يُبنَ production Process Document endpoint بعد.
 
 ## 9.2 Capabilities
 
@@ -669,43 +683,58 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H1 AiServiceClient
+## آخر مهمة مكتملة — H2 Processing DTOs and Contract Alignment
 
-**الحالة:** `DONE` ومندمجة في `main` عبر PR #81 — `refactor(H1): isolate AI service client boundary`.
+**الحالة:** `DONE` ومندمجة في `main` عبر PR #82 — `refactor(H2): align processing DTO contracts`.
 
 تم تنفيذ:
 
-- إنشاء Laravel `AiServiceClient` كـHTTP boundary موحدة مع FastAPI.
-- جعل base URL وinternal API key وconnect timeout وrequest timeout معتمدة على configuration.
-- إرسال `X-Internal-API-Key` و`X-Correlation-ID`.
-- إضافة `AiServiceException`.
-- عزل connection failures وremote HTTP failures وstructured FastAPI errors وinvalid JSON responses وmissing required configuration.
-- دعم الـendpoints الموجودة حالياً فقط:
-  - `GET /api/v1/health`
-  - `GET /api/v1/capabilities`
-- لم يُبنَ `processDocument()` ضمن H1.
-- لم تدخل DTOs أو Processing orchestration أو Queue/Qdrant logic ضمن H1.
+- إضافة FastAPI `ProcessDocumentRequest` بعقد typed يقيّد `processing_profile` إلى `cloud | hybrid_local` و`file_type` إلى `pdf | docx | txt`.
+- تحديث `ProcessDocumentResponse` وتقييد successful response إلى `status = indexed`.
+- إضافة `qdrant_collection` و`profile_snapshot` و`stage_timings_ms` و`warnings` وحقول الصفحات والـchunks والـvectors.
+- جعل `vector_dimension` nullable، وإعادة استخدام `ProcessingProfile` و`ProcessingProfileSnapshot` و`ProcessingStage` و`ProcessingWarning`.
+- إضافة Laravel DTOs:
+  - `ProcessDocumentRequestData`
+  - `ProcessDocumentResult`
+- استخدام Enums الموجودة في Laravel، ومنها `ProcessingProfile` و`FileType` و`ProcessingRunStatus`، بدل strings حرة.
+- جعل `ProcessDocumentRequestData` يحوّل البيانات إلى مفاتيح عقد FastAPI: `user_id` و`document_id` و`processing_run_id` و`processing_profile` و`file_type`.
+
+لم يتم ضمن H2:
+
+- Process Document endpoint.
+- `AiServiceClient::processDocument()`.
+- Queue orchestration.
+- Parsing execution.
+- Chunking execution.
+- Embeddings execution.
+- Sparse generation execution.
+- Qdrant indexing orchestration.
+- ProcessingRun persistence/transitions.
+- `active_processing_run_id` switching.
 
 ## Verification
 
 ```text
-H1 focused tests: 7 passed / 21 assertions
-Laravel full regression: 50 passed / 202 assertions
-Laravel Pint: passed
+FastAPI focused tests: 4 passed
+Laravel DTO focused tests: 2 passed (8 assertions)
+FastAPI full regression: 131 passed
+Laravel full regression: 52 passed (210 assertions)
+Laravel Pint: PASS
 ```
 
-## المهمة التالية
+## المهمة الحالية/التالية
 
 ```text
-H2 — Processing DTOs and contract alignment
+H3 — FastAPI single-profile Process Document API / application orchestration
 ```
 
 Baseline المهمة التالية:
 
 ```text
-Document has active_processing_run_id.
-ProcessingRun lifecycle = pending → processing → indexing → indexed | failed.
-FastAPI has persistent Qdrant indexing primitives but no Process Document endpoint/orchestrator yet.
+Processing DTO contracts are aligned between Laravel and FastAPI.
+FastAPI has persistent Qdrant indexing primitives but no production Process Document endpoint/orchestrator yet.
+AiServiceClient::processDocument(), Queue orchestration, ProcessingRun persistence/transitions,
+and active_processing_run_id switching remain for the tasks assigned to them in the Master Plan.
 No Compare/Winner/temporary artifact lifecycle exists in the target architecture.
 ```
 
