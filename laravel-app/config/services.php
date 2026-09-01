@@ -42,6 +42,10 @@ return [
         'internal_api_key' => env('AI_SERVICE_INTERNAL_API_KEY'),
         'connect_timeout' => (int) env('AI_SERVICE_CONNECT_TIMEOUT', 10),
         'timeout' => (int) env('AI_SERVICE_TIMEOUT', 30),
+        'process_document_timeout' => (int) env(
+            'AI_SERVICE_PROCESS_DOCUMENT_TIMEOUT',
+            300,
+        ),
     ],
 
 ];

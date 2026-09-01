@@ -4,23 +4,31 @@ namespace Tests\Feature\Documents;
 
 use App\Enums\DocumentSecurityScanStatus;
 use App\Enums\DocumentStatus;
+use App\Enums\ProcessingProfile;
+use App\Enums\ProcessingRunStatus;
+use App\Jobs\ProcessDocumentJob;
 use App\Jobs\ScanDocumentSecurityJob;
+use App\Models\ProcessingRun;
 use App\Models\User;
+use App\Services\Documents\DocumentProcessingDispatcher;
 use App\Services\Documents\DocumentSecurityService;
 use App\Services\Documents\DocumentStorageService;
 use App\Services\Documents\DocumentUploadService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ScanDocumentSecurityJobTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseMigrations;
 
     public function test_clean_scan_updates_status_and_promotes_document(): void
     {
+        Queue::fake();
+
         Storage::fake('documents');
         Storage::fake('document_quarantine');
 
@@ -66,18 +74,36 @@ class ScanDocumentSecurityJobTest extends TestCase
             },
         );
 
-        $job = new ScanDocumentSecurityJob($document);
+        $job = new ScanDocumentSecurityJob(
+            $document,
+            ProcessingProfile::Cloud,
+        );
 
         $job->handle(
             app(DocumentSecurityService::class),
             app(DocumentUploadService::class),
+            app(DocumentProcessingDispatcher::class),
         );
 
         $document->refresh();
 
         $this->assertSame(
-            DocumentStatus::Pending,
+            DocumentStatus::Queued,
             $document->status,
+        );
+
+        $processingRun = ProcessingRun::query()->sole();
+
+        $this->assertSame(ProcessingProfile::Cloud, $processingRun->profile);
+        $this->assertSame(
+            ProcessingRunStatus::Pending,
+            $processingRun->status,
+        );
+
+        Queue::assertPushed(
+            ProcessDocumentJob::class,
+            fn (ProcessDocumentJob $job) => $job->processingRunId
+                === $processingRun->id,
         );
 
         Storage::disk('documents')
@@ -89,6 +115,8 @@ class ScanDocumentSecurityJobTest extends TestCase
 
     public function test_failed_scan_remains_quarantined_and_never_falls_back_to_permanent_storage(): void
     {
+        Queue::fake();
+
         Storage::fake('documents');
         Storage::fake('document_quarantine');
 
@@ -112,11 +140,15 @@ class ScanDocumentSecurityJobTest extends TestCase
             },
         );
 
-        $job = new ScanDocumentSecurityJob($document);
+        $job = new ScanDocumentSecurityJob(
+            $document,
+            ProcessingProfile::HybridLocal,
+        );
 
         $job->handle(
             app(DocumentSecurityService::class),
             app(DocumentUploadService::class),
+            app(DocumentProcessingDispatcher::class),
         );
 
         $document->refresh();
@@ -131,5 +163,8 @@ class ScanDocumentSecurityJobTest extends TestCase
 
         Storage::disk('documents')
             ->assertMissing($document->file_path);
+
+        $this->assertDatabaseCount('document_processing_runs', 0);
+        Queue::assertNotPushed(ProcessDocumentJob::class);
     }
 }

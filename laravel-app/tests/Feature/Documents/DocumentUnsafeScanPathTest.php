@@ -4,6 +4,8 @@ namespace Tests\Feature\Documents;
 
 use App\Enums\DocumentSecurityScanStatus;
 use App\Enums\DocumentStatus;
+use App\Enums\ProcessingProfile;
+use App\Jobs\ProcessDocumentJob;
 use App\Models\Document;
 use App\Models\User;
 use App\Services\Documents\DocumentUploadService;
@@ -33,6 +35,7 @@ class DocumentUnsafeScanPathTest extends TestCase
                 'infected.txt',
                 "Unsafe document content.\n",
             ),
+            ProcessingProfile::Cloud,
         );
 
         $uploadService->rejectAfterUnsafeScan(
@@ -51,6 +54,8 @@ class DocumentUnsafeScanPathTest extends TestCase
             ->assertMissing($document->file_path);
 
         $this->assertSame(1, Document::query()->count());
+        $this->assertDatabaseCount('document_processing_runs', 0);
+        Queue::assertNotPushed(ProcessDocumentJob::class);
     }
 
     public function test_scan_failed_document_remains_fail_closed(): void
@@ -69,6 +74,7 @@ class DocumentUnsafeScanPathTest extends TestCase
                 'failed-scan.txt',
                 "Untrusted document content.\n",
             ),
+            ProcessingProfile::Cloud,
         );
 
         $uploadService->rejectAfterUnsafeScan(
@@ -87,5 +93,7 @@ class DocumentUnsafeScanPathTest extends TestCase
             ->assertMissing($document->file_path);
 
         $this->assertSame(1, Document::query()->count());
+        $this->assertDatabaseCount('document_processing_runs', 0);
+        Queue::assertNotPushed(ProcessDocumentJob::class);
     }
 }

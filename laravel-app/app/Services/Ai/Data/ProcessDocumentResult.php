@@ -26,4 +26,33 @@ final readonly class ProcessDocumentResult
         public array $stageTimingsMs,
         public array $warnings,
     ) {}
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    public static function fromValidatedResponse(array $validated): self
+    {
+        return new self(
+            documentId: (int) $validated['document_id'],
+            processingRunId: (int) $validated['processing_run_id'],
+            profile: ProcessingProfile::from(
+                (string) $validated['profile'],
+            ),
+            status: ProcessingRunStatus::from(
+                (string) $validated['status'],
+            ),
+            qdrantCollection: (string) $validated['qdrant_collection'],
+            profileSnapshot: $validated['profile_snapshot'],
+            totalPages: isset($validated['total_pages'])
+                ? (int) $validated['total_pages']
+                : null,
+            totalChunks: (int) $validated['total_chunks'],
+            vectorCount: (int) $validated['vector_count'],
+            vectorDimension: isset($validated['vector_dimension'])
+                ? (int) $validated['vector_dimension']
+                : null,
+            stageTimingsMs: $validated['stage_timings_ms'],
+            warnings: $validated['warnings'],
+        );
+    }
 }

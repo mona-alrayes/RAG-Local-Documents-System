@@ -83,6 +83,35 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+  queue-worker:
+    build:
+      context: .
+      dockerfile: docker/security-worker/Dockerfile
+    restart: unless-stopped
+    init: true
+    working_dir: /var/www/html
+    command:
+      - php
+      - artisan
+      - queue:work
+      - redis
+      - --queue=${REDIS_QUEUE:-default}
+      - --sleep=1
+      - --tries=1
+      - --timeout=0
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   scheduler:
     build:
       context: .

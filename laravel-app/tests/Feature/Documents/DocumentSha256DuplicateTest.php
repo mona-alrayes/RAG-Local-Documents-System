@@ -25,6 +25,7 @@ class DocumentSha256DuplicateTest extends TestCase
                     'report.txt',
                     $content,
                 ),
+                'processing_profile' => 'cloud',
             ])
             ->assertNoContent();
 
@@ -51,6 +52,7 @@ class DocumentSha256DuplicateTest extends TestCase
                     'original.txt',
                     $content,
                 ),
+                'processing_profile' => 'cloud',
             ])
             ->assertNoContent();
 
@@ -62,6 +64,7 @@ class DocumentSha256DuplicateTest extends TestCase
                     'renamed-copy.txt',
                     $content,
                 ),
+                'processing_profile' => 'cloud',
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('document')
