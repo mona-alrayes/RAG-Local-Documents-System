@@ -5,6 +5,7 @@ namespace Tests\Feature\Documents;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Tests\TestCase;
@@ -13,6 +14,67 @@ use ZipArchive;
 class DocumentUploadValidationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_supported_processing_profiles_are_accepted(): void
+    {
+        Queue::fake();
+
+        Storage::fake('documents');
+        Storage::fake('document_quarantine');
+
+        $user = User::factory()->create();
+
+        foreach (['cloud', 'hybrid_local'] as $profile) {
+            $this->actingAs($user)
+                ->postJson('/documents', [
+                    'document' => UploadedFile::fake()->createWithContent(
+                        $profile.'.txt',
+                        "Document content for {$profile}.\n",
+                    ),
+                    'processing_profile' => $profile,
+                ])
+                ->assertNoContent();
+        }
+
+        $this->assertDatabaseCount('documents', 2);
+    }
+
+    public function test_processing_profile_is_required(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->postJson('/documents', [
+                'document' => UploadedFile::fake()->createWithContent(
+                    'missing-profile.txt',
+                    "Document content.\n",
+                ),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('processing_profile');
+
+        $this->assertDatabaseCount('documents', 0);
+    }
+
+    public function test_unsupported_processing_profiles_are_rejected(): void
+    {
+        $user = User::factory()->create();
+
+        foreach (['both', 'compare', 'custom'] as $profile) {
+            $this->actingAs($user)
+                ->postJson('/documents', [
+                    'document' => UploadedFile::fake()->createWithContent(
+                        $profile.'.txt',
+                        "Document content.\n",
+                    ),
+                    'processing_profile' => $profile,
+                ])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('processing_profile');
+        }
+
+        $this->assertDatabaseCount('documents', 0);
+    }
 
     public function test_supported_document_types_are_accepted(): void
     {
@@ -37,6 +99,7 @@ class DocumentUploadValidationTest extends TestCase
         foreach ($documents as $document) {
             $this->postJson('/documents', [
                 'document' => $document,
+                'processing_profile' => 'cloud',
             ])->assertNoContent();
         }
     }
@@ -125,6 +188,7 @@ class DocumentUploadValidationTest extends TestCase
         foreach ($documents as $document) {
             $this->postJson('/documents', [
                 'document' => $document,
+                'processing_profile' => 'cloud',
             ])
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors('document');
@@ -155,6 +219,7 @@ class DocumentUploadValidationTest extends TestCase
 
             $this->postJson('/documents', [
                 'document' => $document,
+                'processing_profile' => 'cloud',
             ])
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors('document');
@@ -179,6 +244,7 @@ class DocumentUploadValidationTest extends TestCase
         $this->actingAs($user)
             ->postJson('/documents', [
                 'document' => $document,
+                'processing_profile' => 'cloud',
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('document');

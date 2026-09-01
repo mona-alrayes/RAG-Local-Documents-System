@@ -3,6 +3,7 @@
 namespace Tests\Feature\Documents;
 
 use App\Enums\DocumentSecurityScanStatus;
+use App\Enums\ProcessingProfile;
 use App\Models\Document;
 use App\Models\User;
 use App\Services\Documents\DocumentUploadService;
@@ -34,6 +35,7 @@ class DocumentCleanPathTest extends TestCase
                 'notes.txt',
                 "Clean document content.\n",
             ),
+            ProcessingProfile::Cloud,
         );
 
         $originalDocumentId = $document->id;
@@ -81,6 +83,7 @@ class DocumentCleanPathTest extends TestCase
                 'notes.txt',
                 "Quarantined document content.\n",
             ),
+            ProcessingProfile::Cloud,
         );
 
         try {

@@ -3,14 +3,24 @@
 namespace App\Services\Ai;
 
 use App\Exceptions\AiServiceException;
+use App\Services\Ai\Data\ProcessDocumentRequestData;
+use App\Services\Ai\Data\ProcessDocumentResult;
+use App\Services\Ai\Validation\ProcessDocumentResponseValidator;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Throwable;
+use UnexpectedValueException;
 
 class AiServiceClient
 {
+    public function __construct(
+        private readonly ProcessDocumentResponseValidator $processDocumentResponseValidator,
+    ) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -25,6 +35,57 @@ class AiServiceClient
     public function capabilities(): array
     {
         return $this->getJson('/api/v1/capabilities');
+    }
+
+    public function processDocument(
+        ProcessDocumentRequestData $data,
+        string $filePath,
+        string $fileName,
+    ): ProcessDocumentResult {
+        $correlationId = (string) Str::uuid();
+        $stream = $this->openDocumentStream($filePath);
+
+        try {
+            try {
+                $response = $this->request($correlationId)
+                    ->timeout(
+                        (int) config(
+                            'services.ai_service.process_document_timeout',
+                            300,
+                        ),
+                    )
+                    ->attach(
+                        'file',
+                        $stream,
+                        $this->safeFileName($fileName, $data),
+                    )
+                    ->post(
+                        '/api/v1/documents/process',
+                        $data->toArray(),
+                    );
+            } catch (ConnectionException $exception) {
+                throw new AiServiceException(
+                    message: 'Unable to connect to the AI service.',
+                    correlationId: $correlationId,
+                    previous: $exception,
+                );
+            }
+        } finally {
+            fclose($stream);
+        }
+
+        if ($response->failed()) {
+            throw $this->remoteFailure(
+                response: $response,
+                fallbackCorrelationId: $correlationId,
+            );
+        }
+
+        return $this->processDocumentResult(
+            response: $response,
+            requestData: $data,
+            fallbackCorrelationId: $correlationId,
+        );
     }
 
     /**
@@ -88,6 +149,109 @@ class AiServiceClient
             ->timeout(
                 (int) config('services.ai_service.timeout', 600),
             );
+    }
+
+    /**
+     * @return resource
+     */
+    private function openDocumentStream(string $filePath)
+    {
+        try {
+            $disk = Storage::disk('documents');
+
+            if (! $disk->exists($filePath)) {
+                throw new AiServiceException(
+                    message: 'Document file is missing from private storage.',
+                );
+            }
+
+            $stream = $disk->readStream($filePath);
+        } catch (AiServiceException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            throw new AiServiceException(
+                message: 'Unable to read document from private storage.',
+                previous: $exception,
+            );
+        }
+
+        if (! is_resource($stream) || ! $this->isReadableStream($stream)) {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+
+            throw new AiServiceException(
+                message: 'Unable to read document from private storage.',
+            );
+        }
+
+        return $stream;
+    }
+
+    /**
+     * @param  resource  $stream
+     */
+    private function isReadableStream($stream): bool
+    {
+        $mode = stream_get_meta_data($stream)['mode'] ?? null;
+
+        return is_string($mode)
+            && (str_contains($mode, 'r') || str_contains($mode, '+'));
+    }
+
+    private function safeFileName(
+        string $fileName,
+        ProcessDocumentRequestData $data,
+    ): string {
+        $normalized = str_replace('\\', '/', $fileName);
+        $basename = trim(basename($normalized));
+
+        return $basename !== ''
+            ? $basename
+            : 'document.'.$data->fileType->value;
+    }
+
+    private function processDocumentResult(
+        Response $response,
+        ProcessDocumentRequestData $requestData,
+        string $fallbackCorrelationId,
+    ): ProcessDocumentResult {
+        $payload = $response->json();
+
+        if (! is_array($payload)) {
+            throw $this->invalidProcessDocumentResponse(
+                response: $response,
+                fallbackCorrelationId: $fallbackCorrelationId,
+            );
+        }
+
+        try {
+            $validated = $this->processDocumentResponseValidator->validate(
+                payload: $payload,
+                requestData: $requestData,
+            );
+        } catch (UnexpectedValueException) {
+            throw $this->invalidProcessDocumentResponse(
+                response: $response,
+                fallbackCorrelationId: $fallbackCorrelationId,
+            );
+        }
+
+        return ProcessDocumentResult::fromValidatedResponse($validated);
+    }
+
+    private function invalidProcessDocumentResponse(
+        Response $response,
+        string $fallbackCorrelationId,
+    ): AiServiceException {
+        return new AiServiceException(
+            message: 'AI service returned an invalid process document response.',
+            statusCode: $response->status(),
+            correlationId: $this->correlationId(
+                response: $response,
+                fallback: $fallbackCorrelationId,
+            ),
+        );
     }
 
     private function remoteFailure(

@@ -4,6 +4,7 @@ namespace App\Services\Documents;
 
 use App\Enums\DocumentSecurityScanStatus;
 use App\Enums\DocumentStatus;
+use App\Enums\ProcessingProfile;
 use App\Jobs\ScanDocumentSecurityJob;
 use App\Models\Document;
 use App\Models\User;
@@ -14,17 +15,31 @@ class DocumentUploadService
 {
     public function __construct(
         private readonly DocumentStorageService $storage,
+        private readonly DocumentProcessingDispatcher $processingDispatcher,
     ) {}
 
-    public function store(User $user, UploadedFile $file): Document
-    {
+    public function store(
+        User $user,
+        UploadedFile $file,
+        ProcessingProfile $processingProfile,
+    ): Document {
         if (config('security.document_security_scan.enabled', true) === false) {
-            return $this->storage->storePermanent($user, $file);
+            $document = $this->storage->storePermanent($user, $file);
+
+            $this->processingDispatcher->dispatchInitial(
+                $document,
+                $processingProfile,
+            );
+
+            return $document;
         }
 
         $document = $this->storage->storeQuarantined($user, $file);
 
-        ScanDocumentSecurityJob::dispatch($document);
+        ScanDocumentSecurityJob::dispatch(
+            $document,
+            $processingProfile,
+        )->afterCommit();
 
         return $document;
     }

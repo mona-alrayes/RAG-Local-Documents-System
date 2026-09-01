@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\ProcessingProfile;
 use App\Models\Document;
 use App\Rules\SecureDocumentUpload;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UploadDocumentRequest extends FormRequest
 {
@@ -31,6 +33,17 @@ class UploadDocumentRequest extends FormRequest
                 'max:'.$maxSizeKilobytes,
                 new SecureDocumentUpload,
             ],
+            'processing_profile' => [
+                'required',
+                Rule::enum(ProcessingProfile::class),
+            ],
         ];
+    }
+
+    public function processingProfile(): ProcessingProfile
+    {
+        return ProcessingProfile::from(
+            (string) $this->validated('processing_profile'),
+        );
     }
 }

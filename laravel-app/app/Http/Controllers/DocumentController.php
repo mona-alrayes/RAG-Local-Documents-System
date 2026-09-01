@@ -43,6 +43,7 @@ class DocumentController extends Controller
             $uploadService->store(
                 $request->user(),
                 $request->file('document'),
+                $request->processingProfile(),
             );
         } catch (DuplicateDocumentException $exception) {
             return response()->json([

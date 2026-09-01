@@ -4,7 +4,9 @@ namespace App\Jobs;
 
 use App\Enums\DocumentSecurityScanStatus;
 use App\Enums\DocumentStatus;
+use App\Enums\ProcessingProfile;
 use App\Models\Document;
+use App\Services\Documents\DocumentProcessingDispatcher;
 use App\Services\Documents\DocumentSecurityService;
 use App\Services\Documents\DocumentUploadService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,6 +20,7 @@ class ScanDocumentSecurityJob implements ShouldQueue
 
     public function __construct(
         public Document $document,
+        public ProcessingProfile $processingProfile,
     ) {
         $this->onQueue(
             (string) config('security.clamav.queue', 'security-scan'),
@@ -27,6 +30,7 @@ class ScanDocumentSecurityJob implements ShouldQueue
     public function handle(
         DocumentSecurityService $securityService,
         DocumentUploadService $uploadService,
+        DocumentProcessingDispatcher $processingDispatcher,
     ): void {
         $this->document->status = DocumentStatus::Scanning;
         $this->document->save();
@@ -51,13 +55,10 @@ class ScanDocumentSecurityJob implements ShouldQueue
                 $scanStatus,
             );
 
-            /*
-         * AI processing has not been dispatched yet.
-         * Keep the aggregate status pending until a real processing
-         * job is dispatched, at which point it may become queued.
-         */
-            $this->document->status = DocumentStatus::Pending;
-            $this->document->save();
+            $processingDispatcher->dispatchInitial(
+                $this->document,
+                $this->processingProfile,
+            );
         } catch (Throwable $exception) {
             $this->document->status = DocumentStatus::Failed;
             $this->document->save();
