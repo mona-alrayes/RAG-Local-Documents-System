@@ -8,6 +8,7 @@ use App\Models\Document;
 use App\Models\ProcessingRun;
 use App\Services\Ai\AiServiceClient;
 use App\Services\Ai\Data\ProcessDocumentRequestData;
+use App\Services\Documents\ProcessingRunResultPersister;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -19,8 +20,10 @@ class ProcessDocumentJob implements ShouldQueue
         public int $processingRunId,
     ) {}
 
-    public function handle(AiServiceClient $client): void
-    {
+    public function handle(
+        AiServiceClient $client,
+        ProcessingRunResultPersister $resultPersister,
+    ): void {
         $processingRun = ProcessingRun::query()
             ->with('document')
             ->findOrFail($this->processingRunId);
@@ -47,10 +50,15 @@ class ProcessDocumentJob implements ShouldQueue
             fileType: $document->file_type,
         );
 
-        $client->processDocument(
+        $result = $client->processDocument(
             data: $requestData,
             filePath: $document->file_path,
             fileName: $document->original_name,
+        );
+
+        $resultPersister->persist(
+            processingRun: $processingRun,
+            result: $result,
         );
     }
 }
