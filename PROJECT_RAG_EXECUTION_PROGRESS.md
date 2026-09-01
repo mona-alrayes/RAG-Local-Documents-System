@@ -2,8 +2,8 @@
 
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
-> **آخر تحديث:** 2026-08-31  
-> **الحالة العامة:** قيد التنفيذ — H3 merged; H4 is next
+> **آخر تحديث:** 2026-09-01
+> **الحالة العامة:** قيد التنفيذ — H4 verified in PR #84; merge pending
 
 ---
 
@@ -17,8 +17,10 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 0f42335252921ffc9fb547b1a8697b04a772bfb4
+Verified Main Commit: 5183d5a5cdf6d47dde6b4c85e8e3cb23a16ea446
 Last Merged Feature PR on main: #83 — feat(H3): add single-profile document processing API
+Open Feature PR: #84 — feat(H4): add document processing job and queue dispatch
+Verified H4 Feature Commit: 79fa93442fcf67c11c78d133b29db740aa87d798
 
 Current Working Branch: main
 
@@ -26,7 +28,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H3 — FastAPI single-profile Process Document API / application orchestration
+H4 — ProcessDocumentJob + queue dispatch (verified in PR #84; not merged yet)
 
 Current Phase:
 H — Processing Orchestration
@@ -40,12 +42,12 @@ Architectural Result:
 - active_processing_run_id is the document pointer to the current indexed run.
 
 Latest Verification:
-H3 focused FastAPI tests: 11 passed
-FastAPI full regression: 142 passed
-Python compileall: PASS
+Laravel full regression: 68 passed (305 assertions)
+Laravel Pint on H4 files: PASS
+Docker Compose config validation: PASS
 
 Next Planned Task:
-H4 — ProcessDocumentJob + queue dispatch
+Merge PR #84, then H5 — Processing metrics / report persistence
 
 Open Blockers: none
 ```
@@ -263,7 +265,7 @@ assert "comparison_report" not in payload
 | H1 AiServiceClient | DONE |
 | H2 Processing DTOs and contract alignment | DONE |
 | H3 FastAPI single-profile Process Document API / application orchestration | DONE |
-| H4 ProcessDocumentJob + queue dispatch | TODO |
+| H4 ProcessDocumentJob + queue dispatch | DONE |
 | H5 Processing metrics / report persistence | TODO |
 | H6 Active-run transaction after successful indexing | TODO |
 | H7 Safe reprocessing replacement | TODO |
@@ -681,47 +683,53 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H3 FastAPI single-profile Process Document API / application orchestration
+## آخر مهمة مكتملة — H4 ProcessDocumentJob + queue dispatch
 
-**الحالة:** `DONE` ومندمجة في `main` عبر PR #83 — `feat(H3): add single-profile document processing API`.
+**الحالة:** `DONE` ومتحقق منها في PR #84 — `feat(H4): add document processing job and queue dispatch`، والـPR مفتوحة ولم تندمج في `main` بعد.
 
 تم تنفيذ:
 
-- إضافة `POST /api/v1/documents/process` بعقد `multipart/form-data`.
-- معالجة Processing Profile واحدة موثوقة فقط لكل request: `cloud` أو `hybrid_local`.
-- عدم وجود Both / Compare / Winner، ومنع silent profile fallback.
-- إعادة استخدام parsing + normalization + chunking + dense embeddings + sparse representation + processing reporting.
-- تنفيذ direct persistent Qdrant indexing باستخدام E9/E10.
-- عدم إرجاع `status="indexed"` إلا بعد نجاح الـindexing والتحقق من exact persisted count.
-- استخدام temporary uploaded-file adapter مع تنظيف الملف بعد المعالجة.
-- عدم إرجاع raw vectors أو temporary filesystem paths ضمن response.
+- إضافة `processing_profile` إلى upload request والتحقق منه كـ`ProcessingProfile` enum.
+- إضافة `DocumentProcessingDispatcher` لإنشاء `ProcessingRun` أولية، تحديث الوثيقة إلى `queued`، ثم إرسال `ProcessDocumentJob` باستخدام `afterCommit()`.
+- تمرير الـProfile عبر مسار الفحص الأمني وإرسال المعالجة فقط بعد نجاح الفحص واعتماد الملف في Private Storage.
+- إضافة `ProcessDocumentJob` لتحميل بيانات الوثيقة والـRun من قاعدة البيانات وبناء `ProcessDocumentRequestData` من مصادر server-side موثوقة.
+- نقل Document وProcessingRun إلى `processing` عند بدء تنفيذ الـJob.
+- إضافة `AiServiceClient::processDocument()` لإرسال الملف والـmetadata بصيغة `multipart/form-data` إلى FastAPI.
+- إضافة `ProcessDocumentResponseValidator` للتحقق من كامل response contract والحقول المتداخلة قبل إنشاء `ProcessDocumentResult` typed.
+- إضافة timeout مستقل لطلب معالجة الوثيقة وqueue worker عام ضمن Docker Compose.
+- منع إنشاء Initial ProcessingRun ثانية للوثيقة نفسها ضمن مسار H4.
+- إضافة `build/` إلى FastAPI `.gitignore` باعتباره build artifact محلياً.
 
-لم يتم ضمن H3:
+لم يتم ضمن H4:
 
-- Laravel `ProcessDocumentJob` أو queue dispatch.
 - Processing metrics / report persistence في Laravel.
 - تبديل `active_processing_run_id`.
+- تحويل الوثيقة إلى `ready` أو الـRun إلى `indexed` داخل Laravel.
+- سياسات retries / idempotency الكاملة المخصصة لـH9.
+- serialized `ai-local` queue والـglobal heavy-resource lock المخصصان لـH10.
 
 ## Verification
 
 ```text
-H3 focused FastAPI tests: 11 passed
-FastAPI full regression: 142 passed
-Python compileall: PASS
+Laravel full regression: 68 passed (305 assertions)
+Laravel Pint on H4 files: PASS
+Docker Compose config validation: PASS
+git diff --check: PASS
 ```
 
 ## المهمة الحالية/التالية
 
 ```text
-H4 — ProcessDocumentJob + queue dispatch
+PR #84 merge, then H5 — Processing metrics / report persistence
 ```
 
 Baseline المهمة التالية:
 
 ```text
-FastAPI now exposes the production single-profile Process Document endpoint and indexes directly into persistent Qdrant.
-H4 adds ProcessDocumentJob and queue dispatch without reintroducing Compare/Winner behavior.
-Processing report persistence and active_processing_run_id switching remain assigned to H5 and H6.
+H4 is implemented and verified in PR #84 but is not merged into main yet.
+Laravel now has the typed queued path required to call the FastAPI Process Document endpoint after the security gate.
+H5 persists the validated processing report in Laravel.
+H6 switches active_processing_run_id only after successful indexing.
 No Compare/Winner/temporary artifact lifecycle exists in the target architecture.
 ```
 
