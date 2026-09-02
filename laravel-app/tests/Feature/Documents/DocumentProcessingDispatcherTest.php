@@ -120,4 +120,144 @@ class DocumentProcessingDispatcherTest extends TestCase
         $this->assertDatabaseCount('document_processing_runs', 0);
         Queue::assertNotPushed(ProcessDocumentJob::class);
     }
+
+    public function test_it_dispatches_reprocessing_without_replacing_the_active_run(): void
+    {
+        Queue::fake();
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'notes.txt',
+                "Permanent document content.\n",
+            ),
+        );
+
+        $activeRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::Cloud,
+            'status' => ProcessingRunStatus::Indexed,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $document->active_processing_run_id = $activeRun->id;
+        $document->status = DocumentStatus::Ready;
+        $document->save();
+
+        $newRun = app(DocumentProcessingDispatcher::class)
+            ->dispatchReprocessing(
+                $document,
+                ProcessingProfile::HybridLocal,
+            );
+
+        $freshDocument = $document->fresh();
+
+        $this->assertSame(
+            $activeRun->id,
+            $freshDocument->active_processing_run_id,
+        );
+
+        $this->assertSame(
+            DocumentStatus::Ready,
+            $freshDocument->status,
+        );
+
+        $this->assertSame(
+            ProcessingRunStatus::Pending,
+            $newRun->status,
+        );
+
+        $this->assertSame(
+            ProcessingProfile::HybridLocal,
+            $newRun->profile,
+        );
+
+        $this->assertDatabaseCount('document_processing_runs', 2);
+
+        Queue::assertPushed(
+            ProcessDocumentJob::class,
+            fn (ProcessDocumentJob $job): bool => $job->processingRunId === $newRun->id,
+        );
+    }
+
+    public function test_it_rejects_reprocessing_without_an_active_run(): void
+    {
+        Queue::fake();
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'notes.txt',
+                "Permanent document content.\n",
+            ),
+        );
+
+        try {
+            app(DocumentProcessingDispatcher::class)
+                ->dispatchReprocessing(
+                    $document,
+                    ProcessingProfile::Cloud,
+                );
+
+            $this->fail('Expected reprocessing without an active run to fail.');
+        } catch (LogicException $exception) {
+            $this->assertSame(
+                'Document must have an active processing run before reprocessing.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertDatabaseCount('document_processing_runs', 0);
+        Queue::assertNotPushed(ProcessDocumentJob::class);
+    }
+
+    public function test_it_rejects_concurrent_reprocessing_dispatches(): void
+    {
+        Queue::fake();
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'notes.txt',
+                "Permanent document content.\n",
+            ),
+        );
+
+        $activeRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::Cloud,
+            'status' => ProcessingRunStatus::Indexed,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $document->active_processing_run_id = $activeRun->id;
+        $document->save();
+
+        $dispatcher = app(DocumentProcessingDispatcher::class);
+
+        $dispatcher->dispatchReprocessing(
+            $document,
+            ProcessingProfile::HybridLocal,
+        );
+
+        try {
+            $dispatcher->dispatchReprocessing(
+                $document,
+                ProcessingProfile::Cloud,
+            );
+
+            $this->fail('Expected concurrent reprocessing to be rejected.');
+        } catch (LogicException $exception) {
+            $this->assertSame(
+                'Document reprocessing is already in progress.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertDatabaseCount('document_processing_runs', 2);
+        Queue::assertPushed(ProcessDocumentJob::class, 1);
+    }
 }

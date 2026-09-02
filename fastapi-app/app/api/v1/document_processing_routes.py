@@ -3,17 +3,25 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydantic import PositiveInt
 
-from app.api.dependencies import get_process_document_service
+from app.api.dependencies import (
+    get_process_document_service,
+    get_processing_run_points_cleanup_service,
+)
 from app.infrastructure.files.temporary_document import (
     temporary_document,
 )
 from app.processing.base import ProcessingProfile
 from app.schemas.documents import (
+    DeleteProcessingRunPointsRequest,
+    DeleteProcessingRunPointsResponse,
     DocumentFileType,
     ProcessDocumentRequest,
     ProcessDocumentResponse,
 )
 from app.services.document_processing import ProcessDocumentService
+from app.services.processing_run_cleanup import (
+    ProcessingRunPointsCleanupService,
+)
 
 
 router = APIRouter(prefix="/api/v1")
@@ -77,6 +85,20 @@ async def process_document(
             )
     finally:
         await file.close()
+
+
+@router.delete(
+    "/documents/processing-runs/points",
+    response_model=DeleteProcessingRunPointsResponse,
+)
+def delete_processing_run_points(
+    request: DeleteProcessingRunPointsRequest,
+    service: Annotated[
+        ProcessingRunPointsCleanupService,
+        Depends(get_processing_run_points_cleanup_service),
+    ],
+) -> DeleteProcessingRunPointsResponse:
+    return service.delete(request=request)
 
 
 def _safe_source_name(

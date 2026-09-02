@@ -334,4 +334,202 @@ class ProcessDocumentJobTest extends TestCase
             $document->fresh()->active_processing_run_id,
         );
     }
+
+    public function test_successful_reprocessing_switches_active_run_before_old_run_cleanup(): void
+    {
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'trusted-notes.txt',
+                "Trusted document content.\n",
+            ),
+        );
+
+        $activeRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::Cloud,
+            'status' => ProcessingRunStatus::Indexed,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+            'qdrant_collection' => 'rag_documents_cloud',
+            'indexed_at' => now(),
+        ]);
+
+        $newRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::HybridLocal,
+            'status' => ProcessingRunStatus::Pending,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $document->active_processing_run_id = $activeRun->id;
+        $document->status = DocumentStatus::Ready;
+        $document->save();
+
+        $result = new ProcessDocumentResult(
+            documentId: $document->id,
+            processingRunId: $newRun->id,
+            profile: ProcessingProfile::HybridLocal,
+            status: ProcessingRunStatus::Indexed,
+            qdrantCollection: 'rag_documents_hybrid_local',
+            profileSnapshot: [],
+            totalPages: null,
+            totalChunks: 2,
+            vectorCount: 2,
+            vectorDimension: 1024,
+            stageTimingsMs: [],
+            warnings: [],
+        );
+
+        $this->mock(
+            AiServiceClient::class,
+            function (MockInterface $mock) use (
+                $activeRun,
+                $document,
+                $newRun,
+                $result,
+            ): void {
+                $mock->shouldReceive('processDocument')
+                    ->once()
+                    ->withArgs(function () use (
+                        $activeRun,
+                        $document,
+                    ): bool {
+                        $freshDocument = $document->fresh();
+
+                        $this->assertSame(
+                            $activeRun->id,
+                            $freshDocument->active_processing_run_id,
+                        );
+
+                        $this->assertSame(
+                            DocumentStatus::Ready,
+                            $freshDocument->status,
+                        );
+
+                        return true;
+                    })
+                    ->andReturn($result);
+
+                $mock->shouldReceive('deleteProcessingRunPoints')
+                    ->once()
+                    ->withArgs(function (
+                        int $userId,
+                        int $documentId,
+                        int $processingRunId,
+                        ProcessingProfile $processingProfile,
+                    ) use (
+                        $activeRun,
+                        $document,
+                        $newRun,
+                    ): bool {
+                        $this->assertSame(
+                            $newRun->id,
+                            $document->fresh()->active_processing_run_id,
+                        );
+
+                        return $userId === (int) $document->user_id
+                            && $documentId === (int) $document->id
+                            && $processingRunId === (int) $activeRun->id
+                            && $processingProfile === ProcessingProfile::Cloud;
+                    });
+            },
+        );
+
+        (new ProcessDocumentJob($newRun->id))->handle(
+            app(AiServiceClient::class),
+            app(ProcessingRunResultPersister::class),
+            app(ProcessingRunActivator::class),
+        );
+
+        $this->assertSame(
+            ProcessingRunStatus::Indexed,
+            $newRun->fresh()->status,
+        );
+
+        $this->assertSame(
+            $newRun->id,
+            $document->fresh()->active_processing_run_id,
+        );
+
+        $this->assertSame(
+            DocumentStatus::Ready,
+            $document->fresh()->status,
+        );
+    }
+
+    public function test_failed_reprocessing_keeps_old_run_active_without_cleanup(): void
+    {
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'trusted-notes.txt',
+                "Trusted document content.\n",
+            ),
+        );
+
+        $activeRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::Cloud,
+            'status' => ProcessingRunStatus::Indexed,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+            'qdrant_collection' => 'rag_documents_cloud',
+            'indexed_at' => now(),
+        ]);
+
+        $newRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::HybridLocal,
+            'status' => ProcessingRunStatus::Pending,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $document->active_processing_run_id = $activeRun->id;
+        $document->status = DocumentStatus::Ready;
+        $document->save();
+
+        $this->mock(
+            AiServiceClient::class,
+            function (MockInterface $mock): void {
+                $mock->shouldReceive('processDocument')
+                    ->once()
+                    ->andThrow(new AiServiceException('AI service failed.'));
+
+                $mock->shouldNotReceive('deleteProcessingRunPoints');
+            },
+        );
+
+        try {
+            (new ProcessDocumentJob($newRun->id))->handle(
+                app(AiServiceClient::class),
+                app(ProcessingRunResultPersister::class),
+                app(ProcessingRunActivator::class),
+            );
+
+            $this->fail('Expected AI service failure was not thrown.');
+        } catch (AiServiceException $exception) {
+            $this->assertSame(
+                'AI service failed.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertSame(
+            $activeRun->id,
+            $document->fresh()->active_processing_run_id,
+        );
+
+        $this->assertSame(
+            DocumentStatus::Ready,
+            $document->fresh()->status,
+        );
+
+        $this->assertSame(
+            ProcessingRunStatus::Processing,
+            $newRun->fresh()->status,
+        );
+    }
 }

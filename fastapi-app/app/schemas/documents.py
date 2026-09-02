@@ -38,3 +38,16 @@ class ProcessDocumentResponse(BaseModel):
     vector_dimension: PositiveInt | None
     stage_timings_ms: dict[ProcessingStage, NonNegativeInt]
     warnings: list[ProcessingWarning]
+
+
+class DeleteProcessingRunPointsRequest(BaseModel):
+    user_id: PositiveInt
+    document_id: PositiveInt
+    processing_run_id: PositiveInt
+    processing_profile: ProcessingProfile
+
+
+class DeleteProcessingRunPointsResponse(BaseModel):
+    document_id: PositiveInt
+    processing_run_id: PositiveInt
+    status: Literal["deleted"]

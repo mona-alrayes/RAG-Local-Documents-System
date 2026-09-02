@@ -27,6 +27,9 @@ from app.runtime.state import (
 )
 from app.schemas.documents import DocumentFileType
 from app.services.document_processing import ProcessDocumentService
+from app.services.processing_run_cleanup import (
+    ProcessingRunPointsCleanupService,
+)
 
 
 def get_process_document_service() -> Iterator[ProcessDocumentService]:
@@ -39,6 +42,20 @@ def get_process_document_service() -> Iterator[ProcessDocumentService]:
             loaders=_build_loaders(settings),
             profile_registry=_build_profile_registry(settings),
             indexer=QdrantDocumentIndexer(qdrant_client),
+        )
+    finally:
+        qdrant_client.close()
+
+
+def get_processing_run_points_cleanup_service(
+) -> Iterator[ProcessingRunPointsCleanupService]:
+    settings = get_settings()
+    qdrant_client = build_qdrant_client(settings)
+
+    try:
+        yield ProcessingRunPointsCleanupService(
+            settings=settings,
+            client=qdrant_client,
         )
     finally:
         qdrant_client.close()
