@@ -12,6 +12,7 @@ use App\Services\Ai\AiServiceClient;
 use App\Services\Ai\Data\ProcessDocumentRequestData;
 use App\Services\Ai\Data\ProcessDocumentResult;
 use App\Services\Documents\DocumentStorageService;
+use App\Services\Documents\ProcessingRunActivator;
 use App\Services\Documents\ProcessingRunResultPersister;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -149,6 +150,7 @@ class ProcessDocumentJobTest extends TestCase
         (new ProcessDocumentJob($processingRun->id))->handle(
             app(AiServiceClient::class),
             app(ProcessingRunResultPersister::class),
+            app(ProcessingRunActivator::class),
         );
 
         $freshRun = $processingRun->fresh();
@@ -204,6 +206,11 @@ class ProcessDocumentJobTest extends TestCase
         $this->assertSame(
             DocumentStatus::Processing,
             $document->fresh()->status,
+        );
+
+        $this->assertSame(
+            $processingRun->id,
+            $document->fresh()->active_processing_run_id,
         );
 
         $freshOtherRun = $otherProcessingRun->fresh();
@@ -273,6 +280,7 @@ class ProcessDocumentJobTest extends TestCase
             (new ProcessDocumentJob($processingRun->id))->handle(
                 app(AiServiceClient::class),
                 app(ProcessingRunResultPersister::class),
+                app(ProcessingRunActivator::class),
             );
 
             $this->fail('Expected AI service failure was not thrown.');
@@ -320,6 +328,10 @@ class ProcessDocumentJobTest extends TestCase
 
         $this->assertNull(
             $freshRun->indexed_at,
+        );
+
+        $this->assertNull(
+            $document->fresh()->active_processing_run_id,
         );
     }
 }
