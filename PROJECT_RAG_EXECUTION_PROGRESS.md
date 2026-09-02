@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-02
-> **الحالة العامة:** قيد التنفيذ — H6 مكتملة ومدموجة في PR #86؛ H7 هي المهمة الحالية
+> **الحالة العامة:** قيد التنفيذ — H7 مكتملة ومدموجة في PR #87؛ H8 هي المهمة الحالية
 
 ---
 
@@ -17,10 +17,10 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: b0bc663ef8a4655aa2f861a085f68efcd2822023
-Last Merged Feature PR on main: #86 — feat(H6): activate indexed processing run transactionally
-Latest Task PR: #86 — feat(H6): activate indexed processing run transactionally
-Verified H6 Feature Commit: 11a30cc041b996331a3f423893bd46bae7be8ab9
+Verified Main Commit: a31b449989081d58b1230465c995f55c57ddf3e0
+Last Merged Feature PR on main: #87 — feat(H7): add safe reprocessing replacement
+Latest Task PR: #87 — feat(H7): add safe reprocessing replacement
+Verified H7 Feature Commit: 91e8be13eae5a1873fcdb15462d27b84a66d94cb
 
 Current Working Branch: main
 
@@ -28,7 +28,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H6 — Active Processing Run Transaction After Successful Indexing
+H7 — Safe Reprocessing Replacement
 
 Current Phase:
 H — Processing Orchestration
@@ -40,16 +40,20 @@ Architectural Result:
 - No temporary comparison artifacts or promotion flow.
 - Direct persistent Qdrant indexing is the target path.
 - active_processing_run_id is the document pointer to the current indexed run.
+- Reprocessing keeps the old active run usable until the replacement is indexed and switched transactionally.
+- Old-run Qdrant cleanup starts only after a successful active-run switch.
 
 Latest Verification:
-PR #86 merged on GitHub: PASS
-main contains merge commit b0bc663ef8a4655aa2f861a085f68efcd2822023: PASS
-Focused tests: 5 passed (42 assertions)
-Full regression: 71 passed (334 assertions)
-Pint: passed
+PR #87 merged on GitHub: PASS
+main contains merge commit a31b449989081d58b1230465c995f55c57ddf3e0: PASS
+Focused Laravel tests after Pint: 31 passed (143 assertions)
+Laravel full regression: 79 passed (366 assertions)
+FastAPI focused cleanup tests: 4 passed
+FastAPI full regression: 146 passed
+Pint: passed (8 files; 3 style issues fixed)
 
 Current Task:
-H7 — Safe Reprocessing Replacement
+H8 — Aggregate Document Status Projector
 
 Open Blockers: none
 ```
@@ -270,7 +274,7 @@ assert "comparison_report" not in payload
 | H4 ProcessDocumentJob + queue dispatch | DONE |
 | H5 Processing metrics / report persistence | DONE |
 | H6 Active-run transaction after successful indexing | DONE |
-| H7 Safe reprocessing replacement | TODO |
+| H7 Safe reprocessing replacement | DONE |
 | H8 Aggregate status projector | TODO |
 | H9 Queue retries / timeouts / idempotency | TODO |
 | H10 Serialized `ai-local` queue + global heavy-resource lock | TODO |
@@ -685,50 +689,74 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H6 Active Processing Run Transaction After Successful Indexing
+## آخر مهمة مكتملة — H7 Safe Reprocessing Replacement
 
-**الحالة:** `DONE` ومتحقق منها في PR #86 — `feat(H6): activate indexed processing run transactionally`، والمدمجة في `main`.
+**الحالة:** `DONE` ومتحقق منها في PR #87 — `feat(H7): add safe reprocessing replacement`، والمدمجة في `main`.
 
 تم تنفيذ:
 
-- إضافة `ProcessingRunActivator`.
-- تفعيل الـindexed `ProcessingRun` داخل Laravel DB transaction.
-- التحقق أن الـrun تابعة للوثيقة وحالتها `Indexed`.
-- منع استبدال active run موجودة لأن ذلك ضمن H7.
-- ربط التفعيل مع `ProcessDocumentJob` بعد نجاح persistence.
-- عدم تغيير `Document.status` إلى `Ready` لأن ذلك ضمن H8.
+- إضافة `dispatchReprocessing()` كمسار صريح ومستقل عن `dispatchInitial()`.
+- اشتراط وجود active run صالحة ومفهرسة قبل إعادة المعالجة.
+- منع إنشاء أكثر من reprocessing run قيد التنفيذ للوثيقة نفسها.
+- إبقاء `active_processing_run_id` القديمة دون تغيير أثناء معالجة البديل.
+- تطوير `ProcessingRunActivator` لدعم التفعيل الأولي والاستبدال الآمن داخل Laravel DB transaction.
+- التحقق أن Run البديلة تابعة للوثيقة وحالتها `Indexed` قبل تحويل المؤشر.
+- إبقاء `Document.status` الحالية دون تغيير أثناء reprocessing كي تبقى النسخة العاملة متاحة.
+- تنفيذ old-run cleanup فقط بعد نجاح transaction وتحويل المؤشر إلى Run الجديدة.
+- إضافة FastAPI internal cleanup endpoint يستخدم scope دقيقاً:
+  - `user_id`
+  - `document_id`
+  - `processing_run_id`
+- اشتقاق Qdrant Collection من Processing Profile الموثوقة وعدم قبول اسم Collection من العميل.
+- التحقق بعد الحذف أن عدد نقاط Run القديمة أصبح صفراً.
+- إضافة Laravel AI client method لاستدعاء cleanup والتحقق من response.
+- إضافة اختبارات تغطي بقاء Run القديمة، فشل البديل، نجاح التحويل، rollback عند Run غير صالحة، وترتيب cleanup بعد switch.
 
-لم يتم ضمن H6:
+لم يتم ضمن H7:
 
-- Safe reprocessing replacement المخصصة لـH7.
-- Aggregate status projector وتحويل `Document.status` إلى `Ready` المخصصان لـH8.
-- سياسات retries / timeouts / idempotency الكاملة المخصصة لـH9.
+- Aggregate Document Status Projector وتحويل الحالة المجمعة إلى `Ready` المخصصان لـH8.
+- retries / timeouts / generalized idempotency / recovery المخصصة لـH9.
 - serialized `ai-local` queue والـglobal heavy-resource lock المخصصان لـH10.
+- أي Compare/Winner/temporary artifact lifecycle.
 
 ## Verification
 
 ```text
-PR #86 merged on GitHub: PASS
-Merge commit: b0bc663ef8a4655aa2f861a085f68efcd2822023
+PR #87 merged on GitHub: PASS
+Feature commit: 91e8be13eae5a1873fcdb15462d27b84a66d94cb
+Merge commit: a31b449989081d58b1230465c995f55c57ddf3e0
 main contains the merge commit: PASS
-Focused tests: 5 passed (42 assertions)
-Full regression: 71 passed (334 assertions)
-Pint: passed
+
+Focused Laravel tests after Pint:
+31 passed (143 assertions)
+
+Laravel full regression:
+79 passed (366 assertions)
+
+FastAPI focused cleanup tests:
+4 passed
+
+FastAPI full regression:
+146 passed
+
+Pint:
+passed (8 files; 3 style issues fixed)
 ```
 
 ## المهمة الحالية/التالية
 
 ```text
-H7 — Safe Reprocessing Replacement
+H8 — Aggregate Document Status Projector
 ```
 
 Baseline المهمة التالية:
 
 ```text
-H6 is merged into main and activates the first indexed ProcessingRun transactionally after successful persistence.
-H7 safely replaces an existing active run only after the replacement run is fully indexed.
-The old active run remains usable until the replacement succeeds.
-Document.status remains unchanged until H8.
+H7 is merged into main and safely replaces an existing active ProcessingRun only after the replacement is fully indexed.
+The old active run remains usable while the replacement is processing or when it fails.
+Old-run Qdrant cleanup starts only after the transactional active-run switch succeeds.
+H8 owns aggregate Document status projection and the transition to Ready.
+H9 owns retries, timeouts, generalized idempotency, and recovery.
 No Compare/Winner/temporary artifact lifecycle exists in the target architecture.
 ```
 
