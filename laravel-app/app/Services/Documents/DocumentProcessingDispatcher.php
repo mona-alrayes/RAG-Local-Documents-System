@@ -51,4 +51,69 @@ class DocumentProcessingDispatcher
             return $processingRun;
         });
     }
+
+    public function dispatchReprocessing(
+        Document $document,
+        ProcessingProfile $profile,
+    ): ProcessingRun {
+        if (! Storage::disk('documents')->exists($document->file_path)) {
+            throw new RuntimeException(
+                'Document must exist in permanent private storage before reprocessing.',
+            );
+        }
+
+        return DB::transaction(function () use ($document, $profile): ProcessingRun {
+            $lockedDocument = Document::query()
+                ->lockForUpdate()
+                ->findOrFail($document->id);
+
+            if ($lockedDocument->active_processing_run_id === null) {
+                throw new LogicException(
+                    'Document must have an active processing run before reprocessing.',
+                );
+            }
+
+            $activeProcessingRun = ProcessingRun::query()
+                ->lockForUpdate()
+                ->find($lockedDocument->active_processing_run_id);
+
+            if (
+                ! $activeProcessingRun instanceof ProcessingRun
+                || (int) $activeProcessingRun->document_id
+                !== (int) $lockedDocument->getKey()
+                || $activeProcessingRun->status
+                !== ProcessingRunStatus::Indexed
+            ) {
+                throw new LogicException(
+                    'Document active processing run is invalid for reprocessing.',
+                );
+            }
+
+            $hasProcessingRunInProgress = $lockedDocument
+                ->processingRuns()
+                ->whereIn('status', [
+                    ProcessingRunStatus::Pending->value,
+                    ProcessingRunStatus::Processing->value,
+                    ProcessingRunStatus::Indexing->value,
+                ])
+                ->exists();
+
+            if ($hasProcessingRunInProgress) {
+                throw new LogicException(
+                    'Document reprocessing is already in progress.',
+                );
+            }
+
+            $processingRun = $lockedDocument->processingRuns()->create([
+                'profile' => $profile,
+                'status' => ProcessingRunStatus::Pending,
+                'profile_snapshot' => [],
+                'stage_timings_ms' => [],
+            ]);
+
+            ProcessDocumentJob::dispatch($processingRun->id)->afterCommit();
+
+            return $processingRun;
+        });
+    }
 }

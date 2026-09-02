@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai;
 
+use App\Enums\ProcessingProfile;
 use App\Exceptions\AiServiceException;
 use App\Services\Ai\Data\ProcessDocumentRequestData;
 use App\Services\Ai\Data\ProcessDocumentResult;
@@ -86,6 +87,60 @@ class AiServiceClient
             requestData: $data,
             fallbackCorrelationId: $correlationId,
         );
+    }
+
+    public function deleteProcessingRunPoints(
+        int $userId,
+        int $documentId,
+        int $processingRunId,
+        ProcessingProfile $processingProfile,
+    ): void {
+        $correlationId = (string) Str::uuid();
+
+        try {
+            $response = $this->request($correlationId)
+                ->delete(
+                    '/api/v1/documents/processing-runs/points',
+                    [
+                        'user_id' => $userId,
+                        'document_id' => $documentId,
+                        'processing_run_id' => $processingRunId,
+                        'processing_profile' => $processingProfile->value,
+                    ],
+                );
+        } catch (ConnectionException $exception) {
+            throw new AiServiceException(
+                message: 'Unable to connect to the AI service.',
+                correlationId: $correlationId,
+                previous: $exception,
+            );
+        }
+
+        if ($response->failed()) {
+            throw $this->remoteFailure(
+                response: $response,
+                fallbackCorrelationId: $correlationId,
+            );
+        }
+
+        $payload = $response->json();
+
+        if (
+            ! is_array($payload)
+            || data_get($payload, 'status') !== 'deleted'
+            || (int) data_get($payload, 'document_id') !== $documentId
+            || (int) data_get($payload, 'processing_run_id')
+            !== $processingRunId
+        ) {
+            throw new AiServiceException(
+                message: 'AI service returned an invalid processing run cleanup response.',
+                statusCode: $response->status(),
+                correlationId: $this->correlationId(
+                    response: $response,
+                    fallback: $correlationId,
+                ),
+            );
+        }
     }
 
     /**

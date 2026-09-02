@@ -79,7 +79,7 @@ class ProcessingRunActivatorTest extends TestCase
         );
     }
 
-    public function test_it_does_not_replace_an_existing_active_processing_run(): void
+    public function test_it_replaces_an_existing_active_processing_run(): void
     {
         Storage::fake('documents');
 
@@ -108,13 +108,54 @@ class ProcessingRunActivatorTest extends TestCase
         $document->active_processing_run_id = $activeRun->id;
         $document->save();
 
+        $previousRun = app(ProcessingRunActivator::class)
+            ->activate($newRun);
+
+        $this->assertNotNull($previousRun);
+        $this->assertSame($activeRun->id, $previousRun->id);
+
+        $this->assertSame(
+            $newRun->id,
+            $document->fresh()->active_processing_run_id,
+        );
+    }
+
+    public function test_failed_replacement_keeps_the_existing_active_run(): void
+    {
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'trusted-notes.txt',
+                "Trusted document content.\n",
+            ),
+        );
+
+        $activeRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::Cloud,
+            'status' => ProcessingRunStatus::Indexed,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $newRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::HybridLocal,
+            'status' => ProcessingRunStatus::Processing,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $document->active_processing_run_id = $activeRun->id;
+        $document->save();
+
         try {
             app(ProcessingRunActivator::class)->activate($newRun);
 
-            $this->fail('Expected active processing run replacement failure was not thrown.');
+            $this->fail('Expected replacement failure was not thrown.');
         } catch (LogicException $exception) {
             $this->assertSame(
-                'Document already has an active processing run.',
+                'Only an indexed processing run may be activated.',
                 $exception->getMessage(),
             );
         }

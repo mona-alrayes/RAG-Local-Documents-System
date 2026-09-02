@@ -41,8 +41,10 @@ class ProcessDocumentJob implements ShouldQueue
         $processingRun->status = ProcessingRunStatus::Processing;
         $processingRun->save();
 
-        $document->status = DocumentStatus::Processing;
-        $document->save();
+        if ($document->active_processing_run_id === null) {
+            $document->status = DocumentStatus::Processing;
+            $document->save();
+        }
 
         $requestData = new ProcessDocumentRequestData(
             userId: (int) $document->user_id,
@@ -63,6 +65,17 @@ class ProcessDocumentJob implements ShouldQueue
             result: $result,
         );
 
-        $processingRunActivator->activate($processingRun);
+        $previousProcessingRun = $processingRunActivator->activate(
+            $processingRun,
+        );
+
+        if ($previousProcessingRun instanceof ProcessingRun) {
+            $client->deleteProcessingRunPoints(
+                userId: (int) $document->user_id,
+                documentId: (int) $document->getKey(),
+                processingRunId: (int) $previousProcessingRun->getKey(),
+                processingProfile: $previousProcessingRun->profile,
+            );
+        }
     }
 }

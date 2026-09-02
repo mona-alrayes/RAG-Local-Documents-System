@@ -108,7 +108,6 @@ class AiServiceClientTest extends TestCase
                 $exception->getPrevious(),
             );
         }
-
     }
 
     public function test_health_rejects_invalid_json_response(): void
@@ -476,12 +475,14 @@ class AiServiceClientTest extends TestCase
             'stage' => 'unknown_stage',
         ]];
 
-        foreach ([
-            $invalidSnapshot,
-            $mismatchedSnapshot,
-            $invalidTiming,
-            $invalidWarning,
-        ] as $invalidResponse) {
+        foreach (
+            [
+                $invalidSnapshot,
+                $mismatchedSnapshot,
+                $invalidTiming,
+                $invalidWarning,
+            ] as $invalidResponse
+        ) {
             Http::fake([
                 'http://ai-service.test/api/v1/documents/process' => Http::response(
                     $invalidResponse,
@@ -571,6 +572,67 @@ class AiServiceClientTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_delete_processing_run_points_sends_the_exact_run_scope(): void
+    {
+        $this->configureAiService();
+
+        Http::fake([
+            'http://ai-service.test/api/v1/documents/processing-runs/points' => Http::response([
+                'document_id' => 20,
+                'processing_run_id' => 30,
+                'status' => 'deleted',
+            ]),
+        ]);
+
+        app(AiServiceClient::class)->deleteProcessingRunPoints(
+            userId: 10,
+            documentId: 20,
+            processingRunId: 30,
+            processingProfile: ProcessingProfile::Cloud,
+        );
+
+        Http::assertSent(function (Request $request): bool {
+            return $request->method() === 'DELETE'
+                && $request->url()
+                === 'http://ai-service.test/api/v1/documents/processing-runs/points'
+                && $request->data() === [
+                    'user_id' => 10,
+                    'document_id' => 20,
+                    'processing_run_id' => 30,
+                    'processing_profile' => 'cloud',
+                ]
+                && $request->hasHeader(
+                    'X-Internal-API-Key',
+                    'test-secret',
+                );
+        });
+    }
+
+    public function test_delete_processing_run_points_rejects_a_mismatched_response(): void
+    {
+        $this->configureAiService();
+
+        Http::fake([
+            'http://ai-service.test/api/v1/documents/processing-runs/points' => Http::response([
+                'document_id' => 20,
+                'processing_run_id' => 999,
+                'status' => 'deleted',
+            ]),
+        ]);
+
+        $this->expectException(AiServiceException::class);
+        $this->expectExceptionMessage(
+            'AI service returned an invalid processing run cleanup response.',
+        );
+
+        app(AiServiceClient::class)->deleteProcessingRunPoints(
+            userId: 10,
+            documentId: 20,
+            processingRunId: 30,
+            processingProfile: ProcessingProfile::Cloud,
+        );
     }
 
     private function configureAiService(): void
