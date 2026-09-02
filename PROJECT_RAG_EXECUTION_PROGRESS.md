@@ -2,8 +2,8 @@
 
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
-> **آخر تحديث:** 2026-09-01
-> **الحالة العامة:** قيد التنفيذ — H5 مكتملة ومدموجة في PR #85؛ H6 هي المهمة الحالية
+> **آخر تحديث:** 2026-09-02
+> **الحالة العامة:** قيد التنفيذ — H6 مكتملة ومدموجة في PR #86؛ H7 هي المهمة الحالية
 
 ---
 
@@ -17,10 +17,10 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 9dd8d0803bcc7499ff24d748cd8d6c39c8369e3b
-Last Merged Feature PR on main: #85 — feat(H5): persist processing metrics and report
-Latest Task PR: #85 — feat(H5): persist processing metrics and report
-Verified H5 Feature Commit: f3e7e39afb00c9aac4314c4bdfa4695f0bfaf2b2
+Verified Main Commit: b0bc663ef8a4655aa2f861a085f68efcd2822023
+Last Merged Feature PR on main: #86 — feat(H6): activate indexed processing run transactionally
+Latest Task PR: #86 — feat(H6): activate indexed processing run transactionally
+Verified H6 Feature Commit: 11a30cc041b996331a3f423893bd46bae7be8ab9
 
 Current Working Branch: main
 
@@ -28,7 +28,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H5 — Processing Metrics / Report Persistence
+H6 — Active Processing Run Transaction After Successful Indexing
 
 Current Phase:
 H — Processing Orchestration
@@ -42,11 +42,14 @@ Architectural Result:
 - active_processing_run_id is the document pointer to the current indexed run.
 
 Latest Verification:
-PR #85 merged on GitHub: PASS
-main contains merge commit 9dd8d0803bcc7499ff24d748cd8d6c39c8369e3b: PASS
+PR #86 merged on GitHub: PASS
+main contains merge commit b0bc663ef8a4655aa2f861a085f68efcd2822023: PASS
+Focused tests: 5 passed (42 assertions)
+Full regression: 71 passed (334 assertions)
+Pint: passed
 
 Current Task:
-H6 — Active-run transaction after successful indexing
+H7 — Safe Reprocessing Replacement
 
 Open Blockers: none
 ```
@@ -266,7 +269,7 @@ assert "comparison_report" not in payload
 | H3 FastAPI single-profile Process Document API / application orchestration | DONE |
 | H4 ProcessDocumentJob + queue dispatch | DONE |
 | H5 Processing metrics / report persistence | DONE |
-| H6 Active-run transaction after successful indexing | TODO |
+| H6 Active-run transaction after successful indexing | DONE |
 | H7 Safe reprocessing replacement | TODO |
 | H8 Aggregate status projector | TODO |
 | H9 Queue retries / timeouts / idempotency | TODO |
@@ -682,47 +685,50 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H5 Processing Metrics / Report Persistence
+## آخر مهمة مكتملة — H6 Active Processing Run Transaction After Successful Indexing
 
-**الحالة:** `DONE` ومتحقق منها في PR #85 — `feat(H5): persist processing metrics and report`، والمدمجة في `main`.
+**الحالة:** `DONE` ومتحقق منها في PR #86 — `feat(H6): activate indexed processing run transactionally`، والمدمجة في `main`.
 
 تم تنفيذ:
 
-- إضافة `ProcessingRunResultPersister` لحفظ نتيجة المعالجة الموثوقة على `document_processing_runs`.
-- حفظ `profile_snapshot` و`total_pages` و`total_chunks` و`vector_count` و`vector_dimension`.
-- حفظ `stage_timings_ms` و`warnings` و`qdrant_collection` و`status` و`indexed_at`.
-- ربط `ProcessDocumentJob` بالـpersister بعد نجاح `AiServiceClient::processDocument()`.
-- إضافة invariants تمنع حفظ النتيجة على ProcessingRun أو Document أو Profile غير مطابق.
+- إضافة `ProcessingRunActivator`.
+- تفعيل الـindexed `ProcessingRun` داخل Laravel DB transaction.
+- التحقق أن الـrun تابعة للوثيقة وحالتها `Indexed`.
+- منع استبدال active run موجودة لأن ذلك ضمن H7.
+- ربط التفعيل مع `ProcessDocumentJob` بعد نجاح persistence.
+- عدم تغيير `Document.status` إلى `Ready` لأن ذلك ضمن H8.
 
-لم يتم ضمن H5:
+لم يتم ضمن H6:
 
-- تحديث `Document.status`.
-- تبديل `active_processing_run_id`.
 - Safe reprocessing replacement المخصصة لـH7.
-- Aggregate status projector المخصص لـH8.
+- Aggregate status projector وتحويل `Document.status` إلى `Ready` المخصصان لـH8.
 - سياسات retries / timeouts / idempotency الكاملة المخصصة لـH9.
 - serialized `ai-local` queue والـglobal heavy-resource lock المخصصان لـH10.
 
 ## Verification
 
 ```text
-PR #85 merged on GitHub: PASS
-Merge commit: 9dd8d0803bcc7499ff24d748cd8d6c39c8369e3b
+PR #86 merged on GitHub: PASS
+Merge commit: b0bc663ef8a4655aa2f861a085f68efcd2822023
 main contains the merge commit: PASS
+Focused tests: 5 passed (42 assertions)
+Full regression: 71 passed (334 assertions)
+Pint: passed
 ```
 
 ## المهمة الحالية/التالية
 
 ```text
-H6 — Active-run transaction after successful indexing
+H7 — Safe Reprocessing Replacement
 ```
 
 Baseline المهمة التالية:
 
 ```text
-H5 is merged into main and persists the validated processing report in Laravel.
-H6 switches active_processing_run_id transactionally only after successful indexing.
-H6 remains TODO and has not been implemented.
+H6 is merged into main and activates the first indexed ProcessingRun transactionally after successful persistence.
+H7 safely replaces an existing active run only after the replacement run is fully indexed.
+The old active run remains usable until the replacement succeeds.
+Document.status remains unchanged until H8.
 No Compare/Winner/temporary artifact lifecycle exists in the target architecture.
 ```
 
