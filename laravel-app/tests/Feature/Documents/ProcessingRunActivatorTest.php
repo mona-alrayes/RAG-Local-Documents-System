@@ -1,0 +1,127 @@
+<?php
+
+namespace Tests\Feature\Documents;
+
+use App\Enums\ProcessingProfile;
+use App\Enums\ProcessingRunStatus;
+use App\Models\User;
+use App\Services\Documents\DocumentStorageService;
+use App\Services\Documents\ProcessingRunActivator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use LogicException;
+use Tests\TestCase;
+
+class ProcessingRunActivatorTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_it_activates_an_indexed_processing_run(): void
+    {
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'trusted-notes.txt',
+                "Trusted document content.\n",
+            ),
+        );
+
+        $processingRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::HybridLocal,
+            'status' => ProcessingRunStatus::Indexed,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        app(ProcessingRunActivator::class)->activate($processingRun);
+
+        $this->assertSame(
+            $processingRun->id,
+            $document->fresh()->active_processing_run_id,
+        );
+    }
+
+    public function test_it_rejects_a_processing_run_that_is_not_indexed(): void
+    {
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'trusted-notes.txt',
+                "Trusted document content.\n",
+            ),
+        );
+
+        $processingRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::Cloud,
+            'status' => ProcessingRunStatus::Processing,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        try {
+            app(ProcessingRunActivator::class)->activate($processingRun);
+
+            $this->fail('Expected activation failure was not thrown.');
+        } catch (LogicException $exception) {
+            $this->assertSame(
+                'Only an indexed processing run may be activated.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertNull(
+            $document->fresh()->active_processing_run_id,
+        );
+    }
+
+    public function test_it_does_not_replace_an_existing_active_processing_run(): void
+    {
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'trusted-notes.txt',
+                "Trusted document content.\n",
+            ),
+        );
+
+        $activeRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::Cloud,
+            'status' => ProcessingRunStatus::Indexed,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $newRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::HybridLocal,
+            'status' => ProcessingRunStatus::Indexed,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $document->active_processing_run_id = $activeRun->id;
+        $document->save();
+
+        try {
+            app(ProcessingRunActivator::class)->activate($newRun);
+
+            $this->fail('Expected active processing run replacement failure was not thrown.');
+        } catch (LogicException $exception) {
+            $this->assertSame(
+                'Document already has an active processing run.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertSame(
+            $activeRun->id,
+            $document->fresh()->active_processing_run_id,
+        );
+    }
+}

@@ -8,6 +8,7 @@ use App\Models\Document;
 use App\Models\ProcessingRun;
 use App\Services\Ai\AiServiceClient;
 use App\Services\Ai\Data\ProcessDocumentRequestData;
+use App\Services\Documents\ProcessingRunActivator;
 use App\Services\Documents\ProcessingRunResultPersister;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -23,6 +24,7 @@ class ProcessDocumentJob implements ShouldQueue
     public function handle(
         AiServiceClient $client,
         ProcessingRunResultPersister $resultPersister,
+        ProcessingRunActivator $processingRunActivator,
     ): void {
         $processingRun = ProcessingRun::query()
             ->with('document')
@@ -60,5 +62,7 @@ class ProcessDocumentJob implements ShouldQueue
             processingRun: $processingRun,
             result: $result,
         );
+
+        $processingRunActivator->activate($processingRun);
     }
 }
