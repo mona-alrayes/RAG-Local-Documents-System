@@ -15,7 +15,7 @@
 > **إستراتيجية المعالجة:** يختار المستخدم Profile واحداً موثوقاً قبل المعالجة: `cloud` أو `hybrid_local` حسب قدرات البيئة  
 > **إستراتيجية LLM:** `Qwen/Qwen3.5-9B` عبر Hugging Face Router في Cloud، و`qwen3.5:4b` عبر Ollama محلياً  
 > **خطة النشر المرجعية:** Oracle Cloud-only للـ`cloud`، وLocal Demo منفصل للـ`cloud` أو `hybrid_local`  
-> **آخر تحديث معماري:** 2026-08-31  
+> **آخر تحديث معماري:** 2026-09-03
 > **Baseline GitHub قبل دمج ARC-1:** `main@a1f28097b398b9bb277f85990a55e489bd54d880`  
 > **Baseline المعماري النشط محلياً:** ARC-1 مكتمل على `task/remove-compare-winner-flow`
 
@@ -427,6 +427,10 @@ Extraction Inspection
 - إنشاء ProcessingRun.
 - حفظ حالة ProcessingRun وDocument.
 - تحديد الـactive/current indexed run للوثيقة.
+- فرض انتقالات ProcessingRun المسموحة وحفظ توقيتاتها.
+- استقبال Processing progress events الموثوقة من FastAPI.
+- تقديم Document presentation/read contracts مستقرة للـBlade/Livewire.
+- تنفيذ Upload/Reprocess/Delete commands مع Authorization وCapabilities validation.
 - Conversations/Messages/Sources.
 - UI وFilament.
 - استدعاء FastAPI عبر `AiServiceClient`.
@@ -461,6 +465,7 @@ Laravel لا ينفذ:
 - Generation.
 - Delete Qdrant points.
 - Structured errors/timings.
+- إرسال progress event داخلي موثوق عند بدء Qdrant indexing.
 
 FastAPI لا يدير:
 
@@ -569,10 +574,18 @@ warnings nullable
 error_code nullable
 failure_reason nullable
 qdrant_collection nullable
+kind
+started_at nullable
+indexing_started_at nullable
 indexed_at nullable
+failed_at nullable
 created_at
 updated_at
 ```
+
+تضاف `kind` بقيمتي `initial | reprocessing` وحقول توقيت المراحل عبر Forward Migration ضمن H9. ويعامل
+`created_at` كتوقيت دخول المحاولة إلى Queue، بينما تحفظ الحقول الصريحة بداية
+المعالجة والفهرسة والفشل دون محاولة استنتاجها من `updated_at`.
 
 لا توجد حقول خاصة بالمقارنة أو temporary artifact lifecycle.
 
@@ -605,21 +618,21 @@ hybrid_local
 - لا يعاد تعديل history المنشور عشوائياً بعد استقرار baseline.
 
 ---
-# 9. ProcessingRun lifecycle الجديد
+# 9. ProcessingRun وDocument lifecycle
 
-## 9.1 أول معالجة
+## 9.1 دورة ProcessingRun الدقيقة
 
 ```text
-pending
+pending        UI: queued
    ↓
 processing
    ↓
 indexing
    ↓
-indexed
+indexed        UI: completed
 ```
 
-وعند الفشل:
+وعند الفشل النهائي بعد انتهاء سياسة الـQueue retries:
 
 ```text
 pending/processing/indexing
@@ -627,7 +640,11 @@ pending/processing/indexing
 failed
 ```
 
-## 9.2 Document aggregate lifecycle
+لا تعرض الواجهة مرحلة لا يثبتها الـBackend فعلياً. `processing` يثبتها Laravel
+عند بدء الـJob، و`indexing` لا تثبت إلا بعد وصول حدث `indexing_started` من
+FastAPI قبل أول Qdrant write.
+
+## 9.2 أول معالجة — Document aggregate lifecycle
 
 مع Security Scan مفعّل:
 
@@ -649,12 +666,44 @@ pending
 → infected
 ```
 
-عند processing failure:
+عند فشل أول معالجة نهائياً:
 
 ```text
 queued/processing/indexing
 → failed
 ```
+
+## 9.3 إعادة المعالجة — فصل الجاهزية عن تقدم المحاولة
+
+عند وجود Run A فعالة ومفهرسة وبدء Run B:
+
+```text
+Document.status = ready
+active_processing_run_id = A
+
+Run B:
+pending → processing → indexing
+```
+
+تبقى `Document.status = ready` لأن A ما زالت صالحة للمحادثات، بينما تعرض
+الواجهة تقدم B بصورة مستقلة. عند نجاح B يتم داخل transaction واحدة:
+
+```text
+Run B = indexed
+active_processing_run_id: A → B
+Document.status = ready
+```
+
+وعند فشل B نهائياً:
+
+```text
+Run B = failed
+active_processing_run_id = A
+Document.status = ready
+```
+
+لا يستخدم وجود Run أحدث أو `latest()` وحده لتقرير جاهزية الوثيقة؛ الجاهزية
+تعتمد فقط على active run صريحة وصالحة.
 
 
 ---
@@ -734,11 +783,19 @@ Hybrid Local sparse
 
 ---
 
-# 12. Process Document API المستهدف
+# 12. Process Document API وProgress Contract
 
-لا يوجد production Process Document endpoint/orchestrator بعد ARC-1؛ سيبنى ضمن المرحلة H.
+## 12.1 Process Document API الحالي
 
-## Request
+المسار الحالي المنفذ ضمن H3 هو:
+
+```text
+POST /api/v1/documents/process
+```
+
+وهو Internal API متزامن بين Laravel وFastAPI.
+
+### Request
 
 Laravel يرسل بيانات موثوقة مشتقة Server-side:
 
@@ -754,7 +811,7 @@ Laravel يرسل بيانات موثوقة مشتقة Server-side:
 
 مع الملف الخاص عبر القناة الداخلية المعتمدة.
 
-## Response contract baseline
+### Response contract
 
 العقد الحالي في FastAPI مبني على:
 
@@ -764,14 +821,64 @@ Laravel يرسل بيانات موثوقة مشتقة Server-side:
   "processing_run_id": 81,
   "profile": "cloud",
   "status": "indexed",
+  "qdrant_collection": "rag_documents_cloud",
+  "profile_snapshot": {},
   "total_pages": 33,
   "total_chunks": 184,
   "vector_count": 184,
-  "vector_dimension": 1024
+  "vector_dimension": 1024,
+  "stage_timings_ms": {},
+  "warnings": []
 }
 ```
 
-أما `qdrant_collection` و`stage_timings_ms` و`warnings` فتدخل ضمن ProcessingRun/report persistence بحسب عقد المرحلة H، ولا يلزم فرضها داخل response قبل تنفيذ orchestration.
+لا يعيد endpoint نجاحاً قبل اكتمال persistent indexing والتحقق من exact count.
+
+## 12.2 Accurate Processing Progress Callback
+
+حتى تعرض Blade/Livewire تقدماً حقيقياً دون الاتصال بـFastAPI، يعتمد H9 قناة
+Server-to-Server مستقلة لاتجاه FastAPI → Laravel:
+
+```text
+POST /internal/api/v1/processing-runs/{processingRun}/events
+```
+
+الحدث المطلوب في v1:
+
+```json
+{
+  "event": "indexing_started",
+  "document_id": 12,
+  "processing_run_id": 81,
+  "correlation_id": "..."
+}
+```
+
+التسلسل الملزم:
+
+```text
+Laravel Queue starts the job
+→ Run = processing + started_at
+→ Laravel calls FastAPI Process Document API
+→ FastAPI finishes parse/chunk/dense/sparse stages
+→ FastAPI sends indexing_started callback
+→ Laravel validates and persists Run = indexing + indexing_started_at
+→ only after callback success may FastAPI write to Qdrant
+→ FastAPI verifies exact count and returns indexed result
+→ Laravel persists Run = indexed + indexed_at
+→ Laravel activates the run and projects Document status
+```
+
+قواعد العقد:
+
+- عنوان Laravel الداخلي يأتي من FastAPI trusted configuration، ولا يقبل من Browser أو request payload.
+- يستخدم اتجاه الـCallback secret مستقلاً عن مفتاح Laravel → FastAPI لتقليل نطاق التسريب.
+- Laravel يتحقق من route/payload IDs، وملكية Run للDocument، والحالة السابقة المسموحة.
+- الحدث idempotent؛ تكراره لنفس Run لا يكرر side effects ولا يرجع الحالة للخلف.
+- يستخدم FastAPI bounded retries للـCallback.
+- إذا تعذر تثبيت `indexing_started` بعد retries، تفشل المعالجة قبل أول Qdrant write.
+- لا يغير FastAPI Business State مباشرة؛ هو يرسل حدث مرحلة، وLaravel وحده يقرر الانتقال ويحفظه.
+- واجهة المستخدم تعمل polling على Laravel/MySQL فقط.
 
 ---
 # 13. Safe Reprocessing
@@ -797,6 +904,8 @@ delete/retire old Run A points safely
 
 - لا نحذف Run A points قبل نجاح Run B.
 - المحادثات الموجودة تستمر باستخدام active run القديم حتى التحويل.
+- تبقى `Document.status = ready` أثناء Run B ما دامت Run A فعالة وصالحة.
+- تعرض Run B للمستخدم بصورة مستقلة كـ`queued/processing/indexing/failed`.
 - التحويل إلى Run B يتم داخل Laravel transaction المناسبة.
 - أي Cleanup للـold points يأتي بعد نجاح switch.
 - deterministic IDs تمنع duplication داخل الـRun نفسه.
@@ -898,6 +1007,9 @@ Browser لا يحدد Collection أو Run موثوقة بمفرده.
 - Internal API only.
 - لا Browser → FastAPI مباشرة.
 - Internal API key إلزامي.
+- Progress callback يصل إلى Laravel internal route فقط وبـsecret مستقل.
+- لا يقبل FastAPI callback URL أو Laravel state من Browser.
+- Laravel يتحقق من كل progress transition ولا يثق بحالة مرسلة مباشرة.
 - لا Secrets أو raw document content في logs افتراضياً.
 
 ---
@@ -1028,6 +1140,9 @@ Hybrid Local
 
 حسب Capabilities.
 
+Laravel يتحقق Server-side من أن Profile المختارة موجودة ضمن Capabilities
+الفعلية؛ `ProcessingProfile` enum وحدها ليست Authorization أو Availability check.
+
 لا تعرض:
 
 ```text
@@ -1041,15 +1156,33 @@ Compare both
 تعرض:
 
 - الملف.
-- الحالة.
+- جاهزية الوثيقة `document_availability`.
 - Processing Profile الحالية.
 - active run.
+- latest processing attempt منفصلة عن active run.
+- نوع المحاولة `initial | reprocessing`.
+- progress/timeline موثقة بالتوقيتات الفعلية.
 - pages/chunks.
 - timings.
 - warnings.
+- safe failure message عند الفشل دون تسريب تفاصيل داخلية.
 - Download.
 - Reprocess.
 - Delete.
+
+مثال إلزامي أثناء إعادة المعالجة:
+
+```text
+آثار تدمر.pdf
+
+جاهزية الوثيقة: Ready
+النسخة المستخدمة: Run A
+
+إعادة المعالجة: Indexing
+المحاولة الجديدة: Run B
+```
+
+لا تختزل الواجهة هاتين الحقيقتين في badge واحدة.
 
 لا تعرض:
 
@@ -1060,7 +1193,7 @@ Compare both
 
 ## 20.3 حالات الواجهة
 
-الحالات الأساسية:
+### جاهزية الوثيقة
 
 ```text
 Pending
@@ -1074,6 +1207,23 @@ Infected
 Provider unavailable
 ```
 
+### حالة آخر محاولة Processing
+
+```text
+Pending  → تعرض Queued
+Processing
+Indexing
+Indexed  → تعرض Completed عند الحاجة داخل timeline
+Failed
+```
+
+في أول معالجة تتقدم حالة الوثيقة مع المحاولة. وفي Reprocessing تبقى الوثيقة
+`Ready` ما دامت active run القديمة صالحة، وتظهر حالة المحاولة الجديدة بجانبها.
+
+عند نجاح البديل واختياره active تختفي بطاقة "إعادة المعالجة جارية" وتبقى
+النتيجة في timeline. وعند فشله تبقى الوثيقة `Ready` وتظهر رسالة أن آخر محاولة
+فشلت مع بقاء النسخة السابقة فعالة.
+
 لا توجد:
 
 ```text
@@ -1084,6 +1234,48 @@ Selection expired
 ## 20.4 Extraction Inspection المستقبلية
 
 إن نُفذت لاحقاً تكون صفحة/لوحة مستقلة للمعاينة، لا شاشة مقارنة.
+
+## 20.5 Frontend Backend Readiness Gate
+
+لا تبدأ المرحلة I قبل اكتمال H8–H13. المقصود ليس منع كتابة PHP داخل Livewire،
+بل منع اكتشاف حاجة متأخرة لتغيير Domain/Schema/Internal APIs أو قواعد الأعمال.
+
+العقد الذي تستهلكه Blade/Livewire يجب أن يقدم على الأقل:
+
+```text
+Document summary
+- id/title/original_name/file_type/file_size
+- document_availability
+- active_run summary
+- latest_attempt summary
+- reprocessing_in_progress
+- safe_failure
+- poll_required
+- allowed_actions
+
+Document details
+- summary fields
+- processing timeline
+- profile/pages/chunks/timings/warnings
+- queued/started/indexing/indexed/failed timestamps
+
+Dashboard summary
+- user-scoped document counts by status
+- active processing/reprocessing counts
+- recent documents/failures
+```
+
+قواعد القراءة:
+
+- كل Queries scoped بالمستخدم ومختبرة ضد IDOR.
+- لا يستخدم Browser `active_processing_run_id` أو collection كمدخل موثوق.
+- list/cards لا تسبب N+1 queries للـactive/latest runs.
+- polling يتوقف عند terminal state ويقرأ من Laravel/MySQL فقط.
+- I2 تستهلك dashboard summary من H12.
+- I3 تستهلك list/filter/read contract من H12.
+- I4 تستهلك Upload + capability availability contract من H12/H13.
+- I5 تستهلك details/timeline وReprocess/Delete commands من H12/H13.
+- I6 تعرض الحالات والأخطاء الآمنة التي يثبتها العقد، ولا تعيد تفسيرها محلياً.
 
 ---
 
@@ -1140,6 +1332,11 @@ Authorize
 لا توجد temporary comparison artifacts ضمن deletion flow.
 
 لا تعتمد على Cascade مخفي للموارد الخارجية.
+
+في v1 يمنع Server-side حذف Document عند وجود Run حالتها
+`pending/processing/indexing`. الهدف منع race بين Queue job وQdrant/file/DB
+cleanup. بعد وصول المحاولة إلى `indexed` أو `failed` تصبح العملية قابلة لإعادة
+المحاولة وفق Authorization والسياسة المعتمدة.
 
 ---
 
@@ -1218,6 +1415,21 @@ source correctness
 
 لا يشترط أي Compare أو Winner.
 
+## 25.1 Definition of Done لBackend المرحلة I
+
+لا تعتبر المرحلة H منتهية ولا تبدأ I قبل تحقق ما يلي:
+
+- Aggregate projector مركزي ومختبر لأول معالجة وإعادة المعالجة.
+- `Ready` وactive run تتغيران transactionally ولا تعتمد الجاهزية على latest run.
+- تقدم `Queued → Processing → Indexing → Ready/Failed` حقيقي وقابل للـpolling.
+- ProcessingRun تحفظ نوع المحاولة وتوقيتات المراحل اللازمة للـtimeline.
+- final failure محفوظة بطريقة آمنة بعد انتهاء retries.
+- server-side Capabilities validation تمنع Profile غير متاحة.
+- user-scoped dashboard/list/details read contracts موجودة ومختبرة.
+- Upload/Reprocess/Delete commands موجودة ومحمية ومختبرة.
+- Reprocess المتزامنة وDelete أثناء العمل مرفوضتان Server-side.
+- الواجهة لا تحتاج اتصالاً مباشراً بـFastAPI أو Qdrant.
+
 ---
 
 # 26. Definition of Done للسؤال
@@ -1258,6 +1470,10 @@ source correctness
 18. `active_processing_run_id` لا يتغير إلا بعد نجاح indexing/count verification.
 19. Cloud sparse وHybrid Local sparse يبقيان عقدين مختلفين عند Qdrant boundary.
 20. سياسة migrations تتبع حالة البيانات: baseline consolidation مسموح فقط في التطوير الفارغ قبل تثبيت release؛ بعد ذلك تستخدم Forward Migrations.
+21. `Document.status` يصف جاهزية الوثيقة، و`ProcessingRun.status` يصف تقدم محاولة محددة؛ لا تدمجان في حالة UI واحدة.
+22. لا تعرض `Indexing` قبل وصول حدث حقيقي من FastAPI وقبل أول Qdrant write.
+23. Laravel يتحقق Server-side من Capabilities قبل Initial Processing أو Reprocessing.
+24. لا تبدأ المرحلة I قبل نجاح Frontend Backend Readiness Gate في H8–H13.
 
 ---
 # 28. ARC-1 — التبسيط المعماري المكتمل
@@ -1398,7 +1614,7 @@ G10 Profile parity / isolation tests
 G11 Single-active-model coordinator + release-after-stage
 ```
 
-## المرحلة H — Processing Orchestration
+## المرحلة H — Processing Orchestration and Documents UI Backend Readiness
 
 ```text
 H1 AiServiceClient
@@ -1409,8 +1625,11 @@ H5 Processing metrics / report persistence
 H6 Active-run transaction after successful indexing
 H7 Safe reprocessing replacement
 H8 Aggregate status projector
-H9 Queue retries / timeouts / idempotency
-H10 Serialized ai-local queue + global heavy-resource lock
+H9 Accurate processing progress callback + run kind/stage timestamps
+H10 Queue retries / timeouts / idempotency / terminal failure finalization
+H11 Serialized ai-local queue + global heavy-resource lock
+H12 Documents presentation read model / polling / capability availability
+H13 Upload / reprocess / delete application commands and authorization
 ```
 
 معيار المرحلة:
@@ -1425,7 +1644,54 @@ one file
 → report persistence
 → active_processing_run_id switch
 → document ready
+→ truthful processing progress persisted in Laravel
+→ frontend-ready read and command contracts
 ```
+
+### H8 — Aggregate status projector
+
+- مركز واحد لقرارات `Document.status` خارج Controller/Job/UI.
+- أول معالجة تعكس `queued/processing/indexing/ready/failed`.
+- Reprocessing لا تخفض Document صالحة من `ready` ما دامت active run القديمة صحيحة.
+- activation يثبت `active_processing_run_id + ready` داخل transaction واحدة.
+- failed replacement تبقى منفصلة ولا تكسر النسخة الفعالة.
+
+### H9 — Accurate processing progress callback
+
+- إضافة `kind`, `started_at`, `indexing_started_at`, `failed_at` إلى ProcessingRun عبر Forward Migration.
+- `created_at` يمثل `queued_at`.
+- Laravel يثبت `processing` عند بدء الـJob.
+- FastAPI يرسل `indexing_started` قبل أول Qdrant write.
+- callback داخلي authenticated، idempotent، ومقيد بانتقالات مسموحة وbounded retries.
+- فشل callback النهائي يوقف العملية قبل Qdrant write.
+
+### H10 — Queue reliability and terminal failure
+
+- retries/timeouts/generalized idempotency.
+- التفريق بين retryable failure وterminal failure.
+- بعد نفاد retries تحفظ Run كـ`failed` مع `error_code`, safe `failure_reason`, `failed_at`.
+- Initial terminal failure يسقط Document إلى `failed`؛ Reprocessing failure تبقي Document `ready` إذا بقيت active run صالحة.
+
+### H11 — Serialized local execution
+
+- serialized `ai-local` queue والـglobal heavy-resource lock.
+
+### H12 — Documents presentation read contract
+
+- user-scoped Dashboard summary.
+- paginated list مع search/status/file-type/profile filters وترتيب موثوق.
+- Document summary/detail DTOs تتضمن `document_availability`, `active_run`, `latest_attempt`, timeline, safe failure, polling hint, allowed actions.
+- eager loading/query strategy تمنع N+1.
+- Capability availability service typed ومتحقق منها مع fail-closed عند بدء معالجة جديدة.
+- existing Ready documents لا تفقد صلاحيتها لمجرد تعذر capability lookup؛ J8 يقرر runtime-capable chat filtering لاحقاً.
+
+### H13 — Documents application commands
+
+- تثبيت Upload response/redirect contract الذي تعتمده I4.
+- Reprocess route/request/policy/action تستخدم H7 وتتحقق من active run وعدم وجود محاولة جارية وتوفر Profile.
+- Delete route/request/policy وDocumentDeletionService مع external cleanup صريح ومنع الحذف أثناء محاولة جارية.
+- أخطاء domain تتحول إلى رسائل آمنة وثابتة للواجهة.
+- Feature tests للownership/IDOR/concurrency/unavailable profile/cleanup ordering.
 
 ## المرحلة I — Blade Documents Experience
 
@@ -1437,6 +1703,10 @@ I4 One-file upload + capability-aware Cloud/Hybrid Local choice
 I5 Document details / processing timeline
 I6 Accessibility / responsive / error states
 ```
+
+المرحلة I تستهلك عقود H12/H13 ولا تعيد تعريف قواعد الحالات أو Availability
+داخل Blade/JavaScript. يسمح بكتابة Livewire presentation wiring، لكن أي تغيير
+Domain/Schema/Internal API بعد بدء I يعد gap يجب توثيقه ومراجعته صراحةً.
 
 ## المرحلة J — Conversations Database
 
@@ -1582,6 +1852,14 @@ DPL-25 Hybrid Local end-to-end processing / chat verification
 - عدم تداخل ClamAV مع Local AI.
 - Restart/persistence حسب النطاق.
 
+متطلبات progress callback المرتبطة بالنشر:
+
+- `DPL-7`: يضبط Laravel internal base URL وcallback secret مستقلاً في Cloud secrets.
+- `DPL-10`: يتحقق أن Cloud-only FastAPI يستطيع إرسال الحدث قبل Qdrant indexing.
+- `DPL-21`: يثبت أن callback route داخلية، authenticated، ولا تقبل Browser traffic أو forged transitions.
+- `DPL-24`: يثبت Host FastAPI → Docker Laravel reachability على Mac وASUS دون hard-coded callback URL في request.
+- `DPL-25`: يثبت ظهور `processing → indexing → indexed/failed` فعلياً في Hybrid Local E2E.
+
 ---
 # 31. Oracle Deployment Baseline
 
@@ -1699,6 +1977,10 @@ Original Documents + MySQL
 
 - Cloud direct processing.
 - Hybrid Local direct processing.
+- truthful `processing → indexing` transition before first Qdrant write.
+- authenticated and idempotent progress callback.
+- forged, out-of-order, cross-document, and cross-run progress events rejected.
+- terminal callback failure produces no hidden Qdrant write.
 - deterministic point IDs.
 - idempotent upsert.
 - count verification.
@@ -1708,9 +1990,23 @@ Original Documents + MySQL
 ## Reprocessing
 
 - old active run remains usable until replacement succeeds.
+- Document remains `ready` while replacement progress is shown separately.
 - failed replacement does not break current document.
+- failed replacement remains visible as latest attempt with a safe failure message.
 - successful replacement switches active run atomically.
 - old points cleaned only after switch.
+
+## Documents UI backend readiness
+
+- owner-scoped dashboard/list/details queries.
+- active run and latest attempt are never conflated.
+- list filters and pagination preserve ownership scope.
+- no N+1 queries for document cards/status summaries.
+- server-side capability rejection for unavailable profiles.
+- concurrent Reprocess rejected.
+- Delete during an active processing attempt rejected.
+- Upload/Reprocess/Delete responses expose stable user-safe errors.
+- polling observes `queued/processing/indexing/indexed/failed` and stops on terminal state.
 
 ## Conversations
 
