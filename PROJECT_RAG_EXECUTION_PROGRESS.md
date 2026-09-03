@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — H9 مكتملة ومدموجة في PR #89؛ H10 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
+> **الحالة العامة:** قيد التنفيذ — H10 مكتملة ومدموجة في PR #90؛ H11 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
 
 ---
 
@@ -17,15 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 8072e1d6e26a1d435d33e8fbbde322e31e387ea9
-Last Merged Feature PR on main: #89 — feat(H9): إضافة تقدم معالجة دقيق وحدث بدء الفهرسة
-Latest Task PR: #89 — feat(H9): إضافة تقدم معالجة دقيق وحدث بدء الفهرسة
-Verified H9 Feature Commits:
-- bb85b04c81eba77261678fa3142508b8b1423239 — feat(H9): add accurate processing progress callback
-- e30474e6dd4a07caf619d35008f5b9e9873cf166 — style(H9): satisfy Laravel Pint
-- c66f25bca792b56505e49ecad94bb2786b61f1da — fix(H9): harden callback redirects and migration backfill
-Verified H9 Merge Commit: 8072e1d6e26a1d435d33e8fbbde322e31e387ea9
-Documentation Baseline: تم تسجيل اكتمال H9 وتسليم H10 كمهمة حالية.
+Verified Main Commit: cb3120f3db313be939934117064caa7cb5436f4e
+Last Merged Feature PR on main: #90 — feat(H10): harden processing queue reliability and failure handling
+Latest Task PR: #90 — feat(H10): harden processing queue reliability and failure handling
+Verified H10 Feature Commit:
+- 328c6eaa98a33db58d3bdf95c971feebcafe3a9e — feat(H10): harden processing queue reliability and failure handling
+Verified H10 Merge Commit: cb3120f3db313be939934117064caa7cb5436f4e
+Documentation Baseline: تم تسجيل اكتمال H10 وتسليم H11 كمهمة حالية.
 
 Current Working Branch: main
 
@@ -33,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H9 — Accurate Processing Progress Callback + Run Kind/Stage Timestamps
+H10 — Queue Retries / Timeouts / Idempotency / Terminal Failure Finalization
 
 Current Phase:
 H — Processing Orchestration
@@ -53,25 +51,30 @@ Architectural Result:
 - يمنع الفشل النهائي للـCallback أول كتابة في Qdrant.
 - يعيد Laravel تحميل وقفل الـRun الفعلية قبل حفظ النجاح، ولا يمكن تجاوز processing مباشرة إلى indexed.
 - تسقط initial attempt حالة indexing على الوثيقة، بينما تبقي reprocessing وثيقة ذات active run صالحة في ready.
-- يجب إكمال H10–H13 قبل المرحلة I حتى تستهلك الواجهة عقود Backend مستقرة.
+- Queue retries محدودة: `tries = 3` مع backoff بقيم `15s` ثم `60s`، وليست retries غير محدودة.
+- مواءمة timeouts المعتمدة هي FastAPI HTTP `300s` ثم Queue job/worker `330s` ثم Redis `retry_after = 360s`، بحيث يبقى Queue timeout أقل من retry_after.
+- تصنف الأعطال إلى retryable temporary failures وterminal permanent failures، مع الحفاظ على structured FastAPI `error.code` داخل Laravel.
+- retry المؤقت يعيد استخدام نفس `ProcessingRun` ونفس Queue job semantics دون إنشاء Run جديدة.
+- terminal أو exhausted failure تثبت في Laravel عبر `ProcessingRunFailureFinalizer` داخل transaction + locking وبشكل idempotent وآمن.
+- terminal finalization تحفظ `status = failed`, `error_code`, safe `failure_reason`, `failed_at`، ولا تغيّر Run أصبحت `indexed` ولا تعيد كتابة `failed_at` عند تكرار finalization.
+- Document availability منفصلة عن ProcessingRun attempt status: الفشل النهائي لأول معالجة يجعل Document `failed`، بينما فشل reprocessing يبقي Document `ready` وactive_processing_run_id القديمة دون تغيير إذا بقيت صالحة.
+- Qdrant indexing idempotent عند retry لأن deterministic Point IDs مع `upsert` تمنع إنشاء duplicate points لنفس Run.
+- يجب إكمال H11–H13 قبل المرحلة I حتى تستهلك الواجهة عقود Backend مستقرة.
 
 Latest Verification:
-PR #89 merged on GitHub: PASS
-PR head matched tested commit c66f25bca792b56505e49ecad94bb2786b61f1da: PASS
-PR mergeable before merge: PASS
-main contains merge commit 8072e1d6e26a1d435d33e8fbbde322e31e387ea9: PASS
-main tree matches the tested H9 branch tree: PASS
-Independent code review: no Critical issues; both Important findings fixed
-Focused Laravel tests: 23 passed (134 assertions)
-Laravel full regression: 99 passed (450 assertions)
-Pint: passed (21 changed PHP files)
-FastAPI focused tests: 10 passed
-FastAPI full regression: 153 passed
-Ruff: passed on affected FastAPI files
-git diff --check: PASS
+PR #90 merged on GitHub: PASS
+PR head commit: 328c6eaa98a33db58d3bdf95c971feebcafe3a9e
+PR merge commit: cb3120f3db313be939934117064caa7cb5436f4e
+main verified at H10 merge commit cb3120f3db313be939934117064caa7cb5436f4e before this progress update: PASS
+H10 scope audit: no H11 serialized ai-local execution or global heavy-resource lock implementation in PR #90
+Focused Laravel H10 tests: 40 passed (217 assertions)
+Laravel full regression: 117 passed (546 assertions)
+Laravel Pint: PASS
+FastAPI Qdrant idempotency focused tests: 5 passed
+FastAPI full regression: 154 passed
 
 Current Task:
-H10 — Queue Retries / Timeouts / Idempotency / Terminal Failure Finalization
+H11 — Serialized ai-local Queue + Global Heavy-Resource Lock
 
 Open Blockers: none
 ```
@@ -296,7 +299,7 @@ assert "comparison_report" not in payload
 | H7 Safe reprocessing replacement | DONE |
 | H8 Aggregate status projector | DONE |
 | H9 Accurate processing progress callback + run kind/stage timestamps | DONE |
-| H10 Queue retries / timeouts / idempotency / terminal failure finalization | TODO |
+| H10 Queue retries / timeouts / idempotency / terminal failure finalization | DONE |
 | H11 Serialized `ai-local` queue + global heavy-resource lock | TODO |
 | H12 Documents presentation read model / polling / capability availability | TODO |
 | H13 Upload / reprocess / delete application commands and authorization | TODO |
@@ -415,12 +418,18 @@ Laravel starts ProcessDocumentJob
 
 ### H10 — Queue reliability and terminal failure
 
-- retries/timeouts/generalized idempotency.
-- تصنيف retryable مقابل terminal failures.
-- بعد نفاد retries تحفظ Run كـ`failed` مع `error_code`, safe `failure_reason`, `failed_at`.
-- فشل Initial Processing النهائي يجعل Document `failed`.
-- فشل Reprocessing النهائي يبقي Document `ready` إذا بقيت active run صالحة.
-- retry لا ينشئ Run جديدة ولا يكرر Qdrant points.
+- `ProcessDocumentJob` يستخدم retries محدودة: `tries = 3` مع backoff `15s`, `60s`.
+- timeout alignment المعتمد: FastAPI HTTP `300s`، Queue job/worker `330s`، Redis `retry_after = 360s`.
+- `ProcessingRunFailureClassifier` يميز retryable temporary failures عن terminal permanent failures.
+- يحافظ `AiServiceClient` و`AiServiceException` على structured FastAPI `error.code` كي يستخدمه التصنيف والتثبيت النهائي.
+- الأخطاء المؤقتة يعاد رميها لتعيد Queue نفس الـJob ونفس `ProcessingRun`، ولا تنشأ Run جديدة أثناء retry.
+- `ProcessingRunFailureFinalizer` يثبت terminal/exhausted failure داخل transaction مع row locking وبشكل idempotent.
+- terminal finalization تحفظ `status = failed`, `error_code`, safe `failure_reason`, `failed_at`.
+- Run التي أصبحت `indexed` محمية من late failure hooks، وإعادة finalization لRun فاشلة لا تعيد كتابة `failed_at` أو سبب الفشل الأول.
+- الفشل النهائي لأول معالجة يجعل `Document.status = failed`.
+- فشل reprocessing النهائي مع active run قديمة صالحة يبقي `Document.status = ready` و`active_processing_run_id` القديمة دون تغيير.
+- Qdrant retry idempotency تعتمد deterministic Point IDs + `upsert`، ولذلك إعادة نفس ProcessingRun لا تنشئ duplicate points.
+- H10 لا تنفذ serialized `ai-local` execution أو global heavy-resource lock؛ هذان ضمن H11.
 
 ### H11 — Serialized local execution
 
@@ -902,29 +911,28 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H9 Accurate Processing Progress Callback + Run Kind/Stage Timestamps
+## آخر مهمة مكتملة — H10 Queue Retries / Timeouts / Idempotency / Terminal Failure Finalization
 
-**الحالة:** `DONE` ومتحقق منها في PR #89 — `feat(H9): إضافة تقدم معالجة دقيق وحدث بدء الفهرسة`، والمدمجة في `main`.
+**الحالة:** `DONE` ومتحقق منها في PR #90 — `feat(H10): harden processing queue reliability and failure handling`، والمدمجة في `main`.
 
 تم تنفيذ:
 
-- Forward Migration تضيف `kind`, `started_at`, `indexing_started_at`, `failed_at` مع backfill محدود الذاكرة للـRuns الموجودة.
-- تحديد `initial` و`reprocessing` صراحة عند dispatch، واعتبار `created_at` هو `queued_at`.
-- تسجيل `processing + started_at` عند بدء الـJob بصورة idempotent دون إرجاع retry من `indexing` إلى الخلف.
-- Internal Laravel callback لحدث `indexing_started` فقط، بسر مستقل لاتجاه FastAPI → Laravel.
-- تحقق route/payload IDs والملكية والحالة السابقة، مع transaction وlocking وreplay idempotent يثبت timestamp مرة واحدة.
-- إسقاط الحالة عبر `DocumentStatusProjector`: Initial تصبح `indexing`، وReprocessing تبقي Document `ready` عند وجود active run صالحة.
-- FastAPI callback client بإعدادات typed وtrusted، timeout محدود، bounded retries، ورسائل خطأ لا تسرّب السر.
-- رفض HTTP redirects قبل إرسال السر إلى أي origin آخر.
-- تثبيت الترتيب: parse → normalize → chunk → dense → sparse → callback success → أول Qdrant write → exact count verification.
-- إيقاف المعالجة قبل أول Qdrant write عند فشل callback النهائي.
-- إعادة تحميل وقفل ProcessingRun الفعلية قبل حفظ النتيجة، ومنع الانتقال المباشر `processing → indexed`.
-- الحفاظ على activation وإعادة المعالجة الآمنة دون إدخال سياسة H10.
+- ضبط `ProcessDocumentJob` على 3 محاولات كحد أقصى مع backoff `15s` ثم `60s`.
+- تثبيت timeout alignment: FastAPI processing HTTP timeout = `300s`، Queue job/worker timeout = `330s`، Redis `retry_after = 360s`.
+- إضافة `ProcessingRunFailureClassifier` لتصنيف retryable temporary failures مقابل terminal permanent failures.
+- الحفاظ على structured FastAPI `error.code` داخل `AiServiceException` عبر `AiServiceClient`.
+- إضافة `ProcessingRunFailureFinalizer` لحفظ الفشل النهائي بصورة آمنة.
+- terminal finalization تحفظ `status = failed`, `error_code`, safe `failure_reason`, `failed_at` داخل transaction + row locking.
+- finalization idempotent: لا تغيّر Run أصبحت `Indexed`، ولا تعيد كتابة `failed_at` أو بيانات الفشل الأول عند تكرارها على Run فاشلة.
+- الأخطاء المؤقتة يعاد رميها لتستفيد Queue من retries المحدودة مع إعادة استخدام نفس `ProcessingRun` وعدم إنشاء Run جديدة.
+- exhausted retries وtimeout النهائي يثبتان failure نهائياً عبر hook موحد وآمن.
+- أول Processing نهائية الفشل تجعل `Document.status = failed`.
+- Reprocessing نهائية الفشل مع active run قديمة صالحة تبقي `Document.status = ready` وتحافظ على `active_processing_run_id` القديمة.
+- تثبيت Qdrant retry idempotency عبر deterministic Point IDs و`upsert`، بحيث إعادة نفس ProcessingRun لا تنشئ duplicate points.
 
-لم يتم ضمن H9:
+لم يتم ضمن H10:
 
-- Queue retries/timeouts/generalized idempotency أو terminal failure finalization المخصصة لـH10.
-- serialized `ai-local` queue والـglobal heavy-resource lock المخصصان لـH11.
+- serialized `ai-local` queue أو global heavy-resource lock المخصصان لـH11.
 - Documents presentation read contract المخصصة لـH12.
 - Upload/Reprocess/Delete application commands المكتملة للواجهة والمخصصة لـH13.
 - أي Blade/Livewire UI أو Compare/Winner/temporary artifact lifecycle.
@@ -932,59 +940,50 @@ polling + completed-answer visual reveal
 ## Verification
 
 ```text
-PR #89 merged on GitHub: PASS
-Feature commits:
-- bb85b04c81eba77261678fa3142508b8b1423239
-- e30474e6dd4a07caf619d35008f5b9e9873cf166
-- c66f25bca792b56505e49ecad94bb2786b61f1da
-Merge commit: 8072e1d6e26a1d435d33e8fbbde322e31e387ea9
-PR head matched the tested commit: PASS
-main contains the merge commit: PASS
-main tree matches the tested H9 branch tree: PASS
-Independent review: no Critical issues; 2 Important findings fixed
+PR #90 merged on GitHub: PASS
+Feature commit:
+- 328c6eaa98a33db58d3bdf95c971feebcafe3a9e
+Merge commit: cb3120f3db313be939934117064caa7cb5436f4e
+main verified at H10 merge commit before this progress update: PASS
+H10 scope audit: no H11 serialized ai-local execution or global heavy-resource lock implementation in PR #90
 
-Focused Laravel tests:
-23 passed (134 assertions)
+Focused Laravel H10 tests:
+40 passed (217 assertions)
 
 Laravel full regression:
-99 passed (450 assertions)
+117 passed (546 assertions)
 
-Pint:
-passed (21 changed PHP files)
+Laravel Pint:
+PASS
 
-FastAPI focused tests:
-10 passed
+FastAPI Qdrant idempotency focused tests:
+5 passed
 
 FastAPI full regression:
-153 passed
-
-Ruff:
-passed on affected FastAPI files
-
-git diff --check:
-PASS
+154 passed
 ```
 
 ## المهمة الحالية/التالية
 
 ```text
-H10 — Queue Retries / Timeouts / Idempotency / Terminal Failure Finalization
+H11 — Serialized ai-local Queue + Global Heavy-Resource Lock
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت H9 في main عبر PR #89.
-تحفظ ProcessingRun الآن kind ووقت queued عبر created_at وحقلي started_at وindexing_started_at صراحة.
-يمتلك Laravel حالتي processing/indexing ويعرض callback موثوقاً لحدث indexing_started.
-يجب أن يتلقى FastAPI إقرار callback صالحاً قبل أول Qdrant write.
-يعيد Laravel تحميل وقفل الـRun الفعلية قبل حفظ نجاح indexed.
-تسقط المعالجة الأولية indexing على الوثيقة، بينما تبقي reprocessing وثيقة ذات active run صالحة في ready.
-تمتلك H10 queue retries وtimeouts وgeneralized idempotency وتصنيف retryable/terminal وإنهاء الفشل النهائي.
-تمتلك H11 serialized ai-local execution والـglobal heavy-resource lock.
+دُمجت H10 في main عبر PR #90.
+أصبحت Queue retries محدودة بثلاث محاولات مع backoff 15s ثم 60s.
+مواءمة timeouts المعتمدة هي FastAPI 300s ثم Queue job/worker 330s ثم Redis retry_after 360s.
+تصنف الأعطال إلى retryable temporary وterminal permanent مع الحفاظ على FastAPI error.code.
+تعيد retry المؤقتة استخدام نفس ProcessingRun ولا تنشئ Run جديدة.
+تثبت terminal/exhausted failures داخل Laravel بصورة transaction-safe وidempotent وتحفظ error_code وsafe failure_reason وfailed_at.
+لا تكسر reprocessing الفاشلة active indexed run السابقة، وتبقى Document ready إذا بقيت النسخة القديمة صالحة.
+إعادة فهرسة نفس Run إلى Qdrant idempotent عبر deterministic IDs وupsert.
+تمتلك H11 serialized ai-local execution والـglobal heavy-resource lock المشترك مع ClamAV.
 تمتلك H12 document read models الجاهزة للواجهة وcapability availability.
 تمتلك H13 أوامر Upload/Reprocess/Delete المستقرة والauthorization وأخطاء UI الآمنة.
-لا تبدأ المرحلة I قبل إكمال H10–H13 لبوابة Frontend Backend Readiness.
+لا تبدأ المرحلة I قبل إكمال H11–H13 لبوابة Frontend Backend Readiness.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
