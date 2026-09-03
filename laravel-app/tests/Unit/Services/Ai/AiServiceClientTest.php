@@ -236,9 +236,15 @@ class AiServiceClientTest extends TestCase
             );
 
             $this->assertSame(500, $exception->statusCode);
+
             $this->assertSame(
                 'body-correlation-id',
                 $exception->correlationId,
+            );
+
+            $this->assertSame(
+                'internal_error',
+                $exception->errorCode,
             );
         }
     }
