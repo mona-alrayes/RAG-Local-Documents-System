@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — H13 مكتملة ومدموجة في PR #93؛ اكتملت بوابة Backend H8–H13؛ I1 هي المهمة الحالية
+> **الحالة العامة:** قيد التنفيذ — I1 مكتملة ومدموجة في PR #94؛ أصبح App Shell الموحّد والـSidebar المتجاوبة جاهزين؛ I2 هي المهمة الحالية
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf
-Last Merged Feature PR on main: #93 — H13 Documents Application Commands
-Latest Task PR: #93 — H13 Documents Application Commands
-Verified H13 Feature Commit:
-- cacea37958a84d1efcdce65877bf1ad19fd92ca9 — H13 document application commands
-Verified H13 Merge Commit: 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf
-Documentation Baseline: تم تسجيل اكتمال H13 وإغلاق Frontend Backend Readiness Gate وتسليم I1 كمهمة حالية.
+Verified Main Commit: cd8698ef8ed643bc7fdb96539664c98f9a63924e
+Last Merged Feature PR on main: #94 — I1 Responsive App Shell / Sidebar
+Latest Task PR: #94 — I1 Responsive App Shell / Sidebar
+Verified I1 Feature Commit:
+- 98d43d14895ac05329b03c7d0e5540da128fb79c — I1 responsive authenticated app shell
+Verified I1 Merge Commit: cd8698ef8ed643bc7fdb96539664c98f9a63924e
+Documentation Baseline: تم تسجيل اكتمال I1 وتسليم I2 Workspace dashboard كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H13 — Documents Application Commands
+I1 — Responsive App Shell / Sidebar
 
 Current Phase:
 I — Blade Documents Experience
@@ -80,19 +80,28 @@ Architectural Result:
 - Delete يرفض الحذف أثناء `pending/processing/indexing`، وينظف Qdrant اعتمادًا على ProcessingRun data الموثوقة Server-side، ثم permanent/quarantine private storage، ثم processing runs والوثيقة بترتيب آمن.
 - تحول أخطاء business/application عند HTTP boundary إلى رسائل UI آمنة بدل كشف تفاصيل داخلية.
 - اكتملت H8–H13 وأصبحت عقود القراءة والأوامر جاهزة لتبدأ المرحلة I دون إعادة تعريف Business State داخل الواجهة.
+- أصبحت الصفحات المحمية بعد تسجيل الدخول تستخدم App Shell موحداً بواجهة عربية RTL وFlux responsive sidebar قابلة لإعادة الاستخدام.
+- الـSidebar مناسبة وثابتة على Desktop، وتتحول على Mobile إلى drawer تفتح وتغلق عبر Flux دون JavaScript مخصص، مع Mobile header وزر فتح القائمة.
+- التنقل المركزي يعرض الروابط الفعلية فقط: Workspace وDocuments وAccount Settings، مع Active state حسب route الحالية وبقاء `documents.*` ضمن حالة الوثائق النشطة.
+- تعرض الـSidebar هوية المستخدم وإجراء Logout، ويحمي `flux:main` المحتوى من horizontal overflow غير المقصود.
+- I1 لم تعِد تصميم محتوى Workspace أو Documents أو Settings، ولم تغيّر business logic أو عقود H12/H13 أو FastAPI/Qdrant/Retrieval/Chat/Database.
 
 Latest Verification:
-PR #93 merged on GitHub: PASS
-PR head commit: cacea37958a84d1efcdce65877bf1ad19fd92ca9
-PR merge commit: 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf
-main verified at H13 merge commit 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf before this progress update: PASS
-H13 focused tests: 23 passed (152 assertions)
-Laravel full regression: 140 passed (679 assertions)
-Laravel Pint: PASS
-FastAPI: لم يتم تعديل FastAPI في H13، ولم يُسجل FastAPI regression ضمن هذه المهمة.
+PR #94 merged on GitHub: PASS
+PR head commit: 98d43d14895ac05329b03c7d0e5540da128fb79c
+PR merge commit: cd8698ef8ed643bc7fdb96539664c98f9a63924e
+main verified at I1 merge commit cd8698ef8ed643bc7fdb96539664c98f9a63924e before this progress update: PASS
+I1 focused App Shell test: 1 passed (18 assertions)
+Laravel full regression: 141 passed (697 assertions)
+Frontend build: npm run build — PASS
+Laravel Pint: ./vendor/bin/pint --dirty — PASS
+Laravel full regression after Pint adjustment: 141 passed (697 assertions)
+Laravel Pint verification: ./vendor/bin/pint --dirty --test — PASS
+Manual responsive verification: PASS — Desktop sidebar; Mobile drawer open/close; Workspace/Documents/Account Settings active states; no unintended horizontal overflow
+FastAPI: لم تُشغّل الاختبارات لأن I1 لم تغيّر FastAPI.
 
 Current Task:
-I1 — Responsive app shell / sidebar
+I2 — Workspace dashboard
 
 Open Blockers: none
 ```
@@ -546,12 +555,61 @@ FastAPI:
 
 | المهمة | الحالة |
 |---|---|
-| I1 Responsive app shell / sidebar | TODO |
+| I1 Responsive app shell / sidebar | DONE |
 | I2 Workspace dashboard | TODO |
 | I3 Documents list / cards / filters | TODO |
 | I4 One-file upload + capability-aware Cloud/Hybrid Local choice | TODO |
 | I5 Document details / processing timeline | TODO |
 | I6 Accessibility / responsive / error states | TODO |
+
+### I1 — Responsive App Shell / Sidebar
+
+**الحالة:** `DONE` ومتحقق منها في PR #94 والمدمجة في `main`.
+
+تم تنفيذ:
+
+- إنشاء App Shell موحّد للصفحات المحمية بعد تسجيل الدخول عبر authenticated layout المشترك.
+- تحويل الـlayout إلى Flux responsive sidebar قابلة لإعادة الاستخدام مع دعم RTL والواجهة العربية.
+- Sidebar مناسبة وثابتة على Desktop، وMobile drawer تفتح وتغلق عبر Flux دون JavaScript مخصص.
+- مركزية Navigation على الروابط الفعلية الموجودة فقط: Workspace وDocuments وAccount Settings.
+- Active navigation state حسب route الحالية، مع `documents.*` لإبقاء صفحات Documents الفرعية ضمن حالة الوثائق النشطة.
+- عرض هوية المستخدم وإجراء Logout داخل الـSidebar.
+- إضافة Mobile header مع زر فتح القائمة.
+- حماية المحتوى الرئيسي من horizontal overflow غير المقصود.
+- الحفاظ على محتوى Workspace وDocuments وSettings دون إعادة تصميم ضمن I1.
+- عدم تغيير أي business logic أو عقود H12/H13، وعدم إجراء تغييرات على FastAPI أو Qdrant أو Retrieval أو Chat أو Database.
+- تغييرات PR #94 الفعلية محصورة في:
+  - `laravel-app/resources/views/components/layouts/app.blade.php`
+  - `laravel-app/tests/Feature/AppShellTest.php`
+
+Verification المثبت لـI1:
+
+```text
+Focused App Shell test:
+1 passed (18 assertions)
+
+Laravel full regression:
+141 passed (697 assertions)
+
+Frontend build:
+npm run build — PASS
+
+Pint:
+./vendor/bin/pint --dirty — PASS
+بعد تعديل Pint أعيد تشغيل full Laravel suite — PASS
+./vendor/bin/pint --dirty --test — PASS
+
+Manual responsive verification — PASS:
+- Desktop sidebar
+- Mobile drawer open/close
+- Workspace active state
+- Documents active state
+- Account Settings active state
+- لا يوجد horizontal overflow غير مقصود
+
+FastAPI:
+لم تُشغّل الاختبارات لأن I1 لم تغيّر FastAPI.
+```
 
 الواجهة تعرض فقط Processing Profiles المتاحة فعلياً من Capabilities.
 
@@ -1024,7 +1082,7 @@ Ruff:
 All checks passed
 ```
 
-## آخر مهمة مكتملة — H13 Documents Application Commands
+## المهمة السابقة المكتملة — H13 Documents Application Commands
 
 **الحالة:** `DONE` ومتحقق منها في PR #93، والمدمجة في `main` عند merge commit `2cf17e21b9d2a1eb80918788841c375aeb1a6ebf`.
 
@@ -1063,19 +1121,73 @@ FastAPI:
 لم يتم تعديل FastAPI في H13، ولم يُسجل FastAPI regression ضمن هذه المهمة.
 ```
 
+## آخر مهمة مكتملة — I1 Responsive App Shell / Sidebar
+
+**الحالة:** `DONE` ومتحقق منها في PR #94، والمدمجة في `main` عند merge commit `cd8698ef8ed643bc7fdb96539664c98f9a63924e`.
+
+تم تنفيذ:
+
+- إنشاء App Shell موحّد للصفحات المحمية بعد تسجيل الدخول وتحويل authenticated layout المشترك إلى Sidebar responsive قابلة لإعادة الاستخدام.
+- دعم RTL والواجهة العربية باستخدام Flux responsive sidebar.
+- Sidebar مناسبة على Desktop وMobile drawer تفتح وتغلق دون JavaScript مخصص.
+- Navigation مركزية للروابط الموجودة فعلياً: Workspace وDocuments وAccount Settings.
+- Active navigation حسب route، مع بقاء صفحات `documents.*` ضمن active state الخاص بالوثائق.
+- هوية المستخدم وLogout داخل الـSidebar، وMobile header مع زر فتح القائمة.
+- حماية المحتوى الرئيسي من horizontal overflow غير المقصود.
+- عدم إعادة تصميم محتوى Workspace أو Documents أو Settings وعدم تغيير business logic أو عقود H12/H13.
+- لا تغييرات على FastAPI أو Qdrant أو Retrieval أو Chat أو Database.
+- الملفات المتغيرة في PR #94 فقط:
+  - `laravel-app/resources/views/components/layouts/app.blade.php`
+  - `laravel-app/tests/Feature/AppShellTest.php`
+
+### Verification I1
+
+```text
+PR #94 merged on GitHub: PASS
+Feature commit:
+- 98d43d14895ac05329b03c7d0e5540da128fb79c
+Merge commit:
+- cd8698ef8ed643bc7fdb96539664c98f9a63924e
+
+Focused App Shell test:
+1 passed (18 assertions)
+
+Laravel full regression:
+141 passed (697 assertions)
+
+Frontend build:
+npm run build — PASS
+
+Pint:
+./vendor/bin/pint --dirty — PASS
+بعد تعديل Pint أعيد تشغيل full Laravel suite — PASS
+./vendor/bin/pint --dirty --test — PASS
+
+Manual responsive verification — PASS:
+- Desktop sidebar
+- Mobile drawer open/close
+- Workspace active state
+- Documents active state
+- Account Settings active state
+- لا يوجد horizontal overflow غير مقصود
+
+FastAPI:
+لم تُشغّل الاختبارات لأن I1 لم تغيّر FastAPI.
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-I1 — Responsive app shell / sidebar
+I2 — Workspace dashboard
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت H13 في main عبر PR #93 واكتملت Frontend Backend Readiness Gate في H8–H13.
-أصبحت عقود Documents read/polling/capabilities في H12 وأوامر Upload/Reprocess/Delete في H13 مستقرة وجاهزة للاستهلاك من Blade/Livewire.
-تبدأ المرحلة I بالمهمة I1 — Responsive app shell / sidebar كما تحدد خريطة المهام في PROJECT_RAG_MASTER_PLAN.md.
-المرحلة I تستهلك عقود H12/H13 ولا تعيد تعريف Document/ProcessingRun business state داخل Blade أو JavaScript.
+دُمجت I1 في main عبر PR #94 وأصبح App Shell الموحّد والـSidebar المتجاوبة قاعدة الواجهة المحمية.
+تبدأ I2 — Workspace dashboard وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك H12 dashboard summary بدلاً من إعادة تفسير حالات Documents محلياً.
+يبقى محتوى Workspace/Document/Settings الحالي دون إعادة تصميم سابق من I1؛ إعادة تصميم Workspace الفعلية تبدأ ضمن I2.
+لا تغيّر المرحلة I عقود H12/H13 أو Business State داخل Blade/JavaScript دون توثيق gap معماري صريح.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
