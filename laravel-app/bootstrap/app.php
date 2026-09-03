@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\InvalidProcessingRunTransition;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -28,7 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         $exceptions->render(function (
-            \App\Exceptions\InvalidProcessingRunTransition $exception,
+            InvalidProcessingRunTransition $exception,
             Request $request,
         ) {
             if (! $request->is('internal/api/*')) {
