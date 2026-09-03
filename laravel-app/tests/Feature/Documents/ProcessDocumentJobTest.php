@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Ai\AiServiceClient;
 use App\Services\Ai\Data\ProcessDocumentRequestData;
 use App\Services\Ai\Data\ProcessDocumentResult;
+use App\Services\Documents\DocumentStatusProjector;
 use App\Services\Documents\DocumentStorageService;
 use App\Services\Documents\ProcessingRunActivator;
 use App\Services\Documents\ProcessingRunResultPersister;
@@ -151,6 +152,7 @@ class ProcessDocumentJobTest extends TestCase
             app(AiServiceClient::class),
             app(ProcessingRunResultPersister::class),
             app(ProcessingRunActivator::class),
+            app(DocumentStatusProjector::class),
         );
 
         $freshRun = $processingRun->fresh();
@@ -204,7 +206,7 @@ class ProcessDocumentJobTest extends TestCase
         );
 
         $this->assertSame(
-            DocumentStatus::Processing,
+            DocumentStatus::Ready,
             $document->fresh()->status,
         );
 
@@ -281,6 +283,7 @@ class ProcessDocumentJobTest extends TestCase
                 app(AiServiceClient::class),
                 app(ProcessingRunResultPersister::class),
                 app(ProcessingRunActivator::class),
+                app(DocumentStatusProjector::class),
             );
 
             $this->fail('Expected AI service failure was not thrown.');
@@ -441,6 +444,7 @@ class ProcessDocumentJobTest extends TestCase
             app(AiServiceClient::class),
             app(ProcessingRunResultPersister::class),
             app(ProcessingRunActivator::class),
+            app(DocumentStatusProjector::class),
         );
 
         $this->assertSame(
@@ -507,6 +511,7 @@ class ProcessDocumentJobTest extends TestCase
                 app(AiServiceClient::class),
                 app(ProcessingRunResultPersister::class),
                 app(ProcessingRunActivator::class),
+                app(DocumentStatusProjector::class),
             );
 
             $this->fail('Expected AI service failure was not thrown.');

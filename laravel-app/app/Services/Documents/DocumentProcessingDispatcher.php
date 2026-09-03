@@ -2,7 +2,6 @@
 
 namespace App\Services\Documents;
 
-use App\Enums\DocumentStatus;
 use App\Enums\ProcessingProfile;
 use App\Enums\ProcessingRunStatus;
 use App\Jobs\ProcessDocumentJob;
@@ -15,6 +14,10 @@ use RuntimeException;
 
 class DocumentProcessingDispatcher
 {
+    public function __construct(
+        private readonly DocumentStatusProjector $documentStatusProjector,
+    ) {}
+
     public function dispatchInitial(
         Document $document,
         ProcessingProfile $profile,
@@ -43,8 +46,10 @@ class DocumentProcessingDispatcher
                 'stage_timings_ms' => [],
             ]);
 
-            $lockedDocument->status = DocumentStatus::Queued;
-            $lockedDocument->save();
+            $this->documentStatusProjector->project(
+                $lockedDocument,
+                $processingRun,
+            );
 
             ProcessDocumentJob::dispatch($processingRun->id)->afterCommit();
 

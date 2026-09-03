@@ -10,6 +10,10 @@ use LogicException;
 
 class ProcessingRunActivator
 {
+    public function __construct(
+        private readonly DocumentStatusProjector $documentStatusProjector,
+    ) {}
+
     public function activate(ProcessingRun $processingRun): ?ProcessingRun
     {
         $processingRunId = (int) $processingRun->getKey();
@@ -69,10 +73,10 @@ class ProcessingRunActivator
                     }
                 }
 
-                $document->active_processing_run_id =
-                    $lockedProcessingRun->getKey();
-
-                $document->save();
+                $this->documentStatusProjector->projectActivation(
+                    $document,
+                    $lockedProcessingRun,
+                );
 
                 return $previousProcessingRun;
             },

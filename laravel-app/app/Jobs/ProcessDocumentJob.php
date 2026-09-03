@@ -2,12 +2,12 @@
 
 namespace App\Jobs;
 
-use App\Enums\DocumentStatus;
 use App\Enums\ProcessingRunStatus;
 use App\Models\Document;
 use App\Models\ProcessingRun;
 use App\Services\Ai\AiServiceClient;
 use App\Services\Ai\Data\ProcessDocumentRequestData;
+use App\Services\Documents\DocumentStatusProjector;
 use App\Services\Documents\ProcessingRunActivator;
 use App\Services\Documents\ProcessingRunResultPersister;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -25,6 +25,7 @@ class ProcessDocumentJob implements ShouldQueue
         AiServiceClient $client,
         ProcessingRunResultPersister $resultPersister,
         ProcessingRunActivator $processingRunActivator,
+        DocumentStatusProjector $documentStatusProjector,
     ): void {
         $processingRun = ProcessingRun::query()
             ->with('document')
@@ -41,10 +42,7 @@ class ProcessDocumentJob implements ShouldQueue
         $processingRun->status = ProcessingRunStatus::Processing;
         $processingRun->save();
 
-        if ($document->active_processing_run_id === null) {
-            $document->status = DocumentStatus::Processing;
-            $document->save();
-        }
+        $documentStatusProjector->project($document, $processingRun);
 
         $requestData = new ProcessDocumentRequestData(
             userId: (int) $document->user_id,
