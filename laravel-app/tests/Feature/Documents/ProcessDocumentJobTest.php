@@ -11,13 +11,14 @@ use App\Models\User;
 use App\Services\Ai\AiServiceClient;
 use App\Services\Ai\Data\ProcessDocumentRequestData;
 use App\Services\Ai\Data\ProcessDocumentResult;
-use App\Services\Documents\DocumentStatusProjector;
 use App\Services\Documents\DocumentStorageService;
 use App\Services\Documents\ProcessingRunActivator;
+use App\Services\Documents\ProcessingRunProgressor;
 use App\Services\Documents\ProcessingRunResultPersister;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use LogicException;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -144,15 +145,27 @@ class ProcessDocumentJobTest extends TestCase
 
                         return true;
                     })
-                    ->andReturn($result);
+                    ->andReturnUsing(function () use (
+                        $processingRun,
+                        $result,
+                    ): ProcessDocumentResult {
+                        $processingRun->newQuery()
+                            ->whereKey($processingRun->getKey())
+                            ->update([
+                                'status' => ProcessingRunStatus::Indexing,
+                                'indexing_started_at' => now(),
+                            ]);
+
+                        return $result;
+                    });
             },
         );
 
         (new ProcessDocumentJob($processingRun->id))->handle(
             app(AiServiceClient::class),
+            app(ProcessingRunProgressor::class),
             app(ProcessingRunResultPersister::class),
             app(ProcessingRunActivator::class),
-            app(DocumentStatusProjector::class),
         );
 
         $freshRun = $processingRun->fresh();
@@ -202,6 +215,14 @@ class ProcessDocumentJobTest extends TestCase
         );
 
         $this->assertNotNull(
+            $freshRun->started_at,
+        );
+
+        $this->assertNotNull(
+            $freshRun->indexing_started_at,
+        );
+
+        $this->assertNotNull(
             $freshRun->indexed_at,
         );
 
@@ -246,6 +267,72 @@ class ProcessDocumentJobTest extends TestCase
         );
     }
 
+    public function test_job_rejects_indexed_result_when_callback_did_not_advance_run(): void
+    {
+        Storage::fake('documents');
+
+        $document = app(DocumentStorageService::class)->storePermanent(
+            User::factory()->create(),
+            UploadedFile::fake()->createWithContent(
+                'trusted-notes.txt',
+                "Trusted document content.\n",
+            ),
+        );
+
+        $processingRun = $document->processingRuns()->create([
+            'profile' => ProcessingProfile::Cloud,
+            'status' => ProcessingRunStatus::Pending,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $result = new ProcessDocumentResult(
+            documentId: $document->id,
+            processingRunId: $processingRun->id,
+            profile: ProcessingProfile::Cloud,
+            status: ProcessingRunStatus::Indexed,
+            qdrantCollection: 'rag_documents_cloud',
+            profileSnapshot: [],
+            totalPages: 1,
+            totalChunks: 1,
+            vectorCount: 1,
+            vectorDimension: 1024,
+            stageTimingsMs: [],
+            warnings: [],
+        );
+
+        $this->mock(
+            AiServiceClient::class,
+            function (MockInterface $mock) use ($result): void {
+                $mock->shouldReceive('processDocument')
+                    ->once()
+                    ->andReturn($result);
+            },
+        );
+
+        try {
+            (new ProcessDocumentJob($processingRun->id))->handle(
+                app(AiServiceClient::class),
+                app(ProcessingRunProgressor::class),
+                app(ProcessingRunResultPersister::class),
+                app(ProcessingRunActivator::class),
+            );
+
+            $this->fail('Expected missing indexing callback to be rejected.');
+        } catch (LogicException $exception) {
+            $this->assertSame(
+                'Only an indexing run may persist a successful processing result.',
+                $exception->getMessage(),
+            );
+        }
+
+        $freshRun = $processingRun->fresh();
+
+        $this->assertSame(ProcessingRunStatus::Processing, $freshRun->status);
+        $this->assertNull($freshRun->indexed_at);
+        $this->assertNull($document->fresh()->active_processing_run_id);
+    }
+
     public function test_client_failure_does_not_persist_successful_processing_result(): void
     {
         Storage::fake('documents');
@@ -281,9 +368,9 @@ class ProcessDocumentJobTest extends TestCase
         try {
             (new ProcessDocumentJob($processingRun->id))->handle(
                 app(AiServiceClient::class),
+                app(ProcessingRunProgressor::class),
                 app(ProcessingRunResultPersister::class),
                 app(ProcessingRunActivator::class),
-                app(DocumentStatusProjector::class),
             );
 
             $this->fail('Expected AI service failure was not thrown.');
@@ -300,6 +387,9 @@ class ProcessDocumentJobTest extends TestCase
             ProcessingRunStatus::Processing,
             $freshRun->status,
         );
+
+        $this->assertNotNull($freshRun->started_at);
+        $this->assertNull($freshRun->indexing_started_at);
 
         $this->assertSame(
             [],
@@ -413,7 +503,19 @@ class ProcessDocumentJobTest extends TestCase
 
                         return true;
                     })
-                    ->andReturn($result);
+                    ->andReturnUsing(function () use (
+                        $newRun,
+                        $result,
+                    ): ProcessDocumentResult {
+                        $newRun->newQuery()
+                            ->whereKey($newRun->getKey())
+                            ->update([
+                                'status' => ProcessingRunStatus::Indexing,
+                                'indexing_started_at' => now(),
+                            ]);
+
+                        return $result;
+                    });
 
                 $mock->shouldReceive('deleteProcessingRunPoints')
                     ->once()
@@ -442,9 +544,9 @@ class ProcessDocumentJobTest extends TestCase
 
         (new ProcessDocumentJob($newRun->id))->handle(
             app(AiServiceClient::class),
+            app(ProcessingRunProgressor::class),
             app(ProcessingRunResultPersister::class),
             app(ProcessingRunActivator::class),
-            app(DocumentStatusProjector::class),
         );
 
         $this->assertSame(
@@ -509,9 +611,9 @@ class ProcessDocumentJobTest extends TestCase
         try {
             (new ProcessDocumentJob($newRun->id))->handle(
                 app(AiServiceClient::class),
+                app(ProcessingRunProgressor::class),
                 app(ProcessingRunResultPersister::class),
                 app(ProcessingRunActivator::class),
-                app(DocumentStatusProjector::class),
             );
 
             $this->fail('Expected AI service failure was not thrown.');

@@ -27,6 +27,7 @@ from app.runtime.state import (
 )
 from app.schemas.documents import DocumentFileType
 from app.services.document_processing import ProcessDocumentService
+from app.services.processing_progress import LaravelProcessingProgressClient
 from app.services.processing_run_cleanup import (
     ProcessingRunPointsCleanupService,
 )
@@ -42,6 +43,9 @@ def get_process_document_service() -> Iterator[ProcessDocumentService]:
             loaders=_build_loaders(settings),
             profile_registry=_build_profile_registry(settings),
             indexer=QdrantDocumentIndexer(qdrant_client),
+            progress_notifier=LaravelProcessingProgressClient.from_settings(
+                settings
+            ),
         )
     finally:
         qdrant_client.close()

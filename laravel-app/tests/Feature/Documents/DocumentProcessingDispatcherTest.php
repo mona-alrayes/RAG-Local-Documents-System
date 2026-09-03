@@ -4,6 +4,7 @@ namespace Tests\Feature\Documents;
 
 use App\Enums\DocumentStatus;
 use App\Enums\ProcessingProfile;
+use App\Enums\ProcessingRunKind;
 use App\Enums\ProcessingRunStatus;
 use App\Jobs\ProcessDocumentJob;
 use App\Models\User;
@@ -49,8 +50,13 @@ class DocumentProcessingDispatcherTest extends TestCase
             ProcessingRunStatus::Pending,
             $processingRun->status,
         );
+        $this->assertSame(ProcessingRunKind::Initial, $processingRun->kind);
         $this->assertSame([], $processingRun->profile_snapshot);
         $this->assertSame([], $processingRun->stage_timings_ms);
+        $this->assertNotNull($processingRun->created_at);
+        $this->assertNull($processingRun->started_at);
+        $this->assertNull($processingRun->indexing_started_at);
+        $this->assertNull($processingRun->failed_at);
         $this->assertDatabaseCount('document_processing_runs', 1);
 
         Queue::assertPushed(
@@ -172,6 +178,13 @@ class DocumentProcessingDispatcherTest extends TestCase
             ProcessingProfile::HybridLocal,
             $newRun->profile,
         );
+
+        $this->assertSame(
+            ProcessingRunKind::Reprocessing,
+            $newRun->kind,
+        );
+        $this->assertNotNull($newRun->created_at);
+        $this->assertNull($newRun->started_at);
 
         $this->assertDatabaseCount('document_processing_runs', 2);
 

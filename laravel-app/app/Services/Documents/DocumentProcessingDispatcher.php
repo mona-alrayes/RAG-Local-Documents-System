@@ -3,6 +3,7 @@
 namespace App\Services\Documents;
 
 use App\Enums\ProcessingProfile;
+use App\Enums\ProcessingRunKind;
 use App\Enums\ProcessingRunStatus;
 use App\Jobs\ProcessDocumentJob;
 use App\Models\Document;
@@ -42,6 +43,7 @@ class DocumentProcessingDispatcher
             $processingRun = $lockedDocument->processingRuns()->create([
                 'profile' => $profile,
                 'status' => ProcessingRunStatus::Pending,
+                'kind' => ProcessingRunKind::Initial,
                 'profile_snapshot' => [],
                 'stage_timings_ms' => [],
             ]);
@@ -112,6 +114,7 @@ class DocumentProcessingDispatcher
             $processingRun = $lockedDocument->processingRuns()->create([
                 'profile' => $profile,
                 'status' => ProcessingRunStatus::Pending,
+                'kind' => ProcessingRunKind::Reprocessing,
                 'profile_snapshot' => [],
                 'stage_timings_ms' => [],
             ]);

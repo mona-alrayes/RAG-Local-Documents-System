@@ -2,13 +2,12 @@
 
 namespace App\Jobs;
 
-use App\Enums\ProcessingRunStatus;
 use App\Models\Document;
 use App\Models\ProcessingRun;
 use App\Services\Ai\AiServiceClient;
 use App\Services\Ai\Data\ProcessDocumentRequestData;
-use App\Services\Documents\DocumentStatusProjector;
 use App\Services\Documents\ProcessingRunActivator;
+use App\Services\Documents\ProcessingRunProgressor;
 use App\Services\Documents\ProcessingRunResultPersister;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -23,13 +22,13 @@ class ProcessDocumentJob implements ShouldQueue
 
     public function handle(
         AiServiceClient $client,
+        ProcessingRunProgressor $processingRunProgressor,
         ProcessingRunResultPersister $resultPersister,
         ProcessingRunActivator $processingRunActivator,
-        DocumentStatusProjector $documentStatusProjector,
     ): void {
-        $processingRun = ProcessingRun::query()
-            ->with('document')
-            ->findOrFail($this->processingRunId);
+        $processingRun = $processingRunProgressor
+            ->markProcessingStarted($this->processingRunId)
+            ->load('document');
 
         $document = $processingRun->document;
 
@@ -38,11 +37,6 @@ class ProcessDocumentJob implements ShouldQueue
                 'Processing run does not have an associated document.',
             );
         }
-
-        $processingRun->status = ProcessingRunStatus::Processing;
-        $processingRun->save();
-
-        $documentStatusProjector->project($document, $processingRun);
 
         $requestData = new ProcessDocumentRequestData(
             userId: (int) $document->user_id,
@@ -58,13 +52,13 @@ class ProcessDocumentJob implements ShouldQueue
             fileName: $document->original_name,
         );
 
-        $resultPersister->persist(
-            processingRun: $processingRun,
+        $indexedProcessingRun = $resultPersister->persist(
+            processingRunId: $this->processingRunId,
             result: $result,
         );
 
         $previousProcessingRun = $processingRunActivator->activate(
-            $processingRun,
+            $indexedProcessingRun,
         );
 
         if ($previousProcessingRun instanceof ProcessingRun) {
