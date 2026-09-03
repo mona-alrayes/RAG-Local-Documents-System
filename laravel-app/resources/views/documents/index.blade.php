@@ -1,72 +1,280 @@
 <x-layouts.app title="الوثائق">
-    <header class="mb-8">
-        <p class="text-sm font-semibold text-cyan-400">
-            الوثائق
-        </p>
+    @php
+        $hasActiveFilters =
+            request()->filled('search')
+            || request()->filled('status')
+            || request()->filled('file_type');
+    @endphp
 
-        <h1 class="mt-2 text-3xl font-bold text-ice-100">
-            وثائقي
-        </h1>
+    <div class="space-y-8">
+        {{-- Header --}}
+        <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-sm font-semibold text-cyan-400">
+                    إدارة الوثائق
+                </p>
 
-        <p class="mt-3 text-mist-300">
-            استعرض الوثائق المرتبطة بحسابك.
-        </p>
-    </header>
+                <h1 class="mt-2 text-3xl font-bold text-ice-100">
+                    وثائقي
+                </h1>
 
-    <div class="space-y-4">
-        @forelse ($documents as $document)
-            <article class="rounded-xl border border-white/10 bg-navy-900/70 p-6">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h2 class="font-semibold text-ice-100">
-                            {{ $document->title ?: $document->original_name }}
-                        </h2>
+                <p class="mt-3 max-w-2xl text-sm leading-7 text-mist-300">
+                    استعرض ملفاتك، تابع حالة المعالجة، وابحث عن الوثيقة التي تحتاجها.
+                </p>
+            </div>
 
-                        <p class="mt-2 text-sm text-mist-300">
-                            {{ $document->original_name }}
-                        </p>
+            <div class="shrink-0 text-sm text-mist-300">
+                {{ $documents->total() }} وثيقة
+            </div>
+        </header>
 
-                        <dl class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-mist-300">
-                            <div>
-                                <dt class="sr-only">النوع</dt>
-                                <dd>{{ strtoupper($document->file_type->value) }}</dd>
-                            </div>
-
-                            <div>
-                                <dt class="sr-only">الحجم</dt>
-                                <dd>{{ number_format($document->file_size) }} بايت</dd>
-                            </div>
-
-                            <div>
-                                <dt class="sr-only">الحالة</dt>
-                                <dd>{{ $document->status->value }}</dd>
-                            </div>
-
-                            <div>
-                                <dt class="sr-only">تاريخ الإضافة</dt>
-                                <dd>{{ $document->created_at->format('Y-m-d') }}</dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                    <a
-                        href="{{ route('documents.show', $document) }}"
-                        class="inline-flex rounded-lg border border-cyan-400/30 px-4 py-2 text-sm font-semibold text-cyan-400 transition hover:bg-cyan-400/10"
+        {{-- Filters --}}
+        <section
+            class="rounded-2xl border border-white/10 bg-navy-900/70 p-4 sm:p-5"
+            aria-label="تصفية الوثائق"
+        >
+            <form
+                method="GET"
+                action="{{ route('documents.index') }}"
+                class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px_auto]"
+            >
+                <div>
+                    <label
+                        for="search"
+                        class="mb-2 block text-sm font-medium text-ice-100"
                     >
-                        عرض التفاصيل
-                    </a>
-                </div>
-            </article>
-        @empty
-            <p class="rounded-xl border border-white/10 bg-navy-900/70 p-6 text-mist-300">
-                لا توجد وثائق حتى الآن.
-            </p>
-        @endforelse
-    </div>
+                        البحث
+                    </label>
 
-    @if ($documents->hasPages())
-        <div class="mt-6">
-            {{ $documents->links() }}
-        </div>
-    @endif
+                    <input
+                        id="search"
+                        name="search"
+                        type="search"
+                        value="{{ request('search') }}"
+                        placeholder="ابحث بالعنوان أو اسم الملف..."
+                        class="w-full rounded-xl border border-white/10 bg-navy-950 px-4 py-2.5 text-sm text-ice-100 outline-none transition placeholder:text-mist-500 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/10"
+                    >
+                </div>
+
+                <div>
+                    <label
+                        for="status"
+                        class="mb-2 block text-sm font-medium text-ice-100"
+                    >
+                        الحالة
+                    </label>
+
+                    <select
+                        id="status"
+                        name="status"
+                        class="w-full rounded-xl border border-white/10 bg-navy-950 px-4 py-2.5 text-sm text-ice-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/10"
+                    >
+                        <option value="">كل الحالات</option>
+
+                        @foreach (\App\Enums\DocumentStatus::cases() as $status)
+                            <option
+                                value="{{ $status->value }}"
+                                @selected(request('status') === $status->value)
+                            >
+                                {{ $status->value }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label
+                        for="file_type"
+                        class="mb-2 block text-sm font-medium text-ice-100"
+                    >
+                        نوع الملف
+                    </label>
+
+                    <select
+                        id="file_type"
+                        name="file_type"
+                        class="w-full rounded-xl border border-white/10 bg-navy-950 px-4 py-2.5 text-sm text-ice-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/10"
+                    >
+                        <option value="">كل الأنواع</option>
+
+                        @foreach (\App\Enums\FileType::cases() as $fileType)
+                            <option
+                                value="{{ $fileType->value }}"
+                                @selected(request('file_type') === $fileType->value)
+                            >
+                                {{ strtoupper($fileType->value) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="flex items-end gap-2">
+                    <button
+                        type="submit"
+                        class="inline-flex min-h-10 items-center justify-center rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-navy-950 transition hover:bg-cyan-300"
+                    >
+                        تطبيق
+                    </button>
+
+                    @if ($hasActiveFilters)
+                        <a
+                            href="{{ route('documents.index') }}"
+                            class="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-mist-300 transition hover:bg-white/5 hover:text-ice-100"
+                        >
+                            مسح
+                        </a>
+                    @endif
+                </div>
+            </form>
+        </section>
+
+        {{-- Documents --}}
+        @if ($documents->isNotEmpty())
+            <section class="space-y-3" aria-label="قائمة الوثائق">
+                @foreach ($documents as $document)
+                    @php
+                        $displayTitle = $document->title ?: $document->originalName;
+
+                        $fileSize = match (true) {
+                            $document->fileSize >= 1024 * 1024 =>
+                                number_format($document->fileSize / (1024 * 1024), 1) . ' MB',
+
+                            $document->fileSize >= 1024 =>
+                                number_format($document->fileSize / 1024, 1) . ' KB',
+
+                            default =>
+                                number_format($document->fileSize) . ' B',
+                        };
+                    @endphp
+
+                    <article
+                        class="group rounded-2xl border border-white/10 bg-navy-900/70 p-5 transition hover:border-white/20 hover:bg-navy-900"
+                    >
+                        <div class="flex min-w-0 items-start gap-4">
+                            {{-- File icon --}}
+                            <div
+                                class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-cyan-300 sm:flex"
+                                aria-hidden="true"
+                            >
+                                {{ strtoupper($document->fileType->value) }}
+                            </div>
+
+                            {{-- Main information --}}
+                            <div class="min-w-0 flex-1">
+                                <div class="flex min-w-0 items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <a
+                                            href="{{ route('documents.show', $document->id) }}"
+                                            class="block truncate font-semibold text-ice-100 transition hover:text-cyan-300"
+                                        >
+                                            {{ $displayTitle }}
+                                        </a>
+
+                                        @if ($document->title)
+                                            <p
+                                                class="mt-1 truncate text-sm text-mist-400"
+                                                title="{{ $document->originalName }}"
+                                            >
+                                                {{ $document->originalName }}
+                                            </p>
+                                        @endif
+                                    </div>
+
+                                    <x-documents.actions-menu :document="$document" />
+                                </div>
+
+                                <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs text-mist-300">
+                                    <span class="font-medium text-mist-200">
+                                        {{ strtoupper($document->fileType->value) }}
+                                    </span>
+
+                                    <span>
+                                        {{ $fileSize }}
+                                    </span>
+
+                                    <x-documents.status-indicator
+                                        :availability="$document->availability"
+                                    />
+
+                                    <span>
+                                        أضيفت
+                                        <time datetime="{{ $document->createdAt->toIso8601String() }}">
+                                            {{ $document->createdAt->format('Y-m-d') }}
+                                        </time>
+                                    </span>
+                                </div>
+
+                                @if ($document->reprocessingInProgress)
+                                    <div
+                                        class="mt-4 inline-flex items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-300"
+                                    >
+                                        <span
+                                            class="size-2 rounded-full bg-amber-400"
+                                            aria-hidden="true"
+                                        ></span>
+
+                                        إعادة المعالجة جارية
+                                    </div>
+                                @endif
+
+                                @if ($document->safeFailure !== null)
+                                    <p
+                                        class="mt-4 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
+                                    >
+                                        {{ __('documents.failure.processing_failed') }}
+                                    </p>
+                                @endif
+                            </div>
+                        </div>
+                    </article>
+                @endforeach
+            </section>
+
+            @if ($documents->hasPages())
+                <div class="pt-2">
+                    {{ $documents->links() }}
+                </div>
+            @endif
+        @elseif (! $hasAnyDocuments)
+            {{-- Account has no documents --}}
+            <section
+                class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-6 py-14 text-center"
+            >
+                <div
+                    class="mx-auto flex size-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-cyan-300"
+                    aria-hidden="true"
+                >
+                    <span class="text-xl font-bold">+</span>
+                </div>
+
+                <h2 class="mt-5 text-lg font-semibold text-ice-100">
+                    لا توجد وثائق حتى الآن
+                </h2>
+
+                <p class="mx-auto mt-2 max-w-md text-sm leading-7 text-mist-300">
+                    ستظهر الوثائق التي تضيفها هنا مع حالة المعالجة والإجراءات المتاحة لكل وثيقة.
+                </p>
+            </section>
+        @else
+            {{-- Filters returned no results --}}
+            <section
+                class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-6 py-14 text-center"
+            >
+                <h2 class="text-lg font-semibold text-ice-100">
+                    لا توجد نتائج مطابقة
+                </h2>
+
+                <p class="mx-auto mt-2 max-w-md text-sm leading-7 text-mist-300">
+                    لم نجد وثائق تطابق البحث أو الفلاتر الحالية.
+                </p>
+
+                <a
+                    href="{{ route('documents.index') }}"
+                    class="mt-5 inline-flex items-center justify-center rounded-xl border border-cyan-400/30 px-4 py-2.5 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
+                >
+                    مسح جميع الفلاتر
+                </a>
+            </section>
+        @endif
+    </div>
 </x-layouts.app>
