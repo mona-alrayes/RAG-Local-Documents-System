@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — H8 مكتملة ومدموجة في PR #88؛ H9 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
+> **الحالة العامة:** قيد التنفيذ — H9 مكتملة ومدموجة في PR #89؛ H10 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
 
 ---
 
@@ -17,12 +17,15 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: cf27459b091b54e7b33c6e872ef97a653f895c1c
-Last Merged Feature PR on main: #88 — feat(H8): add aggregate document status projector
-Latest Task PR: #88 — feat(H8): add aggregate document status projector
-Verified H8 Feature Commits: d5ff5b47c081ff1c6487061f7d7673c4527fd688, d58a73058f2e4aa308e2ad6c80bdaeea41c63d83
-Verified H8 Merge Commit: cf27459b091b54e7b33c6e872ef97a653f895c1c
-Latest Planning Commit on main: 82cdd5d7d909315703e69f3c2ebf942a43ae6ac9 — docs: advance active baseline to H9
+Verified Main Commit: 8072e1d6e26a1d435d33e8fbbde322e31e387ea9
+Last Merged Feature PR on main: #89 — feat(H9): إضافة تقدم معالجة دقيق وحدث بدء الفهرسة
+Latest Task PR: #89 — feat(H9): إضافة تقدم معالجة دقيق وحدث بدء الفهرسة
+Verified H9 Feature Commits:
+- bb85b04c81eba77261678fa3142508b8b1423239 — feat(H9): add accurate processing progress callback
+- e30474e6dd4a07caf619d35008f5b9e9873cf166 — style(H9): satisfy Laravel Pint
+- c66f25bca792b56505e49ecad94bb2786b61f1da — fix(H9): harden callback redirects and migration backfill
+Verified H9 Merge Commit: 8072e1d6e26a1d435d33e8fbbde322e31e387ea9
+Documentation Baseline: تم تسجيل اكتمال H9 وتسليم H10 كمهمة حالية.
 
 Current Working Branch: main
 
@@ -30,39 +33,45 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H8 — Aggregate Document Status Projector
+H9 — Accurate Processing Progress Callback + Run Kind/Stage Timestamps
 
 Current Phase:
 H — Processing Orchestration
 
 Architectural Result:
-- One trusted Processing Profile per ProcessingRun: cloud | hybrid_local.
-- No Compare upload workflow.
-- No Winner/Loser selection lifecycle.
-- No temporary comparison artifacts or promotion flow.
-- Direct persistent Qdrant indexing is the target path.
-- active_processing_run_id is the document pointer to the current indexed run.
-- Reprocessing keeps the old active run usable until the replacement is indexed and switched transactionally.
-- Old-run Qdrant cleanup starts only after a successful active-run switch.
-- Document.status represents current document availability; ProcessingRun.status represents one attempt's progress.
-- DocumentStatusProjector is the central source for processing-related aggregate status decisions.
-- Initial attempts project pending/processing/indexing/failed to queued/processing/indexing/failed.
-- Activation persists active_processing_run_id + ready together inside the existing transaction.
-- Reprocessing progress is displayed separately while the document remains Ready through its valid old active run.
-- v1 progress must be truthful: Queued → Processing → Indexing → Ready/Failed.
-- FastAPI reports indexing_started to an authenticated Laravel internal callback before the first Qdrant write.
-- H8–H13 must finish before phase I so the UI consumes stable read/command contracts instead of reopening Domain/Schema/Internal APIs.
+- كل ProcessingRun تستخدم Processing Profile واحدة موثوقة: cloud | hybrid_local.
+- لا يوجد Compare/Winner/temporary artifact lifecycle.
+- تبقى الفهرسة الدائمة المباشرة في Qdrant هي المسار المعتمد.
+- يبقى active_processing_run_id مؤشر الوثيقة إلى الـRun المفهرسة الحالية.
+- تصف Document.status جاهزية الوثيقة، بينما تصف ProcessingRun.status تقدم محاولة واحدة.
+- تميز ProcessingRun.kind صراحة بين initial وreprocessing.
+- يمثل created_at وقت queued، وتحفظ started_at وindexing_started_at صراحة.
+- يسجل Laravel حالة processing عند بدء الـJob ويبقى المالك الوحيد لـBusiness State.
+- يرسل FastAPI حدث indexing_started الموثوق بعد dense/sparse وقبل أول Qdrant write.
+- يفرض الـCallback تحقق IDs والملكية والحالة السابقة وidempotency والlocking والسر المستقل للاتجاه العكسي.
+- ترفض redirects كي لا ينتقل callback secret إلى origin آخر.
+- يمنع الفشل النهائي للـCallback أول كتابة في Qdrant.
+- يعيد Laravel تحميل وقفل الـRun الفعلية قبل حفظ النجاح، ولا يمكن تجاوز processing مباشرة إلى indexed.
+- تسقط initial attempt حالة indexing على الوثيقة، بينما تبقي reprocessing وثيقة ذات active run صالحة في ready.
+- يجب إكمال H10–H13 قبل المرحلة I حتى تستهلك الواجهة عقود Backend مستقرة.
 
 Latest Verification:
-PR #88 merged on GitHub: PASS
-main contains merge commit cf27459b091b54e7b33c6e872ef97a653f895c1c: PASS
-DocumentStatusProjector tests: 7 passed (22 assertions)
-Focused Laravel tests: 14 passed (84 assertions)
-Laravel full regression: 86 passed (390 assertions)
-Pint: passed (7 H8 files)
+PR #89 merged on GitHub: PASS
+PR head matched tested commit c66f25bca792b56505e49ecad94bb2786b61f1da: PASS
+PR mergeable before merge: PASS
+main contains merge commit 8072e1d6e26a1d435d33e8fbbde322e31e387ea9: PASS
+main tree matches the tested H9 branch tree: PASS
+Independent code review: no Critical issues; both Important findings fixed
+Focused Laravel tests: 23 passed (134 assertions)
+Laravel full regression: 99 passed (450 assertions)
+Pint: passed (21 changed PHP files)
+FastAPI focused tests: 10 passed
+FastAPI full regression: 153 passed
+Ruff: passed on affected FastAPI files
+git diff --check: PASS
 
 Current Task:
-H9 — Accurate Processing Progress Callback
+H10 — Queue Retries / Timeouts / Idempotency / Terminal Failure Finalization
 
 Open Blockers: none
 ```
@@ -286,7 +295,7 @@ assert "comparison_report" not in payload
 | H6 Active-run transaction after successful indexing | DONE |
 | H7 Safe reprocessing replacement | DONE |
 | H8 Aggregate status projector | DONE |
-| H9 Accurate processing progress callback + run kind/stage timestamps | TODO |
+| H9 Accurate processing progress callback + run kind/stage timestamps | DONE |
 | H10 Queue retries / timeouts / idempotency / terminal failure finalization | TODO |
 | H11 Serialized `ai-local` queue + global heavy-resource lock | TODO |
 | H12 Documents presentation read model / polling / capability availability | TODO |
@@ -893,79 +902,90 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H8 Aggregate Document Status Projector
+## آخر مهمة مكتملة — H9 Accurate Processing Progress Callback + Run Kind/Stage Timestamps
 
-**الحالة:** `DONE` ومتحقق منها في PR #88 — `feat(H8): add aggregate document status projector`، والمدمجة في `main`.
+**الحالة:** `DONE` ومتحقق منها في PR #89 — `feat(H9): إضافة تقدم معالجة دقيق وحدث بدء الفهرسة`، والمدمجة في `main`.
 
 تم تنفيذ:
 
-- إضافة `DocumentStatusProjector` كمصدر مركزي لقرارات حالة الوثيقة المرتبطة بالمعالجة.
-- إسقاط حالة أول معالجة من Run المقصودة صراحةً:
-  - `pending → queued`
-  - `processing → processing`
-  - `indexing → indexing`
-  - `failed → failed`
-- إبقاء الوثيقة `ready` أثناء تقدم أو فشل replacement run ما دامت active run القديمة تابعة للوثيقة وحالتها `indexed`.
-- رفض Run التابعة لوثيقة أخرى ورفض active pointer المفقودة أو غير الصالحة.
-- عدم استخدام `latest()` أو أحدث Run ضمنياً لتحديد جاهزية الوثيقة.
-- منع Run مفهرسة وغير مفعّلة من تحويل الوثيقة إلى `ready`.
-- تثبيت `active_processing_run_id + ready` معاً عبر `ProcessingRunActivator` داخل transaction واحدة.
-- ربط `DocumentProcessingDispatcher` و`ProcessDocumentJob` و`ProcessingRunActivator` بالـprojector بدل قرارات الحالة المتفرقة.
-- إضافة اختبارات مستقلة للـprojector وتحديث اختبارات الـJob والـActivator.
+- Forward Migration تضيف `kind`, `started_at`, `indexing_started_at`, `failed_at` مع backfill محدود الذاكرة للـRuns الموجودة.
+- تحديد `initial` و`reprocessing` صراحة عند dispatch، واعتبار `created_at` هو `queued_at`.
+- تسجيل `processing + started_at` عند بدء الـJob بصورة idempotent دون إرجاع retry من `indexing` إلى الخلف.
+- Internal Laravel callback لحدث `indexing_started` فقط، بسر مستقل لاتجاه FastAPI → Laravel.
+- تحقق route/payload IDs والملكية والحالة السابقة، مع transaction وlocking وreplay idempotent يثبت timestamp مرة واحدة.
+- إسقاط الحالة عبر `DocumentStatusProjector`: Initial تصبح `indexing`، وReprocessing تبقي Document `ready` عند وجود active run صالحة.
+- FastAPI callback client بإعدادات typed وtrusted، timeout محدود، bounded retries، ورسائل خطأ لا تسرّب السر.
+- رفض HTTP redirects قبل إرسال السر إلى أي origin آخر.
+- تثبيت الترتيب: parse → normalize → chunk → dense → sparse → callback success → أول Qdrant write → exact count verification.
+- إيقاف المعالجة قبل أول Qdrant write عند فشل callback النهائي.
+- إعادة تحميل وقفل ProcessingRun الفعلية قبل حفظ النتيجة، ومنع الانتقال المباشر `processing → indexed`.
+- الحفاظ على activation وإعادة المعالجة الآمنة دون إدخال سياسة H10.
 
-لم يتم ضمن H8:
+لم يتم ضمن H9:
 
-- Accurate Processing Progress Callback وحقول run kind/stage timestamps المخصصة لـH9.
-- retries / timeouts / generalized idempotency / terminal failure المخصصة لـH10.
+- Queue retries/timeouts/generalized idempotency أو terminal failure finalization المخصصة لـH10.
 - serialized `ai-local` queue والـglobal heavy-resource lock المخصصان لـH11.
 - Documents presentation read contract المخصصة لـH12.
 - Upload/Reprocess/Delete application commands المكتملة للواجهة والمخصصة لـH13.
-- أي Compare/Winner/temporary artifact lifecycle.
+- أي Blade/Livewire UI أو Compare/Winner/temporary artifact lifecycle.
 
 ## Verification
 
 ```text
-PR #88 merged on GitHub: PASS
+PR #89 merged on GitHub: PASS
 Feature commits:
-- d5ff5b47c081ff1c6487061f7d7673c4527fd688
-- d58a73058f2e4aa308e2ad6c80bdaeea41c63d83
-Merge commit: cf27459b091b54e7b33c6e872ef97a653f895c1c
+- bb85b04c81eba77261678fa3142508b8b1423239
+- e30474e6dd4a07caf619d35008f5b9e9873cf166
+- c66f25bca792b56505e49ecad94bb2786b61f1da
+Merge commit: 8072e1d6e26a1d435d33e8fbbde322e31e387ea9
+PR head matched the tested commit: PASS
 main contains the merge commit: PASS
-
-DocumentStatusProjector tests:
-7 passed (22 assertions)
+main tree matches the tested H9 branch tree: PASS
+Independent review: no Critical issues; 2 Important findings fixed
 
 Focused Laravel tests:
-14 passed (84 assertions)
+23 passed (134 assertions)
 
 Laravel full regression:
-86 passed (390 assertions)
+99 passed (450 assertions)
 
 Pint:
-passed (7 H8 files)
+passed (21 changed PHP files)
+
+FastAPI focused tests:
+10 passed
+
+FastAPI full regression:
+153 passed
+
+Ruff:
+passed on affected FastAPI files
+
+git diff --check:
+PASS
 ```
 
 ## المهمة الحالية/التالية
 
 ```text
-H9 — Accurate Processing Progress Callback
+H10 — Queue Retries / Timeouts / Idempotency / Terminal Failure Finalization
 ```
 
 Baseline المهمة التالية:
 
 ```text
-H8 is merged into main and centralizes processing-related Document.status projection.
-Initial processing now projects queued/processing/indexing/failed from the explicitly intended ProcessingRun.
-A valid indexed active run keeps the Document ready while a replacement is processing or failed.
-Activation writes active_processing_run_id + ready together inside the existing transaction.
-Invalid active pointers and cross-document runs are rejected; readiness never falls back to latest run.
-H9 owns truthful processing progress, the authenticated indexing_started callback, run kind, and stage timestamps.
-H10 owns retries, timeouts, generalized idempotency, and terminal failure finalization.
-H11 owns serialized ai-local execution and the global heavy-resource lock.
-H12 owns the frontend-ready dashboard/list/details read contract and capability availability.
-H13 owns stable Upload/Reprocess/Delete commands, authorization, and safe UI errors.
-Phase I must not start before the remaining H9-H13 tasks complete the Frontend Backend Readiness Gate.
-No Compare/Winner/temporary artifact lifecycle exists in the target architecture.
+دُمجت H9 في main عبر PR #89.
+تحفظ ProcessingRun الآن kind ووقت queued عبر created_at وحقلي started_at وindexing_started_at صراحة.
+يمتلك Laravel حالتي processing/indexing ويعرض callback موثوقاً لحدث indexing_started.
+يجب أن يتلقى FastAPI إقرار callback صالحاً قبل أول Qdrant write.
+يعيد Laravel تحميل وقفل الـRun الفعلية قبل حفظ نجاح indexed.
+تسقط المعالجة الأولية indexing على الوثيقة، بينما تبقي reprocessing وثيقة ذات active run صالحة في ready.
+تمتلك H10 queue retries وtimeouts وgeneralized idempotency وتصنيف retryable/terminal وإنهاء الفشل النهائي.
+تمتلك H11 serialized ai-local execution والـglobal heavy-resource lock.
+تمتلك H12 document read models الجاهزة للواجهة وcapability availability.
+تمتلك H13 أوامر Upload/Reprocess/Delete المستقرة والauthorization وأخطاء UI الآمنة.
+لا تبدأ المرحلة I قبل إكمال H10–H13 لبوابة Frontend Backend Readiness.
+لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
 ---

@@ -17,7 +17,7 @@
 > **خطة النشر المرجعية:** Oracle Cloud-only للـ`cloud`، وLocal Demo منفصل للـ`cloud` أو `hybrid_local`  
 > **آخر تحديث معماري:** 2026-09-03
 > **Baseline GitHub التاريخي قبل ARC-1:** `main@a1f28097b398b9bb277f85990a55e489bd54d880`
-> **Baseline التطبيقي النشط:** `main` بعد H8 المدمجة في PR #88؛ H9 هي المهمة الحالية
+> **Baseline التطبيقي النشط:** `main` بعد H9 المدمجة في PR #89؛ H10 هي المهمة الحالية
 
 > [!IMPORTANT]
 > هذه النسخة **تستبدل جميع النسخ المعمارية السابقة كمرجع نشط**.
@@ -62,8 +62,8 @@ Git / Pull Requests
 
 ## 0.3 الـBaseline المدموج والقرار التخطيطي الحالي
 
-تم دمج ARC-1 إلى `main` عبر PR #80، ثم اكتملت مهام orchestration حتى H8 عبر
-PR #88. الفرع التاريخي الذي نفذت عليه ARC-1 هو:
+تم دمج ARC-1 إلى `main` عبر PR #80، ثم اكتملت مهام orchestration حتى H9 عبر
+PR #89. الفرع التاريخي الذي نفذت عليه ARC-1 هو:
 
 ```text
 task/remove-compare-winner-flow
@@ -80,8 +80,8 @@ one trusted profile per ProcessingRun
 ```
 
 تمت إزالة كل ما يخص Upload Compare/Winner/temporary comparison artifacts من
-الـactive architecture والكود المدموج. اكتملت H8، والقرار التخطيطي النشط التالي
-هو إنهاء H9–H13 لإكمال Frontend Backend Readiness Gate قبل بدء المرحلة I.
+الـactive architecture والكود المدموج. اكتملت H9، والقرار التخطيطي النشط التالي
+هو إنهاء H10–H13 لإكمال Frontend Backend Readiness Gate قبل بدء المرحلة I.
 
 ---
 
@@ -584,7 +584,7 @@ created_at
 updated_at
 ```
 
-تضاف `kind` بقيمتي `initial | reprocessing` وحقول توقيت المراحل عبر Forward Migration ضمن H9. ويعامل
+أضيفت `kind` بقيمتي `initial | reprocessing` وحقول توقيت المراحل عبر Forward Migration في H9. ويعامل
 `created_at` كتوقيت دخول المحاولة إلى Queue، بينما تحفظ الحقول الصريحة بداية
 المعالجة والفهرسة والفشل دون محاولة استنتاجها من `updated_at`.
 
