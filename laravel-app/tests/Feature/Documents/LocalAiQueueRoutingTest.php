@@ -9,6 +9,7 @@ use App\Services\Documents\DocumentProcessingDispatcher;
 use App\Services\Documents\DocumentStorageService;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -16,6 +17,24 @@ use Tests\TestCase;
 class LocalAiQueueRoutingTest extends TestCase
 {
     use DatabaseMigrations;
+
+    /**
+     * يعزل اختبارات queue routing عن FastAPI الحقيقي
+     * مع إبقاء capability validation ضمن المسار الفعلي.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::fake([
+            '*/api/v1/capabilities' => Http::response([
+                'available_profiles' => [
+                    ProcessingProfile::Cloud->value,
+                    ProcessingProfile::HybridLocal->value,
+                ],
+            ]),
+        ]);
+    }
 
     public function test_cloud_processing_is_dispatched_to_default_queue(): void
     {

@@ -7,7 +7,6 @@ from app.runtime.state import local_runtime_state
 from app.schemas.capabilities import DeploymentCapabilitiesResponse
 from app.services.capabilities import CapabilitiesService
 
-
 router = APIRouter(prefix="/api/v1")
 
 capabilities_service = CapabilitiesService()
@@ -21,6 +20,6 @@ def capabilities(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> DeploymentCapabilitiesResponse:
     return capabilities_service.build(
-        settings.rag_deployment_mode,
+        settings,
         local_runtime_state.get(),
     )

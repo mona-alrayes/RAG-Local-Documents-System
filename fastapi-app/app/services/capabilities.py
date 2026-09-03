@@ -1,4 +1,6 @@
-from app.core.config import DeploymentMode
+from pydantic import SecretStr
+
+from app.core.config import DeploymentMode, Settings
 from app.runtime.models import LocalRuntimeSnapshot
 from app.schemas.capabilities import (
     DeploymentCapabilitiesResponse,
@@ -6,7 +8,6 @@ from app.schemas.capabilities import (
     ProviderStatus,
 )
 from app.schemas.runtime import LocalRuntimeCapability
-
 
 SHARED_PROVIDERS = (
     "llama_parse",
@@ -26,44 +27,153 @@ HYBRID_LOCAL_PROFILE_PROVIDERS = (
 
 
 class CapabilitiesService:
+    """
+    Builds the current AI processing capabilities.
+
+    supported_profiles تحدد ما يسمح به نوع الـdeployment،
+    بينما available_profiles تحدد ما يمكن تشغيله فعليًا الآن
+    حسب الإعدادات وحالة الـlocal runtime.
+    """
+
     def build(
         self,
-        deployment_mode: DeploymentMode,
+        settings: Settings,
         local_runtime_snapshot: LocalRuntimeSnapshot | None = None,
     ) -> DeploymentCapabilitiesResponse:
-        if deployment_mode is DeploymentMode.CLOUD:
-            return DeploymentCapabilitiesResponse(
-                deployment_mode=deployment_mode,
-                supported_profiles=["cloud"],
-                available_profiles=[],
-                providers=self._providers(
-                    SHARED_PROVIDERS + CLOUD_PROFILE_PROVIDERS,
-                ),
-                local_runtime=None,
+        supported_profiles = self._supported_profiles(
+            settings.rag_deployment_mode,
+        )
+
+        available_profiles = self._available_profiles(
+            settings,
+            local_runtime_snapshot,
+        )
+
+        if settings.rag_deployment_mode is DeploymentMode.CLOUD:
+            provider_names = (
+                SHARED_PROVIDERS + CLOUD_PROFILE_PROVIDERS
+            )
+        else:
+            provider_names = (
+                SHARED_PROVIDERS
+                + CLOUD_PROFILE_PROVIDERS
+                + HYBRID_LOCAL_PROFILE_PROVIDERS
             )
 
         return DeploymentCapabilitiesResponse(
-            deployment_mode=deployment_mode,
-            supported_profiles=["cloud", "hybrid_local"],
-            available_profiles=[],
+            deployment_mode=settings.rag_deployment_mode,
+            supported_profiles=supported_profiles,
+            available_profiles=available_profiles,
             providers=self._providers(
-                SHARED_PROVIDERS
-                + CLOUD_PROFILE_PROVIDERS
-                + HYBRID_LOCAL_PROFILE_PROVIDERS,
-            ),
-            local_runtime=self._local_runtime(
+                provider_names,
+                settings,
                 local_runtime_snapshot,
             ),
+            local_runtime=(
+                None
+                if settings.rag_deployment_mode is DeploymentMode.CLOUD
+                else self._local_runtime(local_runtime_snapshot)
+            ),
         )
+
+    def _supported_profiles(
+        self,
+        deployment_mode: DeploymentMode,
+    ) -> list[str]:
+        """
+        يحدد الـprofiles المدعومة معماريًا حسب deployment mode.
+        """
+
+        if deployment_mode is DeploymentMode.CLOUD:
+            return ["cloud"]
+
+        return ["cloud", "hybrid_local"]
+
+    def _available_profiles(
+        self,
+        settings: Settings,
+        local_runtime_snapshot: LocalRuntimeSnapshot | None,
+    ) -> list[str]:
+        """
+        يحدد الـprofiles القابلة لبدء processing فعليًا الآن.
+        """
+
+        available_profiles: list[str] = []
+
+        shared_parser_available = self._has_secret(
+            settings.llama_cloud_api_key,
+        )
+
+        cloud_embeddings_available = self._has_secret(
+            settings.jinaai_api_key,
+        )
+
+        if (
+            shared_parser_available
+            and cloud_embeddings_available
+        ):
+            available_profiles.append("cloud")
+
+        local_runtime_available = (
+            local_runtime_snapshot is not None
+            and local_runtime_snapshot.ready
+        )
+
+        if (
+            settings.rag_deployment_mode is DeploymentMode.LOCAL
+            and shared_parser_available
+            and local_runtime_available
+        ):
+            available_profiles.append("hybrid_local")
+
+        return available_profiles
 
     def _providers(
         self,
         provider_names: tuple[str, ...],
+        settings: Settings,
+        local_runtime_snapshot: LocalRuntimeSnapshot | None,
     ) -> list[ProviderCapability]:
+        """
+        يبني الحالة المختصرة للـproviders التي يمكن التحقق منها بأمان.
+        """
+
+        llama_parse_status = (
+            ProviderStatus.AVAILABLE
+            if self._has_secret(settings.llama_cloud_api_key)
+            else ProviderStatus.UNAVAILABLE
+        )
+
+        jina_status = (
+            ProviderStatus.AVAILABLE
+            if self._has_secret(settings.jinaai_api_key)
+            else ProviderStatus.UNAVAILABLE
+        )
+
+        local_runtime_status = (
+            ProviderStatus.AVAILABLE
+            if (
+                local_runtime_snapshot is not None
+                and local_runtime_snapshot.ready
+            )
+            else ProviderStatus.UNAVAILABLE
+        )
+
+        status_by_provider = {
+            "llama_parse": llama_parse_status,
+            "jina_embeddings": jina_status,
+            "jina_reranker": jina_status,
+            "bge_m3_embeddings": local_runtime_status,
+            "bge_reranker": local_runtime_status,
+        }
+
         return [
             ProviderCapability(
                 provider=provider_name,
-                status=ProviderStatus.NOT_CHECKED,
+                status=status_by_provider.get(
+                    provider_name,
+                    ProviderStatus.NOT_CHECKED,
+                ),
             )
             for provider_name in provider_names
         ]
@@ -72,6 +182,10 @@ class CapabilitiesService:
         self,
         snapshot: LocalRuntimeSnapshot | None,
     ) -> LocalRuntimeCapability | None:
+        """
+        يحول internal runtime snapshot إلى API capability representation.
+        """
+
         if snapshot is None:
             return None
 
@@ -82,4 +196,14 @@ class CapabilitiesService:
             selected_dtype=snapshot.selected_dtype,
             probe_status=snapshot.probe_status,
             failure_reason=snapshot.failure_reason,
+        )
+
+    def _has_secret(self, secret: SecretStr | None) -> bool:
+        """
+        يتحقق من وجود credential فعلية بدون كشف قيمتها.
+        """
+
+        return (
+            secret is not None
+            and bool(secret.get_secret_value().strip())
         )
