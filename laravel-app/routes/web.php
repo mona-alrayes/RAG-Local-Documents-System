@@ -23,4 +23,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/documents/{document}/download', [DocumentController::class, 'download'])
         ->name('documents.download');
+
+    Route::post(
+        '/documents/{document}/reprocess',
+        [DocumentController::class, 'reprocess'],
+    )->name('documents.reprocess');
+
+    Route::delete(
+        '/documents/{document}',
+        [DocumentController::class, 'destroy'],
+    )->name('documents.destroy');
 });

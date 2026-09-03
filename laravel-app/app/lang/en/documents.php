@@ -46,4 +46,25 @@ return [
             'malformed_or_unsafe' => 'The file is malformed or unsafe and cannot be used.',
         ],
     ],
+    'commands' => [
+        'upload' => [
+            'success' => 'The document was uploaded and processing has started.',
+            'duplicate' => 'This document has already been uploaded.',
+        ],
+        'reprocess' => [
+            'started' => 'Document reprocessing has started.',
+            'no_active_run' => 'This document does not have an active processed version to reprocess.',
+            'invalid_active_run' => 'The document cannot be reprocessed in its current state.',
+            'already_in_progress' => 'Document processing is already in progress.',
+            'profile_unavailable' => 'The requested processing profile is currently unavailable.',
+            'service_unavailable' => 'The processing service is currently unavailable. Please try again later.',
+            'failed' => 'Document reprocessing could not be started.',
+        ],
+        'delete' => [
+            'success' => 'The document was deleted successfully.',
+            'processing_in_progress' => 'The document cannot be deleted while processing is in progress.',
+            'cleanup_failed' => 'The document data could not be cleaned up. Deletion was not completed.',
+            'failed' => 'The document could not be deleted.',
+        ],
+    ],
 ];

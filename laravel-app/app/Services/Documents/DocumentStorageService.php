@@ -176,4 +176,28 @@ class DocumentStorageService
             throw $exception;
         }
     }
+
+    public function delete(Document $document): void
+    {
+        foreach (
+            [
+                self::DOCUMENTS_DISK,
+                self::QUARANTINE_DISK,
+            ] as $diskName
+        ) {
+            $disk = Storage::disk($diskName);
+
+            if (! $disk->exists($document->file_path)) {
+                continue;
+            }
+
+            $deleted = $disk->delete($document->file_path);
+
+            if ($deleted !== true) {
+                throw new RuntimeException(
+                    'Unable to delete document file from private storage.',
+                );
+            }
+        }
+    }
 }

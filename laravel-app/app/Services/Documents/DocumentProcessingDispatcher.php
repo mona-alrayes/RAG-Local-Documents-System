@@ -5,6 +5,7 @@ namespace App\Services\Documents;
 use App\Enums\ProcessingProfile;
 use App\Enums\ProcessingRunKind;
 use App\Enums\ProcessingRunStatus;
+use App\Exceptions\DocumentReprocessingException;
 use App\Jobs\ProcessDocumentJob;
 use App\Models\Document;
 use App\Models\ProcessingRun;
@@ -88,9 +89,7 @@ class DocumentProcessingDispatcher
                 ->findOrFail($document->id);
 
             if ($lockedDocument->active_processing_run_id === null) {
-                throw new LogicException(
-                    'Document must have an active processing run before reprocessing.',
-                );
+                throw DocumentReprocessingException::noActiveRun();
             }
 
             $activeProcessingRun = ProcessingRun::query()
@@ -104,9 +103,7 @@ class DocumentProcessingDispatcher
                 || $activeProcessingRun->status
                 !== ProcessingRunStatus::Indexed
             ) {
-                throw new LogicException(
-                    'Document active processing run is invalid for reprocessing.',
-                );
+                throw DocumentReprocessingException::invalidActiveRun();
             }
 
             $hasProcessingRunInProgress = $lockedDocument
@@ -119,9 +116,7 @@ class DocumentProcessingDispatcher
                 ->exists();
 
             if ($hasProcessingRunInProgress) {
-                throw new LogicException(
-                    'Document reprocessing is already in progress.',
-                );
+                throw DocumentReprocessingException::alreadyInProgress();
             }
 
             $processingRun = $lockedDocument->processingRuns()->create([

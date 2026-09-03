@@ -48,17 +48,23 @@ class DocumentTemporaryUploadFlowTest extends TestCase
 
         $user = User::factory()->create();
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->post('/documents', [
                 'document' => UploadedFile::fake()->createWithContent(
                     'notes.txt',
                     "Temporary document content.\n",
                 ),
                 'processing_profile' => 'cloud',
-            ])
-            ->assertNoContent();
+            ]);
 
         $document = Document::query()->sole();
+
+        $response
+            ->assertRedirectToRoute('documents.show', $document)
+            ->assertSessionHas(
+                'success',
+                __('documents.commands.upload.success'),
+            );
 
         $this->assertSame(
             DocumentStatus::Pending,
@@ -72,7 +78,11 @@ class DocumentTemporaryUploadFlowTest extends TestCase
         );
 
         Queue::assertNotPushed(ProcessDocumentJob::class);
-        $this->assertDatabaseCount('document_processing_runs', 0);
+
+        $this->assertDatabaseCount(
+            'document_processing_runs',
+            0,
+        );
 
         Storage::disk('document_quarantine')
             ->assertExists($document->file_path);
@@ -95,24 +105,32 @@ class DocumentTemporaryUploadFlowTest extends TestCase
 
         $user = User::factory()->create();
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->post('/documents', [
                 'document' => UploadedFile::fake()->createWithContent(
                     'notes.txt',
                     "Direct permanent document content.\n",
                 ),
                 'processing_profile' => 'hybrid_local',
-            ])
-            ->assertNoContent();
+            ]);
 
         $document = Document::query()->sole();
+
+        $response
+            ->assertRedirectToRoute('documents.show', $document)
+            ->assertSessionHas(
+                'success',
+                __('documents.commands.upload.success'),
+            );
 
         $this->assertSame(
             DocumentStatus::Queued,
             $document->status,
         );
 
-        Queue::assertNotPushed(ScanDocumentSecurityJob::class);
+        Queue::assertNotPushed(
+            ScanDocumentSecurityJob::class,
+        );
 
         $processingRun = ProcessingRun::query()->sole();
 

@@ -53,6 +53,16 @@ class DocumentPolicy
     }
 
     /**
+     * Determine whether the user can reprocess the document.
+     *
+     * السماح للمالك بإعادة معالجة الوثيقة.
+     */
+    public function reprocess(User $user, Document $document): bool
+    {
+        return $user->id === $document->user_id;
+    }
+
+    /**
      * Determine whether the user can delete the document.
      *
      * السماح للمالك بحذف الوثيقة.
