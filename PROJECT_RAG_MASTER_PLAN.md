@@ -16,8 +16,8 @@
 > **إستراتيجية LLM:** `Qwen/Qwen3.5-9B` عبر Hugging Face Router في Cloud، و`qwen3.5:4b` عبر Ollama محلياً  
 > **خطة النشر المرجعية:** Oracle Cloud-only للـ`cloud`، وLocal Demo منفصل للـ`cloud` أو `hybrid_local`  
 > **آخر تحديث معماري:** 2026-09-03
-> **Baseline GitHub قبل دمج ARC-1:** `main@a1f28097b398b9bb277f85990a55e489bd54d880`  
-> **Baseline المعماري النشط محلياً:** ARC-1 مكتمل على `task/remove-compare-winner-flow`
+> **Baseline GitHub التاريخي قبل ARC-1:** `main@a1f28097b398b9bb277f85990a55e489bd54d880`
+> **Baseline التطبيقي النشط:** `main` بعد H7 المدمجة في PR #87؛ H8 هي المهمة الحالية
 
 > [!IMPORTANT]
 > هذه النسخة **تستبدل جميع النسخ المعمارية السابقة كمرجع نشط**.
@@ -60,9 +60,10 @@ Git / Pull Requests
 - لا نوسع Scope المهمة بلا قرار موثق.
 - Clean Code وSeparation of Concerns وDependency Inversion مبادئ إلزامية.
 
-## 0.3 آخر تغيير معماري مكتمل
+## 0.3 الـBaseline المدموج والقرار التخطيطي الحالي
 
-تم تنفيذ المبادرة التالية محلياً على فرع واحد متكامل:
+تم دمج ARC-1 إلى `main` عبر PR #80، ثم اكتملت مهام orchestration حتى H7 عبر
+PR #87. الفرع التاريخي الذي نفذت عليه ARC-1 هو:
 
 ```text
 task/remove-compare-winner-flow
@@ -78,9 +79,9 @@ one trusted profile per ProcessingRun
 → document ready
 ```
 
-تمت إزالة كل ما يخص Upload Compare/Winner/temporary comparison artifacts من الـactive architecture والكود المحلي.
-
-لا يفترض هذا الملف أن الفرع دُمج إلى `main` حتى يتم ذلك فعلياً عبر Git/PR.
+تمت إزالة كل ما يخص Upload Compare/Winner/temporary comparison artifacts من
+الـactive architecture والكود المدموج. والقرار التخطيطي النشط التالي هو إنهاء
+H8–H13 كـFrontend Backend Readiness Gate قبل بدء المرحلة I.
 
 ---
 
