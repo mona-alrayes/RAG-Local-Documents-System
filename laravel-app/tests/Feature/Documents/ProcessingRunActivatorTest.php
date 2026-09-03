@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Documents;
 
+use App\Enums\DocumentStatus;
 use App\Enums\ProcessingProfile;
 use App\Enums\ProcessingRunStatus;
 use App\Models\User;
@@ -41,6 +42,11 @@ class ProcessingRunActivatorTest extends TestCase
         $this->assertSame(
             $processingRun->id,
             $document->fresh()->active_processing_run_id,
+        );
+
+        $this->assertSame(
+            DocumentStatus::Ready,
+            $document->fresh()->status,
         );
     }
 
@@ -117,6 +123,11 @@ class ProcessingRunActivatorTest extends TestCase
         $this->assertSame(
             $newRun->id,
             $document->fresh()->active_processing_run_id,
+        );
+
+        $this->assertSame(
+            DocumentStatus::Ready,
+            $document->fresh()->status,
         );
     }
 
