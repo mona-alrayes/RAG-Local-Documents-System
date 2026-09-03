@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, OpenerDirector, Request, build_opener
 
 from app.core.config import Settings
 from app.core.exceptions import ApplicationException
@@ -40,7 +40,15 @@ class ProcessingProgressNotifier(Protocol):
     ) -> None: ...
 
 
+class _RejectRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, *args: Any, **kwargs: Any) -> Request | None:
+        return None
+
+
 class UrllibProcessingProgressTransport:
+    def __init__(self) -> None:
+        self._opener: OpenerDirector = build_opener(_RejectRedirectHandler())
+
     def post_json(
         self,
         *,
@@ -58,7 +66,10 @@ class UrllibProcessingProgressTransport:
         )
 
         try:
-            with urlopen(http_request, timeout=timeout_seconds) as response:
+            with self._opener.open(
+                http_request,
+                timeout=timeout_seconds,
+            ) as response:
                 return CallbackResponse(
                     status_code=response.status,
                     payload=self._decode_payload(response.read()),
@@ -173,7 +184,10 @@ class LaravelProcessingProgressClient:
                     "Processing callback returned an invalid acknowledgement."
                 )
 
-                if 400 <= response.status_code < 500 and response.status_code != 429:
+                if (
+                    300 <= response.status_code < 500
+                    and response.status_code != 429
+                ):
                     break
 
             if attempt < self._max_attempts:

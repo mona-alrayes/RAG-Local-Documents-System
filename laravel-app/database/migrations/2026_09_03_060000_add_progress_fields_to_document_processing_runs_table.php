@@ -21,26 +21,29 @@ return new class extends Migration
             $table->timestamp('failed_at')->nullable()->after('indexed_at');
         });
 
-        $seenDocuments = [];
-
         DB::table('document_processing_runs')
-            ->select(['id', 'document_id'])
-            ->orderBy('id')
-            ->chunkById(500, function ($runs) use (&$seenDocuments): void {
-                foreach ($runs as $run) {
-                    $documentId = (int) $run->document_id;
+            ->select('document_id')
+            ->distinct()
+            ->chunkById(500, function ($documents): void {
+                $documentIds = $documents
+                    ->pluck('document_id')
+                    ->map(static fn ($id): int => (int) $id)
+                    ->all();
 
-                    if (isset($seenDocuments[$documentId])) {
-                        DB::table('document_processing_runs')
-                            ->where('id', $run->id)
-                            ->update([
-                                'kind' => ProcessingRunKind::Reprocessing->value,
-                            ]);
-                    }
+                $initialRunIds = DB::table('document_processing_runs')
+                    ->whereIn('document_id', $documentIds)
+                    ->selectRaw('MIN(id) AS id')
+                    ->groupBy('document_id')
+                    ->pluck('id')
+                    ->all();
 
-                    $seenDocuments[$documentId] = true;
-                }
-            });
+                DB::table('document_processing_runs')
+                    ->whereIn('document_id', $documentIds)
+                    ->whereNotIn('id', $initialRunIds)
+                    ->update([
+                        'kind' => ProcessingRunKind::Reprocessing->value,
+                    ]);
+            }, 'document_id');
     }
 
     public function down(): void

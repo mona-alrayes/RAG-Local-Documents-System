@@ -57,4 +57,59 @@ class ProcessingRunSchemaTest extends TestCase
         $this->assertInstanceOf(CarbonInterface::class, $processingRun->failed_at);
         $this->assertInstanceOf(ProcessingRun::class, $processingRun);
     }
+
+    public function test_existing_runs_are_backfilled_by_document_in_id_order(): void
+    {
+        Storage::fake('documents');
+
+        $user = User::factory()->create();
+        $storage = app(DocumentStorageService::class);
+        $documents = collect([
+            $storage->storePermanent(
+                $user,
+                UploadedFile::fake()->createWithContent(
+                    'first-document.txt',
+                    "First document content.\n",
+                ),
+            ),
+            $storage->storePermanent(
+                $user,
+                UploadedFile::fake()->createWithContent(
+                    'second-document.txt',
+                    "Second document content.\n",
+                ),
+            ),
+        ]);
+
+        foreach ([3, 2] as $documentIndex => $runCount) {
+            for ($runIndex = 0; $runIndex < $runCount; $runIndex++) {
+                $documents[$documentIndex]->processingRuns()->create([
+                    'profile' => ProcessingProfile::Cloud,
+                    'status' => ProcessingRunStatus::Processing,
+                    'kind' => ProcessingRunKind::Initial,
+                    'profile_snapshot' => [],
+                    'stage_timings_ms' => [],
+                ]);
+            }
+        }
+
+        $migration = require database_path(
+            'migrations/2026_09_03_060000_add_progress_fields_to_document_processing_runs_table.php',
+        );
+        $migration->down();
+        $migration->up();
+
+        foreach ($documents as $document) {
+            $runs = ProcessingRun::query()
+                ->where('document_id', $document->id)
+                ->orderBy('id')
+                ->get();
+
+            $this->assertSame(ProcessingRunKind::Initial, $runs->first()->kind);
+
+            $runs->skip(1)->each(function (ProcessingRun $run): void {
+                $this->assertSame(ProcessingRunKind::Reprocessing, $run->kind);
+            });
+        }
+    }
 }
