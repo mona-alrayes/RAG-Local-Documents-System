@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — H7 مكتملة ومدموجة في PR #87؛ H8 هي المهمة الحالية؛ H8–H13 أصبحت بوابة Backend إلزامية قبل المرحلة I
+> **الحالة العامة:** قيد التنفيذ — H8 مكتملة ومدموجة في PR #88؛ H9 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
 
 ---
 
@@ -17,11 +17,12 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 3ff97f46b5286679dbd78425ee9a0b70a7dfe430
-Last Merged Feature PR on main: #87 — feat(H7): add safe reprocessing replacement
-Latest Task PR: #87 — feat(H7): add safe reprocessing replacement
-Verified H7 Feature Commit: 91e8be13eae5a1873fcdb15462d27b84a66d94cb
-Latest Planning Commit on main: 3ff97f46b5286679dbd78425ee9a0b70a7dfe430 — docs: align active planning baseline with merged main
+Verified Main Commit: cf27459b091b54e7b33c6e872ef97a653f895c1c
+Last Merged Feature PR on main: #88 — feat(H8): add aggregate document status projector
+Latest Task PR: #88 — feat(H8): add aggregate document status projector
+Verified H8 Feature Commits: d5ff5b47c081ff1c6487061f7d7673c4527fd688, d58a73058f2e4aa308e2ad6c80bdaeea41c63d83
+Verified H8 Merge Commit: cf27459b091b54e7b33c6e872ef97a653f895c1c
+Latest Planning Commit on main: 82cdd5d7d909315703e69f3c2ebf942a43ae6ac9 — docs: advance active baseline to H9
 
 Current Working Branch: main
 
@@ -29,7 +30,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H7 — Safe Reprocessing Replacement
+H8 — Aggregate Document Status Projector
 
 Current Phase:
 H — Processing Orchestration
@@ -44,22 +45,24 @@ Architectural Result:
 - Reprocessing keeps the old active run usable until the replacement is indexed and switched transactionally.
 - Old-run Qdrant cleanup starts only after a successful active-run switch.
 - Document.status represents current document availability; ProcessingRun.status represents one attempt's progress.
+- DocumentStatusProjector is the central source for processing-related aggregate status decisions.
+- Initial attempts project pending/processing/indexing/failed to queued/processing/indexing/failed.
+- Activation persists active_processing_run_id + ready together inside the existing transaction.
 - Reprocessing progress is displayed separately while the document remains Ready through its valid old active run.
 - v1 progress must be truthful: Queued → Processing → Indexing → Ready/Failed.
 - FastAPI reports indexing_started to an authenticated Laravel internal callback before the first Qdrant write.
 - H8–H13 must finish before phase I so the UI consumes stable read/command contracts instead of reopening Domain/Schema/Internal APIs.
 
 Latest Verification:
-PR #87 merged on GitHub: PASS
-main contains merge commit a31b449989081d58b1230465c995f55c57ddf3e0: PASS
-Focused Laravel tests after Pint: 31 passed (143 assertions)
-Laravel full regression: 79 passed (366 assertions)
-FastAPI focused cleanup tests: 4 passed
-FastAPI full regression: 146 passed
-Pint: passed (8 files; 3 style issues fixed)
+PR #88 merged on GitHub: PASS
+main contains merge commit cf27459b091b54e7b33c6e872ef97a653f895c1c: PASS
+DocumentStatusProjector tests: 7 passed (22 assertions)
+Focused Laravel tests: 14 passed (84 assertions)
+Laravel full regression: 86 passed (390 assertions)
+Pint: passed (7 H8 files)
 
 Current Task:
-H8 — Aggregate Document Status Projector
+H9 — Accurate Processing Progress Callback
 
 Open Blockers: none
 ```
@@ -282,7 +285,7 @@ assert "comparison_report" not in payload
 | H5 Processing metrics / report persistence | DONE |
 | H6 Active-run transaction after successful indexing | DONE |
 | H7 Safe reprocessing replacement | DONE |
-| H8 Aggregate status projector | TODO |
+| H8 Aggregate status projector | DONE |
 | H9 Accurate processing progress callback + run kind/stage timestamps | TODO |
 | H10 Queue retries / timeouts / idempotency / terminal failure finalization | TODO |
 | H11 Serialized `ai-local` queue + global heavy-resource lock | TODO |
@@ -890,32 +893,28 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H7 Safe Reprocessing Replacement
+## آخر مهمة مكتملة — H8 Aggregate Document Status Projector
 
-**الحالة:** `DONE` ومتحقق منها في PR #87 — `feat(H7): add safe reprocessing replacement`، والمدمجة في `main`.
+**الحالة:** `DONE` ومتحقق منها في PR #88 — `feat(H8): add aggregate document status projector`، والمدمجة في `main`.
 
 تم تنفيذ:
 
-- إضافة `dispatchReprocessing()` كمسار صريح ومستقل عن `dispatchInitial()`.
-- اشتراط وجود active run صالحة ومفهرسة قبل إعادة المعالجة.
-- منع إنشاء أكثر من reprocessing run قيد التنفيذ للوثيقة نفسها.
-- إبقاء `active_processing_run_id` القديمة دون تغيير أثناء معالجة البديل.
-- تطوير `ProcessingRunActivator` لدعم التفعيل الأولي والاستبدال الآمن داخل Laravel DB transaction.
-- التحقق أن Run البديلة تابعة للوثيقة وحالتها `Indexed` قبل تحويل المؤشر.
-- إبقاء `Document.status` الحالية دون تغيير أثناء reprocessing كي تبقى النسخة العاملة متاحة.
-- تنفيذ old-run cleanup فقط بعد نجاح transaction وتحويل المؤشر إلى Run الجديدة.
-- إضافة FastAPI internal cleanup endpoint يستخدم scope دقيقاً:
-  - `user_id`
-  - `document_id`
-  - `processing_run_id`
-- اشتقاق Qdrant Collection من Processing Profile الموثوقة وعدم قبول اسم Collection من العميل.
-- التحقق بعد الحذف أن عدد نقاط Run القديمة أصبح صفراً.
-- إضافة Laravel AI client method لاستدعاء cleanup والتحقق من response.
-- إضافة اختبارات تغطي بقاء Run القديمة، فشل البديل، نجاح التحويل، rollback عند Run غير صالحة، وترتيب cleanup بعد switch.
+- إضافة `DocumentStatusProjector` كمصدر مركزي لقرارات حالة الوثيقة المرتبطة بالمعالجة.
+- إسقاط حالة أول معالجة من Run المقصودة صراحةً:
+  - `pending → queued`
+  - `processing → processing`
+  - `indexing → indexing`
+  - `failed → failed`
+- إبقاء الوثيقة `ready` أثناء تقدم أو فشل replacement run ما دامت active run القديمة تابعة للوثيقة وحالتها `indexed`.
+- رفض Run التابعة لوثيقة أخرى ورفض active pointer المفقودة أو غير الصالحة.
+- عدم استخدام `latest()` أو أحدث Run ضمنياً لتحديد جاهزية الوثيقة.
+- منع Run مفهرسة وغير مفعّلة من تحويل الوثيقة إلى `ready`.
+- تثبيت `active_processing_run_id + ready` معاً عبر `ProcessingRunActivator` داخل transaction واحدة.
+- ربط `DocumentProcessingDispatcher` و`ProcessDocumentJob` و`ProcessingRunActivator` بالـprojector بدل قرارات الحالة المتفرقة.
+- إضافة اختبارات مستقلة للـprojector وتحديث اختبارات الـJob والـActivator.
 
-لم يتم ضمن H7:
+لم يتم ضمن H8:
 
-- Aggregate Document Status Projector وتحويل الحالة المجمعة إلى `Ready` المخصصان لـH8.
 - Accurate Processing Progress Callback وحقول run kind/stage timestamps المخصصة لـH9.
 - retries / timeouts / generalized idempotency / terminal failure المخصصة لـH10.
 - serialized `ai-local` queue والـglobal heavy-resource lock المخصصان لـH11.
@@ -926,47 +925,46 @@ polling + completed-answer visual reveal
 ## Verification
 
 ```text
-PR #87 merged on GitHub: PASS
-Feature commit: 91e8be13eae5a1873fcdb15462d27b84a66d94cb
-Merge commit: a31b449989081d58b1230465c995f55c57ddf3e0
+PR #88 merged on GitHub: PASS
+Feature commits:
+- d5ff5b47c081ff1c6487061f7d7673c4527fd688
+- d58a73058f2e4aa308e2ad6c80bdaeea41c63d83
+Merge commit: cf27459b091b54e7b33c6e872ef97a653f895c1c
 main contains the merge commit: PASS
 
-Focused Laravel tests after Pint:
-31 passed (143 assertions)
+DocumentStatusProjector tests:
+7 passed (22 assertions)
+
+Focused Laravel tests:
+14 passed (84 assertions)
 
 Laravel full regression:
-79 passed (366 assertions)
-
-FastAPI focused cleanup tests:
-4 passed
-
-FastAPI full regression:
-146 passed
+86 passed (390 assertions)
 
 Pint:
-passed (8 files; 3 style issues fixed)
+passed (7 H8 files)
 ```
 
 ## المهمة الحالية/التالية
 
 ```text
-H8 — Aggregate Document Status Projector
+H9 — Accurate Processing Progress Callback
 ```
 
 Baseline المهمة التالية:
 
 ```text
-H7 is merged into main and safely replaces an existing active ProcessingRun only after the replacement is fully indexed.
-The old active run remains usable while the replacement is processing or when it fails.
-Old-run Qdrant cleanup starts only after the transactional active-run switch succeeds.
-Document.status represents availability; ProcessingRun.status represents one attempt's progress.
-H8 owns aggregate Document status projection and the transactional transition to Ready.
+H8 is merged into main and centralizes processing-related Document.status projection.
+Initial processing now projects queued/processing/indexing/failed from the explicitly intended ProcessingRun.
+A valid indexed active run keeps the Document ready while a replacement is processing or failed.
+Activation writes active_processing_run_id + ready together inside the existing transaction.
+Invalid active pointers and cross-document runs are rejected; readiness never falls back to latest run.
 H9 owns truthful processing progress, the authenticated indexing_started callback, run kind, and stage timestamps.
 H10 owns retries, timeouts, generalized idempotency, and terminal failure finalization.
 H11 owns serialized ai-local execution and the global heavy-resource lock.
 H12 owns the frontend-ready dashboard/list/details read contract and capability availability.
 H13 owns stable Upload/Reprocess/Delete commands, authorization, and safe UI errors.
-Phase I must not start before H8-H13 pass the Frontend Backend Readiness Gate.
+Phase I must not start before the remaining H9-H13 tasks complete the Frontend Backend Readiness Gate.
 No Compare/Winner/temporary artifact lifecycle exists in the target architecture.
 ```
 
