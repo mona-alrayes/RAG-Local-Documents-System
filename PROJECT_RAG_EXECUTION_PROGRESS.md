@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — H12 مكتملة ومدموجة في PR #92؛ H13 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
+> **الحالة العامة:** قيد التنفيذ — H13 مكتملة ومدموجة في PR #93؛ اكتملت بوابة Backend H8–H13؛ I1 هي المهمة الحالية
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: abda4d358f027213556c9cedb6a7b45984a57f50
-Last Merged Feature PR on main: #92 — H12 Documents Presentation Read Model / Polling / Capability Availability
-Latest Task PR: #92 — H12 Documents Presentation Read Model / Polling / Capability Availability
-Verified H12 Feature Commit:
-- cabd2c5bfb5f016ff12eb838fd228fd1e114c236 — H12 documents presentation read model and capability availability
-Verified H12 Merge Commit: abda4d358f027213556c9cedb6a7b45984a57f50
-Documentation Baseline: تم تسجيل اكتمال H12 وتسليم H13 كمهمة حالية.
+Verified Main Commit: 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf
+Last Merged Feature PR on main: #93 — H13 Documents Application Commands
+Latest Task PR: #93 — H13 Documents Application Commands
+Verified H13 Feature Commit:
+- cacea37958a84d1efcdce65877bf1ad19fd92ca9 — H13 document application commands
+Verified H13 Merge Commit: 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf
+Documentation Baseline: تم تسجيل اكتمال H13 وإغلاق Frontend Backend Readiness Gate وتسليم I1 كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,10 +31,10 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H12 — Documents Presentation Read Model / Polling / Capability Availability
+H13 — Documents Application Commands
 
 Current Phase:
-H — Processing Orchestration
+I — Blade Documents Experience
 
 Architectural Result:
 - كل ProcessingRun تستخدم Processing Profile واحدة موثوقة: cloud | hybrid_local.
@@ -75,20 +75,24 @@ Architectural Result:
 - في Cloud تتطلب `cloud` وجود LlamaParse وJina credentials، وفي Local لا تتاح `hybrid_local` إلا مع LlamaParse وruntime محلي `ready`؛ وتعرض provider availability دون كشف secrets.
 - تبقى Ready document والـactive indexed run القديمة صالحة عند تعذر بدء reprocessing بسبب capability، كما تبقى محفوظة عند فشل reprocessing وفق H10/H12 presentation semantics.
 - أضيف localization عربي/إنكليزي لحالات Document availability وProcessingRun status/kind/profile ورسالة الفشل الآمنة وSecure Upload validation.
-- يجب إكمال H13 قبل المرحلة I حتى تستهلك الواجهة عقود Backend مستقرة.
+- ثبت H13 عقد Upload للواجهة عبر redirect ورسائل localized آمنة، وأضاف Reprocess/Delete application commands محمية بالـownership وIDOR checks.
+- Reprocess يعيد استخدام orchestration الموجود مسبقًا، ويرفض الطلب دون active indexed run أو عند وجود محاولة جارية، ويفشل مغلقًا عند عدم توفر Profile المطلوبة.
+- Delete يرفض الحذف أثناء `pending/processing/indexing`، وينظف Qdrant اعتمادًا على ProcessingRun data الموثوقة Server-side، ثم permanent/quarantine private storage، ثم processing runs والوثيقة بترتيب آمن.
+- تحول أخطاء business/application عند HTTP boundary إلى رسائل UI آمنة بدل كشف تفاصيل داخلية.
+- اكتملت H8–H13 وأصبحت عقود القراءة والأوامر جاهزة لتبدأ المرحلة I دون إعادة تعريف Business State داخل الواجهة.
 
 Latest Verification:
-PR #92 merged on GitHub: PASS
-PR head commit: cabd2c5bfb5f016ff12eb838fd228fd1e114c236
-PR merge commit: abda4d358f027213556c9cedb6a7b45984a57f50
-main verified at H12 merge commit abda4d358f027213556c9cedb6a7b45984a57f50 before this progress update: PASS
-Laravel full regression reported in PR #92: 131 passed (614 assertions)
-FastAPI full regression reported in PR #92: 157 passed
+PR #93 merged on GitHub: PASS
+PR head commit: cacea37958a84d1efcdce65877bf1ad19fd92ca9
+PR merge commit: 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf
+main verified at H13 merge commit 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf before this progress update: PASS
+H13 focused tests: 23 passed (152 assertions)
+Laravel full regression: 140 passed (679 assertions)
 Laravel Pint: PASS
-FastAPI Ruff: All checks passed
+FastAPI: لم يتم تعديل FastAPI في H13، ولم يُسجل FastAPI regression ضمن هذه المهمة.
 
 Current Task:
-H13 — Upload / reprocess / delete application commands and authorization
+I1 — Responsive app shell / sidebar
 
 Open Blockers: none
 ```
@@ -316,7 +320,7 @@ assert "comparison_report" not in payload
 | H10 Queue retries / timeouts / idempotency / terminal failure finalization | DONE |
 | H11 Serialized `ai-local` queue + global heavy-resource lock | DONE |
 | H12 Documents presentation read model / polling / capability availability | DONE |
-| H13 Upload / reprocess / delete application commands and authorization | TODO |
+| H13 Upload / reprocess / delete application commands and authorization | DONE |
 
 **معيار انتهاء المرحلة:**
 
@@ -496,12 +500,47 @@ Pint: PASS
 
 ### H13 — Documents application commands
 
-- تثبيت Upload response/redirect contract الذي تستهلكه I4.
-- Reprocess route/request/policy/action تستخدم H7 وتتحقق من ownership وactive run وعدم وجود محاولة جارية وتوفر Profile.
-- Delete route/request/policy وDocumentDeletionService بترتيب external cleanup صريح.
-- منع Delete Server-side عند وجود Run `pending/processing/indexing` لتجنب Queue/Qdrant/file/DB race.
-- تحويل Domain errors إلى رسائل ثابتة وآمنة للواجهة.
-- اختبارات ownership/IDOR/concurrency/unavailable profile/cleanup ordering.
+**الحالة:** `DONE` ومتحقق منها في PR #93 والمدمجة في `main`.
+
+تم تنفيذ:
+
+- تثبيت عقد Upload المناسب للواجهة ليعيد redirect ثابتًا إلى صفحة الوثيقة مع رسائل localized آمنة، بما في ذلك حالة duplicate دون كشف بيانات داخلية.
+- إضافة Reprocess application command مع ownership authorization عبر Policy/FormRequest.
+- الاعتماد على orchestration الموجود مسبقًا لإعادة المعالجة بدل إنشاء مسار موازٍ.
+- منع إعادة المعالجة إذا لم توجد active indexed processing run صالحة.
+- منع concurrent processing/reprocessing attempts على الوثيقة.
+- fail-closed عندما تكون Processing Profile المطلوبة غير متاحة.
+- إضافة Delete application command مع ownership authorization وحماية IDOR.
+- منع حذف الوثيقة Server-side أثناء `Pending / Processing / Indexing`.
+- تنظيف Qdrant لكل ProcessingRun باستخدام `user_id/document_id/processing_run_id/profile` المشتقة من بيانات موثوقة على السيرفر.
+- تنظيف permanent وquarantine private storage عبر `DocumentStorageService`.
+- إزالة active run pointer ثم حذف processing runs والوثيقة بترتيب آمن بعد نجاح external cleanup.
+- إيقاف الحذف عند فشل Qdrant أو storage cleanup بدل ترك حذف جزئي مخفي.
+- تحويل أخطاء business/application إلى رسائل UI ثابتة وآمنة عند HTTP boundary.
+- تحديث اختبارات Upload القديمة لتتوافق مع عقد redirect الجديد.
+- إضافة focused Feature tests لأوامر Reprocess وDelete تشمل ownership/IDOR/concurrency/unavailable profile/cleanup ordering.
+
+Verification المثبت لـH13:
+
+```text
+PR #93 merged on GitHub: PASS
+Feature commit:
+- cacea37958a84d1efcdce65877bf1ad19fd92ca9
+Merge commit:
+- 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf
+
+Focused H13 tests:
+23 passed (152 assertions)
+
+Laravel full regression:
+140 passed (679 assertions)
+
+Laravel Pint:
+PASS
+
+FastAPI:
+لم يتم تعديل FastAPI في H13، ولم يُسجل FastAPI regression ضمن هذه المهمة.
+```
 
 ## I — Blade Documents Experience
 
@@ -945,52 +984,7 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## المهمة السابقة المكتملة — H11 Serialized `ai-local` Queue + Global Heavy-Resource Lock
-
-**الحالة:** `DONE` ومتحقق منها في PR #91 — `feat(H11): serialize local AI processing with shared resource lock`، والمدمجة في `main`.
-
-تم تنفيذ:
-
-- تخصيص Queue مستقلة باسم `ai-local` لمعالجة `hybrid_local`، مع بقاء Cloud processing على الـdefault queue.
-- تشغيل `ai-local` بشكل serialized عبر Worker واحد و`concurrency = 1`.
-- إعادة استخدام `LocalHeavyResourceLock` الحالي بدل إنشاء Lock جديد.
-- مشاركة نفس Redis global heavy-resource lock بين ClamAV وHybrid Local AI.
-- تطبيق bounded acquisition للـLocal AI لمنع الانتظار غير المحدود.
-- اعتبار lock contention حالة Retryable ضمن سياسة retries الحالية.
-- الحفاظ على نفس `processing_run_id` ونفس Processing Profile أثناء retry دون إنشاء Run بديلة.
-- تحرير الـlock بأمان داخل `finally` بعد استدعاء FastAPI.
-- عدم وجود silent fallback من Local إلى Cloud.
-- الحفاظ على H10 reliability contract دون تغيير: `tries = 3`، backoff `15s, 60s`، FastAPI process timeout = `300s`، Job/worker timeout = `330s`، Redis `retry_after = 360s`.
-
-لم يتم ضمن H11:
-
-- Documents presentation read contract المخصصة لـH12.
-- Upload/Reprocess/Delete application commands المكتملة للواجهة والمخصصة لـH13.
-- أي Blade/Livewire UI أو Compare/Winner/temporary artifact lifecycle.
-- أي تعديل على FastAPI production code؛ لذلك لم تكن هناك حاجة إلى pytest/Ruff لهذه المهمة.
-
-### Verification H11
-
-```text
-PR #91 merged on GitHub: PASS
-Feature commit:
-- 5d68f21e3db921a045606ff0060a32999c6c587a
-Merge commit: 766322491ee4701c90bb6bb3cf4b5ec00a1c739d
-
-H11 focused tests:
-10 passed (56 assertions)
-
-H10 / C1 compatibility tests:
-18 passed (161 assertions)
-
-Laravel full regression:
-127 passed (602 assertions)
-
-Laravel Pint:
-PASS
-```
-
-## آخر مهمة مكتملة — H12 Documents Presentation Read Model / Polling / Capability Availability
+## المهمة السابقة المكتملة — H12 Documents Presentation Read Model / Polling / Capability Availability
 
 **الحالة:** `DONE` ومتحقق منها في PR #92، والمدمجة في `main` عند merge commit `abda4d358f027213556c9cedb6a7b45984a57f50`.
 
@@ -1030,24 +1024,58 @@ Ruff:
 All checks passed
 ```
 
+## آخر مهمة مكتملة — H13 Documents Application Commands
+
+**الحالة:** `DONE` ومتحقق منها في PR #93، والمدمجة في `main` عند merge commit `2cf17e21b9d2a1eb80918788841c375aeb1a6ebf`.
+
+تم تنفيذ:
+
+- تثبيت Upload contract المناسب للواجهة مع redirect إلى صفحة الوثيقة ورسائل localized آمنة، وحالة duplicate لا تكشف تفاصيل داخلية.
+- إضافة Reprocess application command محمي بالـownership authorization ويعيد استخدام `DocumentProcessingDispatcher` وsafe reprocessing orchestration الموجود مسبقًا.
+- رفض Reprocess دون active indexed processing run صالحة، أو عند وجود محاولة `pending/processing/indexing` جارية، أو عندما تكون Processing Profile المطلوبة غير متاحة.
+- إضافة Delete application command مع ownership / IDOR protection.
+- منع Delete أثناء وجود ProcessingRun بحالة `Pending / Processing / Indexing` لتجنب races مع Queue/Qdrant/storage/DB.
+- تنظيف Qdrant لكل Run باستخدام ProcessingRun data الموثوقة Server-side بدل مدخلات Browser.
+- تنظيف permanent/quarantine private storage عبر storage service.
+- إزالة active pointer وحذف processing runs ثم الوثيقة بترتيب آمن بعد نجاح external cleanup.
+- تحويل أخطاء business/application عند HTTP boundary إلى رسائل UI localized وآمنة.
+- تحديث اختبارات Upload القديمة لعقد redirect الجديد وإضافة focused Feature tests لـReprocess وDelete.
+
+### Verification H13
+
+```text
+PR #93 merged on GitHub: PASS
+Feature commit:
+- cacea37958a84d1efcdce65877bf1ad19fd92ca9
+Merge commit:
+- 2cf17e21b9d2a1eb80918788841c375aeb1a6ebf
+
+Focused H13 tests:
+23 passed (152 assertions)
+
+Laravel full regression:
+140 passed (679 assertions)
+
+Laravel Pint:
+PASS
+
+FastAPI:
+لم يتم تعديل FastAPI في H13، ولم يُسجل FastAPI regression ضمن هذه المهمة.
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-H13 — Upload / reprocess / delete application commands and authorization
+I1 — Responsive app shell / sidebar
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت H12 في main عبر PR #92.
-أصبحت Documents presentation read models تفصل document availability عن processing attempt status.
-active_run تمثل النسخة المفهرسة الحالية، وlatest_attempt تمثل أحدث محاولة وتظهر مستقلة أثناء reprocessing أو الفشل.
-أصبح dashboard/list/detail query contract user-scoped وجاهزًا للواجهة، مع polling hints وallowed actions وsafe timeline data.
-أصبح FastAPI capabilities يميز supported_profiles عن available_profiles الفعلية حسب credentials/runtime.
-أصبح Laravel يرفض بدء Initial/Reprocessing إذا لم تكن Profile متاحة أو كان capability response غير صالح، قبل إنشاء أي Run أو تعديل حالة الوثيقة.
-تبقى Ready document والـactive run الصالحة محفوظتين عند رفض reprocessing بسبب capability أو عند فشل replacement وفق lifecycle الحالي.
-تمتلك H13 أوامر Upload/Reprocess/Delete المستقرة والauthorization وأخطاء UI الآمنة.
-لا تبدأ المرحلة I قبل إكمال H13 لبوابة Frontend Backend Readiness.
+دُمجت H13 في main عبر PR #93 واكتملت Frontend Backend Readiness Gate في H8–H13.
+أصبحت عقود Documents read/polling/capabilities في H12 وأوامر Upload/Reprocess/Delete في H13 مستقرة وجاهزة للاستهلاك من Blade/Livewire.
+تبدأ المرحلة I بالمهمة I1 — Responsive app shell / sidebar كما تحدد خريطة المهام في PROJECT_RAG_MASTER_PLAN.md.
+المرحلة I تستهلك عقود H12/H13 ولا تعيد تعريف Document/ProcessingRun business state داخل Blade أو JavaScript.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
