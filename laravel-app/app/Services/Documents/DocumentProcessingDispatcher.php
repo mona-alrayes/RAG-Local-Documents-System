@@ -8,15 +8,24 @@ use App\Enums\ProcessingRunStatus;
 use App\Jobs\ProcessDocumentJob;
 use App\Models\Document;
 use App\Models\ProcessingRun;
+use App\Services\Ai\ProcessingCapabilityService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use LogicException;
 use RuntimeException;
 
+/**
+ * Dispatches initial processing and reprocessing attempts.
+ *
+ * قبل إنشاء أي ProcessingRun يتم التأكد أن الـprocessing profile
+ * متاح حاليًا لدى AI service. إذا فشل capability lookup أو كان
+ * الـprofile غير متاح، يتم الرفض بدون تعديل حالة الوثيقة أو إنشاء run جديدة.
+ */
 class DocumentProcessingDispatcher
 {
     public function __construct(
         private readonly DocumentStatusProjector $documentStatusProjector,
+        private readonly ProcessingCapabilityService $processingCapabilityService,
     ) {}
 
     public function dispatchInitial(
@@ -28,6 +37,8 @@ class DocumentProcessingDispatcher
                 'Document must exist in permanent private storage before processing.',
             );
         }
+
+        $this->processingCapabilityService->assertAvailable($profile);
 
         return DB::transaction(function () use ($document, $profile): ProcessingRun {
             $lockedDocument = Document::query()
@@ -68,6 +79,8 @@ class DocumentProcessingDispatcher
                 'Document must exist in permanent private storage before reprocessing.',
             );
         }
+
+        $this->processingCapabilityService->assertAvailable($profile);
 
         return DB::transaction(function () use ($document, $profile): ProcessingRun {
             $lockedDocument = Document::query()

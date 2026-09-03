@@ -12,6 +12,7 @@ use App\Models\ProcessingRun;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -19,6 +20,24 @@ use Tests\TestCase;
 class DocumentTemporaryUploadFlowTest extends TestCase
 {
     use DatabaseMigrations;
+
+    /**
+     * يعزل upload flow عن FastAPI الحقيقي عندما يصل المسار
+     * إلى dispatchInitial مباشرة بعد تعطيل security scan.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::fake([
+            '*/api/v1/capabilities' => Http::response([
+                'available_profiles' => [
+                    ProcessingProfile::Cloud->value,
+                    ProcessingProfile::HybridLocal->value,
+                ],
+            ]),
+        ]);
+    }
 
     public function test_valid_upload_is_stored_in_private_quarantine_only(): void
     {
@@ -97,11 +116,16 @@ class DocumentTemporaryUploadFlowTest extends TestCase
 
         $processingRun = ProcessingRun::query()->sole();
 
-        $this->assertSame($document->id, $processingRun->document_id);
+        $this->assertSame(
+            $document->id,
+            $processingRun->document_id,
+        );
+
         $this->assertSame(
             ProcessingProfile::HybridLocal,
             $processingRun->profile,
         );
+
         $this->assertSame(
             ProcessingRunStatus::Pending,
             $processingRun->status,

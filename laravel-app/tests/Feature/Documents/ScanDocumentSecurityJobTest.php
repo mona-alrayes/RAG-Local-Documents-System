@@ -16,6 +16,7 @@ use App\Services\Documents\DocumentStorageService;
 use App\Services\Documents\DocumentUploadService;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Mockery\MockInterface;
@@ -24,6 +25,24 @@ use Tests\TestCase;
 class ScanDocumentSecurityJobTest extends TestCase
 {
     use DatabaseMigrations;
+
+    /**
+     * يعزل مسار security scan عن FastAPI الحقيقي عندما تنتقل
+     * الوثيقة النظيفة إلى processing بعد نجاح الفحص.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::fake([
+            '*/api/v1/capabilities' => Http::response([
+                'available_profiles' => [
+                    ProcessingProfile::Cloud->value,
+                    ProcessingProfile::HybridLocal->value,
+                ],
+            ]),
+        ]);
+    }
 
     public function test_clean_scan_updates_status_and_promotes_document(): void
     {
@@ -94,7 +113,11 @@ class ScanDocumentSecurityJobTest extends TestCase
 
         $processingRun = ProcessingRun::query()->sole();
 
-        $this->assertSame(ProcessingProfile::Cloud, $processingRun->profile);
+        $this->assertSame(
+            ProcessingProfile::Cloud,
+            $processingRun->profile,
+        );
+
         $this->assertSame(
             ProcessingRunStatus::Pending,
             $processingRun->status,
@@ -164,7 +187,11 @@ class ScanDocumentSecurityJobTest extends TestCase
         Storage::disk('documents')
             ->assertMissing($document->file_path);
 
-        $this->assertDatabaseCount('document_processing_runs', 0);
+        $this->assertDatabaseCount(
+            'document_processing_runs',
+            0,
+        );
+
         Queue::assertNotPushed(ProcessDocumentJob::class);
     }
 }

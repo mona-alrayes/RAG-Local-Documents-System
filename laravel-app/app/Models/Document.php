@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Represents a document owned by a user.
@@ -61,7 +62,6 @@ class Document extends Model
         return $this->hasMany(ProcessingRun::class);
     }
 
-
     /**
      * Get the currently active indexed processing run for this document.
      */
@@ -71,5 +71,13 @@ class Document extends Model
             ProcessingRun::class,
             'active_processing_run_id',
         );
+    }
+
+    /**
+     * Get the latest processing attempt for this document.
+     */
+    public function latestAttempt(): HasOne
+    {
+        return $this->hasOne(ProcessingRun::class)->latestOfMany();
     }
 }

@@ -7,15 +7,37 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Http\UploadedFile;
 use ZipArchive;
 
+/**
+ * Validates uploaded documents before they enter the processing pipeline.
+ *
+ * هذا الـRule مسؤول عن التحقق الأمني الأولي للملفات المرفوعة.
+ *
+ * يتحقق من:
+ * - صحة عملية الرفع.
+ * - أمان اسم الملف.
+ * - الامتداد وMIME type.
+ * - بنية PDF وDOCX وTXT.
+ * - حماية DOCX من archive path traversal والملفات المضغوطة الضخمة.
+ *
+ * الهدف هو رفض الملفات غير المدعومة أو المشبوهة قبل تخزينها ومعالجتها.
+ */
 class SecureDocumentUpload implements ValidationRule
 {
+    /**
+     * Validate the uploaded document.
+     *
+     * ينفذ سلسلة التحقق الرئيسية، ثم يستدعي validator مناسب
+     * حسب نوع الملف: PDF أو DOCX أو TXT.
+     */
     public function validate(
         string $attribute,
         mixed $value,
         Closure $fail,
     ): void {
         if (! $value instanceof UploadedFile || ! $value->isValid()) {
-            $fail('The :attribute must be a valid uploaded file.');
+            $fail(
+                'documents.validation.secure_upload.invalid_file'
+            )->translate();
 
             return;
         }
@@ -30,7 +52,9 @@ class SecureDocumentUpload implements ValidationRule
             $originalPath !== $originalName
             || ! $this->hasSafeOriginalName($originalName)
         ) {
-            $fail('The :attribute filename is unsafe.');
+            $fail(
+                'documents.validation.secure_upload.unsafe_filename'
+            )->translate();
 
             return;
         }
@@ -40,7 +64,9 @@ class SecureDocumentUpload implements ValidationRule
         $allowedMimeTypes = $allowedTypes[$extension] ?? null;
 
         if (! is_array($allowedMimeTypes)) {
-            $fail('The :attribute type is not supported.');
+            $fail(
+                'documents.validation.secure_upload.unsupported_type'
+            )->translate();
 
             return;
         }
@@ -51,7 +77,9 @@ class SecureDocumentUpload implements ValidationRule
             ! is_string($mimeType)
             || ! in_array($mimeType, $allowedMimeTypes, true)
         ) {
-            $fail('The :attribute content does not match its extension.');
+            $fail(
+                'documents.validation.secure_upload.content_mismatch'
+            )->translate();
 
             return;
         }
@@ -59,7 +87,9 @@ class SecureDocumentUpload implements ValidationRule
         $path = $value->getRealPath();
 
         if (! is_string($path)) {
-            $fail('The :attribute could not be inspected.');
+            $fail(
+                'documents.validation.secure_upload.inspection_failed'
+            )->translate();
 
             return;
         }
@@ -72,10 +102,18 @@ class SecureDocumentUpload implements ValidationRule
         };
 
         if (! $isValid) {
-            $fail('The :attribute is malformed or unsafe.');
+            $fail(
+                'documents.validation.secure_upload.malformed_or_unsafe'
+            )->translate();
         }
     }
 
+    /**
+     * Check whether the original filename is safe and supported.
+     *
+     * يمنع أسماء الملفات غير الصالحة أو التي تحتوي مسارات خطرة،
+     * ويتأكد أن الامتداد موجود ضمن الأنواع المسموحة في config.
+     */
     private function hasSafeOriginalName(string $originalName): bool
     {
         $maxLength = (int) config(
@@ -126,6 +164,11 @@ class SecureDocumentUpload implements ValidationRule
         return preg_match($pattern, $originalName) === 1;
     }
 
+    /**
+     * Perform a basic structural validation for PDF files.
+     *
+     * يتحقق أن المحتوى يبدأ بتوقيع PDF ويحتوي علامة نهاية الملف.
+     */
     private function isValidPdf(string $path): bool
     {
         $content = file_get_contents($path);
@@ -138,6 +181,12 @@ class SecureDocumentUpload implements ValidationRule
             && str_contains($content, '%%EOF');
     }
 
+    /**
+     * Validate the basic structure and safety limits of a DOCX archive.
+     *
+     * بما أن DOCX هو ZIP archive، يتم التحقق من الملفات الأساسية داخله،
+     * عدد entries، الحجم بعد فك الضغط، وعدم وجود مسارات خطرة.
+     */
     private function isValidDocx(string $path): bool
     {
         $zip = new ZipArchive;
@@ -206,6 +255,12 @@ class SecureDocumentUpload implements ValidationRule
         }
     }
 
+    /**
+     * Detect unsafe paths inside ZIP/DOCX archives.
+     *
+     * يمنع absolute paths وWindows drive paths واستخدام ".."
+     * لتجنب archive path traversal.
+     */
     private function hasUnsafeArchivePath(string $entryName): bool
     {
         return str_starts_with($entryName, '/')
@@ -218,6 +273,12 @@ class SecureDocumentUpload implements ValidationRule
             );
     }
 
+    /**
+     * Validate TXT content and reject disguised binary documents.
+     *
+     * يتحقق أن الملف UTF-8 نصي ولا يحتوي null bytes،
+     * كما يرفض الملفات التي تبدو PDF أو ZIP/DOCX متنكرة بامتداد TXT.
+     */
     private function isValidText(string $path): bool
     {
         $content = file_get_contents($path);
