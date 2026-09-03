@@ -16,20 +16,27 @@ class DocumentSha256DuplicateTest extends TestCase
     public function test_upload_stores_sha256_calculated_from_stored_content(): void
     {
         Storage::fake('document_quarantine');
+
         $user = User::factory()->create();
         $content = "SHA-256 document content.\n";
 
-        $this->actingAs($user)
-            ->postJson('/documents', [
+        $response = $this->actingAs($user)
+            ->post('/documents', [
                 'document' => UploadedFile::fake()->createWithContent(
                     'report.txt',
                     $content,
                 ),
                 'processing_profile' => 'cloud',
-            ])
-            ->assertNoContent();
+            ]);
 
         $document = Document::query()->sole();
+
+        $response
+            ->assertRedirectToRoute('documents.show', $document)
+            ->assertSessionHas(
+                'success',
+                __('documents.commands.upload.success'),
+            );
 
         $this->assertSame(
             hash('sha256', $content),
@@ -40,48 +47,50 @@ class DocumentSha256DuplicateTest extends TestCase
             ->assertExists($document->file_path);
     }
 
-    public function test_duplicate_content_for_same_user_is_rejected_and_new_file_is_removed(): void
+    public function test_duplicate_content_for_same_user_redirects_to_existing_document_and_new_file_is_removed(): void
     {
         Storage::fake('document_quarantine');
+
         $user = User::factory()->create();
         $content = "Same document content.\n";
 
-        $this->actingAs($user)
-            ->postJson('/documents', [
+        $firstResponse = $this->actingAs($user)
+            ->post('/documents', [
                 'document' => UploadedFile::fake()->createWithContent(
                     'original.txt',
                     $content,
                 ),
                 'processing_profile' => 'cloud',
-            ])
-            ->assertNoContent();
+            ]);
 
         $original = Document::query()->sole();
 
+        $firstResponse
+            ->assertRedirectToRoute('documents.show', $original)
+            ->assertSessionHas(
+                'success',
+                __('documents.commands.upload.success'),
+            );
+
         $this->actingAs($user)
-            ->postJson('/documents', [
+            ->post('/documents', [
                 'document' => UploadedFile::fake()->createWithContent(
                     'renamed-copy.txt',
                     $content,
                 ),
                 'processing_profile' => 'cloud',
             ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('document')
-            ->assertJsonPath(
-                'duplicate_document.id',
-                $original->id,
-            )
-            ->assertJsonPath(
-                'duplicate_document.original_name',
-                'original.txt',
+            ->assertRedirectToRoute('documents.show', $original)
+            ->assertSessionHas(
+                'warning',
+                __('documents.commands.upload.duplicate'),
             );
 
         $this->assertDatabaseCount('documents', 1);
 
         $this->assertCount(
             1,
-            Storage::disk('document_quarantine')->allFiles()
+            Storage::disk('document_quarantine')->allFiles(),
         );
 
         Storage::disk('document_quarantine')

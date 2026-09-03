@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Documents;
 
+use App\Models\Document;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -25,15 +26,23 @@ class DocumentUploadValidationTest extends TestCase
         $user = User::factory()->create();
 
         foreach (['cloud', 'hybrid_local'] as $profile) {
-            $this->actingAs($user)
-                ->postJson('/documents', [
+            $response = $this->actingAs($user)
+                ->post('/documents', [
                     'document' => UploadedFile::fake()->createWithContent(
                         $profile.'.txt',
                         "Document content for {$profile}.\n",
                     ),
                     'processing_profile' => $profile,
-                ])
-                ->assertNoContent();
+                ]);
+
+            $document = Document::query()->latest('id')->firstOrFail();
+
+            $response
+                ->assertRedirectToRoute('documents.show', $document)
+                ->assertSessionHas(
+                    'success',
+                    __('documents.commands.upload.success'),
+                );
         }
 
         $this->assertDatabaseCount('documents', 2);
@@ -96,11 +105,20 @@ class DocumentUploadValidationTest extends TestCase
 
         $this->actingAs($user);
 
-        foreach ($documents as $document) {
-            $this->postJson('/documents', [
-                'document' => $document,
+        foreach ($documents as $uploadedFile) {
+            $response = $this->post('/documents', [
+                'document' => $uploadedFile,
                 'processing_profile' => 'cloud',
-            ])->assertNoContent();
+            ]);
+
+            $document = Document::query()->latest('id')->firstOrFail();
+
+            $response
+                ->assertRedirectToRoute('documents.show', $document)
+                ->assertSessionHas(
+                    'success',
+                    __('documents.commands.upload.success'),
+                );
         }
     }
 
