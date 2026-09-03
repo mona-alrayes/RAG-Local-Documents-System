@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — I1 مكتملة ومدموجة في PR #94؛ أصبح App Shell الموحّد والـSidebar المتجاوبة جاهزين؛ I2 هي المهمة الحالية
+> **الحالة العامة:** قيد التنفيذ — I2 مكتملة ومدموجة في PR #95؛ أصبحت Workspace Dashboard والوثائق الحديثة في Sidebar جاهزة؛ I3 هي المهمة الحالية
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: cd8698ef8ed643bc7fdb96539664c98f9a63924e
-Last Merged Feature PR on main: #94 — I1 Responsive App Shell / Sidebar
-Latest Task PR: #94 — I1 Responsive App Shell / Sidebar
-Verified I1 Feature Commit:
-- 98d43d14895ac05329b03c7d0e5540da128fb79c — I1 responsive authenticated app shell
-Verified I1 Merge Commit: cd8698ef8ed643bc7fdb96539664c98f9a63924e
-Documentation Baseline: تم تسجيل اكتمال I1 وتسليم I2 Workspace dashboard كمهمة حالية.
+Verified Main Commit: fa8041b3afc78e4d21419ece8dd405d425702aba
+Last Merged Feature PR on main: #95 — I2 Workspace Dashboard
+Latest Task PR: #95 — I2 Workspace Dashboard
+Verified I2 Feature Commit:
+- 67f96f5da27f528f2fe57bbdd79136d78e255058 — I2 workspace dashboard and document sidebar
+Verified I2 Merge Commit: fa8041b3afc78e4d21419ece8dd405d425702aba
+Documentation Baseline: تم تسجيل اكتمال I2 وتسليم I3 Documents list / cards / filters كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-I1 — Responsive App Shell / Sidebar
+I2 — Workspace Dashboard
 
 Current Phase:
 I — Blade Documents Experience
@@ -85,23 +85,28 @@ Architectural Result:
 - التنقل المركزي يعرض الروابط الفعلية فقط: Workspace وDocuments وAccount Settings، مع Active state حسب route الحالية وبقاء `documents.*` ضمن حالة الوثائق النشطة.
 - تعرض الـSidebar هوية المستخدم وإجراء Logout، ويحمي `flux:main` المحتوى من horizontal overflow غير المقصود.
 - I1 لم تعِد تصميم محتوى Workspace أو Documents أو Settings، ولم تغيّر business logic أو عقود H12/H13 أو FastAPI/Qdrant/Retrieval/Chat/Database.
+- استبدلت I2 صفحة Workspace placeholder بلوحة Dashboard فعلية عبر `WorkspaceController` تستهلك `DocumentReadService` وH12 Presentation Layer بدل إعادة تفسير Business State داخل الواجهة.
+- تعرض Workspace إحصائيات إجمالي الوثائق والجاهزة وقيد المعالجة والفاشلة وعدد إعادة المعالجة عند وجودها، إضافة إلى أحدث الوثائق وأحدث حالات الفشل وEmpty State عند عدم وجود وثائق.
+- توسع App Shell في I2 بقائمة وثائق داخل الـSidebar قابلة للفتح والإغلاق، وتعرض أحدث 5 وثائق للمستخدم فقط مع مؤشر حالة ملوّن لكل وثيقة.
+- أضيفت قائمة إجراءات موحدة للوثيقة: عرض التفاصيل، التحميل، إعادة المعالجة، والحذف، مع احترام presentation hints: `canDownload`, `canReprocess`, `canDelete`.
+- أعيد استخدام `DocumentReadService::recentForUser()` مع eager loading للـ`activeProcessingRun` و`latestAttempt` لمنع N+1، وبقيت كل Queries user-scoped لمنع تسريب وثائق مستخدم آخر.
+- أضيفت اختبارات I2 للـWorkspace Dashboard والـApp Shell/Sidebar بما يشمل عزل بيانات المستخدم وعرض الحالات والإجراءات.
 
 Latest Verification:
-PR #94 merged on GitHub: PASS
-PR head commit: 98d43d14895ac05329b03c7d0e5540da128fb79c
-PR merge commit: cd8698ef8ed643bc7fdb96539664c98f9a63924e
-main verified at I1 merge commit cd8698ef8ed643bc7fdb96539664c98f9a63924e before this progress update: PASS
-I1 focused App Shell test: 1 passed (18 assertions)
-Laravel full regression: 141 passed (697 assertions)
+PR #95 merged on GitHub: PASS
+PR head commit: 67f96f5da27f528f2fe57bbdd79136d78e255058
+PR merge commit: fa8041b3afc78e4d21419ece8dd405d425702aba
+main verified at I2 merge commit fa8041b3afc78e4d21419ece8dd405d425702aba before this progress update: PASS
+WorkspaceDashboardTest: 2 passed (9 assertions)
+AppShellTest: 2 passed (27 assertions)
+Laravel full regression: 144 passed (715 assertions)
+Laravel Pint on I2 files: PASS
 Frontend build: npm run build — PASS
-Laravel Pint: ./vendor/bin/pint --dirty — PASS
-Laravel full regression after Pint adjustment: 141 passed (697 assertions)
-Laravel Pint verification: ./vendor/bin/pint --dirty --test — PASS
-Manual responsive verification: PASS — Desktop sidebar; Mobile drawer open/close; Workspace/Documents/Account Settings active states; no unintended horizontal overflow
-FastAPI: لم تُشغّل الاختبارات لأن I1 لم تغيّر FastAPI.
+Manual browser verification: PASS
+FastAPI: لم تُشغّل الاختبارات لأن I2 لم تغيّر FastAPI.
 
 Current Task:
-I2 — Workspace dashboard
+I3 — Documents list / cards / filters
 
 Open Blockers: none
 ```
@@ -556,7 +561,7 @@ FastAPI:
 | المهمة | الحالة |
 |---|---|
 | I1 Responsive app shell / sidebar | DONE |
-| I2 Workspace dashboard | TODO |
+| I2 Workspace dashboard | DONE |
 | I3 Documents list / cards / filters | TODO |
 | I4 One-file upload + capability-aware Cloud/Hybrid Local choice | TODO |
 | I5 Document details / processing timeline | TODO |
@@ -609,6 +614,56 @@ Manual responsive verification — PASS:
 
 FastAPI:
 لم تُشغّل الاختبارات لأن I1 لم تغيّر FastAPI.
+```
+
+### I2 — Workspace Dashboard
+
+**الحالة:** `DONE` ومتحقق منها في PR #95 والمدمجة في `main`.
+
+تم تنفيذ:
+
+- استبدال صفحة Workspace placeholder بلوحة Dashboard فعلية عبر `WorkspaceController`.
+- استهلاك `DocumentReadService::dashboardForUser()` وH12 Presentation Layer بدل إعادة تعريف حالات الوثائق أو منطق الأعمال داخل Blade.
+- عرض إحصائيات: إجمالي الوثائق، الجاهزة، قيد المعالجة، الفاشلة، وعدد إعادة المعالجة عند وجودها.
+- عرض أحدث الوثائق وأحدث حالات الفشل، مع Empty State عند عدم وجود وثائق.
+- توسيع App Shell بقسم وثائق داخل الـSidebar قابل للفتح والإغلاق.
+- عرض أحدث 5 وثائق للمستخدم داخل Sidebar مع مؤشر حالة ملوّن لكل وثيقة.
+- إضافة قائمة إجراءات موحدة لكل وثيقة: عرض التفاصيل، التحميل، إعادة المعالجة، الحذف.
+- احترام presentation hints الموجودة: `canDownload`, `canReprocess`, `canDelete` وعدم إعادة تقرير صلاحية الأفعال داخل الواجهة.
+- إعادة استخدام H12 Presentation Layer و`DocumentReadService`، وإضافة `recentForUser()` للاستخدام المشترك بين Dashboard وSidebar.
+- الحفاظ على user scoping في كل القراءة ومنع تسريب وثائق مستخدم آخر.
+- استخدام eager loading للـ`activeProcessingRun` و`latestAttempt` لتجنب N+1.
+- إضافة `WorkspaceDashboardTest` وامتداد `AppShellTest` لتغطية الـDashboard والـSidebar وعزل بيانات المستخدم.
+
+Verification المثبت لـI2:
+
+```text
+PR #95 merged on GitHub: PASS
+Feature commit:
+- 67f96f5da27f528f2fe57bbdd79136d78e255058
+Merge commit:
+- fa8041b3afc78e4d21419ece8dd405d425702aba
+
+WorkspaceDashboardTest:
+2 passed (9 assertions)
+
+AppShellTest:
+2 passed (27 assertions)
+
+Laravel full regression:
+144 passed (715 assertions)
+
+Laravel Pint on I2 files:
+PASS
+
+Frontend build:
+npm run build — PASS
+
+Manual browser verification:
+PASS
+
+FastAPI:
+لم تُشغّل الاختبارات لأن I2 لم تغيّر FastAPI.
 ```
 
 الواجهة تعرض فقط Processing Profiles المتاحة فعلياً من Capabilities.
@@ -1121,7 +1176,7 @@ FastAPI:
 لم يتم تعديل FastAPI في H13، ولم يُسجل FastAPI regression ضمن هذه المهمة.
 ```
 
-## آخر مهمة مكتملة — I1 Responsive App Shell / Sidebar
+## المهمة السابقة المكتملة — I1 Responsive App Shell / Sidebar
 
 **الحالة:** `DONE` ومتحقق منها في PR #94، والمدمجة في `main` عند merge commit `cd8698ef8ed643bc7fdb96539664c98f9a63924e`.
 
@@ -1175,18 +1230,66 @@ FastAPI:
 لم تُشغّل الاختبارات لأن I1 لم تغيّر FastAPI.
 ```
 
+## آخر مهمة مكتملة — I2 Workspace Dashboard
+
+**الحالة:** `DONE` ومتحقق منها في PR #95، والمدمجة في `main` عند merge commit `fa8041b3afc78e4d21419ece8dd405d425702aba`.
+
+تم تنفيذ:
+
+- استبدال Workspace placeholder بلوحة Dashboard فعلية تعتمد `WorkspaceController`.
+- استخدام `DocumentReadService` وH12 Presentation Layer لقراءة Dashboard user-scoped دون إعادة تفسير Business State في الواجهة.
+- عرض إجمالي الوثائق والجاهزة وقيد المعالجة والفاشلة وعدد إعادة المعالجة عند وجودها.
+- عرض أحدث الوثائق وأحدث حالات الفشل وEmpty State.
+- توسيع App Shell بقسم وثائق داخل Sidebar قابل للفتح والإغلاق.
+- عرض أحدث 5 وثائق للمستخدم داخل Sidebar، مع مؤشر حالة ملوّن.
+- توفير إجراءات عرض التفاصيل والتحميل وإعادة المعالجة والحذف مع احترام `canDownload`, `canReprocess`, `canDelete`.
+- إعادة استخدام `DocumentReadService::recentForUser()` مع eager loading لتجنب N+1.
+- الحفاظ على user scoping ومنع تسريب وثائق مستخدم آخر.
+- إضافة اختبارات Dashboard وSidebar.
+
+### Verification I2
+
+```text
+PR #95 merged on GitHub: PASS
+Feature commit:
+- 67f96f5da27f528f2fe57bbdd79136d78e255058
+Merge commit:
+- fa8041b3afc78e4d21419ece8dd405d425702aba
+
+WorkspaceDashboardTest:
+2 passed (9 assertions)
+
+AppShellTest:
+2 passed (27 assertions)
+
+Laravel full regression:
+144 passed (715 assertions)
+
+Laravel Pint on I2 files:
+PASS
+
+Frontend build:
+npm run build — PASS
+
+Manual browser verification:
+PASS
+
+FastAPI:
+لم تُشغّل الاختبارات لأن I2 لم تغيّر FastAPI.
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-I2 — Workspace dashboard
+I3 — Documents list / cards / filters
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت I1 في main عبر PR #94 وأصبح App Shell الموحّد والـSidebar المتجاوبة قاعدة الواجهة المحمية.
-تبدأ I2 — Workspace dashboard وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك H12 dashboard summary بدلاً من إعادة تفسير حالات Documents محلياً.
-يبقى محتوى Workspace/Document/Settings الحالي دون إعادة تصميم سابق من I1؛ إعادة تصميم Workspace الفعلية تبدأ ضمن I2.
+دُمجت I2 في main عبر PR #95 وأصبحت Workspace Dashboard الفعلية وقائمة أحدث الوثائق داخل الـSidebar جاهزتين.
+تبدأ I3 — Documents list / cards / filters وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك H12 list/filter/read contract بدلاً من إعادة تفسير حالات Documents محلياً.
+يبقى App Shell وWorkspace Dashboard الناتجان عن I1/I2 قاعدة الواجهة؛ لا يعاد تصميمهما ضمن I3 إلا بما يلزم لدمج صفحة الوثائق ضمن نفس العقود.
 لا تغيّر المرحلة I عقود H12/H13 أو Business State داخل Blade/JavaScript دون توثيق gap معماري صريح.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
