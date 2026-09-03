@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Documents;
 
+use App\Enums\DocumentStatus;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -41,6 +42,143 @@ class DocumentPagesTest extends TestCase
             ->assertOk()
             ->assertSee('owner-document.pdf')
             ->assertDontSee('other-document.pdf');
+    }
+
+    public function test_index_can_filter_documents_by_search(): void
+    {
+        $user = User::factory()->create();
+
+        $user->documents()->create([
+            'original_name' => 'annual-report.pdf',
+            'stored_name' => 'annual-report-stored.pdf',
+            'file_path' => 'documents/annual-report-stored.pdf',
+            'file_type' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 1024,
+            'sha256' => hash('sha256', 'annual-report'),
+        ]);
+
+        $user->documents()->create([
+            'original_name' => 'meeting-notes.txt',
+            'stored_name' => 'meeting-notes-stored.txt',
+            'file_path' => 'documents/meeting-notes-stored.txt',
+            'file_type' => 'txt',
+            'mime_type' => 'text/plain',
+            'file_size' => 512,
+            'sha256' => hash('sha256', 'meeting-notes'),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get('/documents?search=annual');
+
+        $response
+            ->assertOk()
+            ->assertViewHas(
+                'documents',
+                fn ($documents): bool => $documents->total() === 1
+                    && $documents->first()->originalName === 'annual-report.pdf',
+            );
+    }
+
+    public function test_index_can_filter_documents_by_status(): void
+    {
+        $user = User::factory()->create();
+
+        $user->documents()->create([
+            'original_name' => 'pending-document.pdf',
+            'stored_name' => 'pending-document-stored.pdf',
+            'file_path' => 'documents/pending-document-stored.pdf',
+            'file_type' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 1024,
+            'sha256' => hash('sha256', 'pending-document'),
+        ]);
+
+        $failedDocument = $user->documents()->create([
+            'original_name' => 'failed-document.pdf',
+            'stored_name' => 'failed-document-stored.pdf',
+            'file_path' => 'documents/failed-document-stored.pdf',
+            'file_type' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 1024,
+            'sha256' => hash('sha256', 'failed-document'),
+        ]);
+
+        $failedDocument->status = DocumentStatus::Failed;
+        $failedDocument->save();
+
+        $response = $this
+            ->actingAs($user)
+            ->get('/documents?status=failed');
+
+        $response
+            ->assertOk()
+            ->assertViewHas(
+                'documents',
+                fn ($documents): bool => $documents->total() === 1
+                    && $documents->first()->originalName === 'failed-document.pdf',
+            );
+    }
+
+    public function test_index_displays_distinct_empty_state_when_user_has_no_documents(): void
+    {
+        $user = User::factory()->create();
+
+        $this
+            ->actingAs($user)
+            ->get('/documents')
+            ->assertOk()
+            ->assertSee('لا توجد وثائق حتى الآن')
+            ->assertSee('pending')
+            ->assertDontSee('documents.availability.pending')
+            ->assertDontSee('لا توجد نتائج مطابقة');
+    }
+
+    public function test_index_displays_filtered_empty_state_when_filters_match_nothing(): void
+    {
+        $user = User::factory()->create();
+
+        $user->documents()->create([
+            'original_name' => 'existing-document.pdf',
+            'stored_name' => 'existing-document-stored.pdf',
+            'file_path' => 'documents/existing-document-stored.pdf',
+            'file_type' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 1024,
+            'sha256' => hash('sha256', 'existing-document'),
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->get('/documents?search=does-not-exist')
+            ->assertOk()
+            ->assertSee('لا توجد نتائج مطابقة')
+            ->assertSee('مسح جميع الفلاتر')
+            ->assertDontSee('لا توجد وثائق حتى الآن');
+    }
+
+    public function test_index_pagination_preserves_active_filters(): void
+    {
+        $user = User::factory()->create();
+
+        foreach (range(1, 11) as $index) {
+            $user->documents()->create([
+                'original_name' => "document-{$index}.pdf",
+                'stored_name' => "document-{$index}-stored.pdf",
+                'file_path' => "documents/document-{$index}-stored.pdf",
+                'file_type' => 'pdf',
+                'mime_type' => 'application/pdf',
+                'file_size' => 1024,
+                'sha256' => hash('sha256', "document-{$index}"),
+            ]);
+        }
+
+        $this
+            ->actingAs($user)
+            ->get('/documents?file_type=pdf')
+            ->assertOk()
+            ->assertSee('file_type=pdf&amp;page=2', false);
     }
 
     public function test_owner_can_view_their_document_details(): void

@@ -61,6 +61,7 @@ final class DocumentReadService
         DocumentListCriteria $criteria,
     ): LengthAwarePaginator {
         $query = $user->documents()
+            ->getQuery()
             ->with([
                 'activeProcessingRun',
                 'latestAttempt',
@@ -85,6 +86,14 @@ final class DocumentReadService
                 ->summaryMapper
                 ->map($document),
         );
+    }
+
+    /**
+     * Determine whether the user owns at least one document.
+     */
+    public function hasAnyForUser(User $user): bool
+    {
+        return $user->documents()->exists();
     }
 
     /**

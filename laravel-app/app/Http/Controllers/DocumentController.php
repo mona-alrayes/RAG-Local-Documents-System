@@ -7,14 +7,15 @@ use App\Exceptions\DocumentDeletionException;
 use App\Exceptions\DocumentReprocessingException;
 use App\Exceptions\DuplicateDocumentException;
 use App\Http\Requests\DeleteDocumentRequest;
+use App\Http\Requests\DocumentIndexRequest;
 use App\Http\Requests\ReprocessDocumentRequest;
 use App\Http\Requests\UploadDocumentRequest;
 use App\Models\Document;
 use App\Services\Documents\DocumentDeletionService;
 use App\Services\Documents\DocumentProcessingDispatcher;
 use App\Services\Documents\DocumentUploadService;
+use App\Services\Documents\Presentation\DocumentReadService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -22,16 +23,25 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
-    public function index(Request $request): View
-    {
-        Gate::authorize('viewAny', Document::class);
+    public function index(
+        DocumentIndexRequest $request,
+        DocumentReadService $documentReadService,
+    ): View {
+        $documents = $documentReadService
+            ->paginateForUser(
+                $request->user(),
+                $request->criteria(),
+            )
+            ->appends($request->validated());
 
-        $documents = $request->user()
-            ->documents()
-            ->latest()
-            ->paginate(10);
+        $hasAnyDocuments = $documentReadService->hasAnyForUser(
+            $request->user(),
+        );
 
-        return view('documents.index', compact('documents'));
+        return view('documents.index', compact(
+            'documents',
+            'hasAnyDocuments',
+        ));
     }
 
     public function show(Document $document): View
