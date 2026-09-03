@@ -13,6 +13,8 @@ use App\Services\Ai\Data\ProcessDocumentRequestData;
 use App\Services\Ai\Data\ProcessDocumentResult;
 use App\Services\Documents\DocumentStorageService;
 use App\Services\Documents\ProcessingRunActivator;
+use App\Services\Documents\ProcessingRunFailureClassifier;
+use App\Services\Documents\ProcessingRunFailureFinalizer;
 use App\Services\Documents\ProcessingRunProgressor;
 use App\Services\Documents\ProcessingRunResultPersister;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -166,6 +168,8 @@ class ProcessDocumentJobTest extends TestCase
             app(ProcessingRunProgressor::class),
             app(ProcessingRunResultPersister::class),
             app(ProcessingRunActivator::class),
+            app(ProcessingRunFailureClassifier::class),
+            app(ProcessingRunFailureFinalizer::class),
         );
 
         $freshRun = $processingRun->fresh();
@@ -310,30 +314,55 @@ class ProcessDocumentJobTest extends TestCase
             },
         );
 
-        try {
-            (new ProcessDocumentJob($processingRun->id))->handle(
-                app(AiServiceClient::class),
-                app(ProcessingRunProgressor::class),
-                app(ProcessingRunResultPersister::class),
-                app(ProcessingRunActivator::class),
-            );
+        $job = (new ProcessDocumentJob($processingRun->id))
+            ->withFakeQueueInteractions();
 
-            $this->fail('Expected missing indexing callback to be rejected.');
-        } catch (LogicException $exception) {
-            $this->assertSame(
-                'Only an indexing run may persist a successful processing result.',
-                $exception->getMessage(),
-            );
-        }
+        $job->handle(
+            app(AiServiceClient::class),
+            app(ProcessingRunProgressor::class),
+            app(ProcessingRunResultPersister::class),
+            app(ProcessingRunActivator::class),
+            app(ProcessingRunFailureClassifier::class),
+            app(ProcessingRunFailureFinalizer::class),
+        );
+
+        $job->assertFailedWith(LogicException::class);
 
         $freshRun = $processingRun->fresh();
 
-        $this->assertSame(ProcessingRunStatus::Processing, $freshRun->status);
+        $this->assertSame(
+            ProcessingRunStatus::Failed,
+            $freshRun->status,
+        );
+
+        $this->assertSame(
+            'processing_terminal_failure',
+            $freshRun->error_code,
+        );
+
+        $this->assertSame(
+            'Document processing failed and cannot be retried.',
+            $freshRun->failure_reason,
+        );
+
+        $this->assertNotNull($freshRun->started_at);
+        $this->assertNull($freshRun->indexing_started_at);
         $this->assertNull($freshRun->indexed_at);
-        $this->assertNull($document->fresh()->active_processing_run_id);
+        $this->assertNotNull($freshRun->failed_at);
+
+        $freshDocument = $document->fresh();
+
+        $this->assertSame(
+            DocumentStatus::Failed,
+            $freshDocument->status,
+        );
+
+        $this->assertNull(
+            $freshDocument->active_processing_run_id,
+        );
     }
 
-    public function test_client_failure_does_not_persist_successful_processing_result(): void
+    public function test_terminal_client_failure_finalizes_processing_run(): void
     {
         Storage::fake('documents');
 
@@ -365,31 +394,40 @@ class ProcessDocumentJobTest extends TestCase
             },
         );
 
-        try {
-            (new ProcessDocumentJob($processingRun->id))->handle(
-                app(AiServiceClient::class),
-                app(ProcessingRunProgressor::class),
-                app(ProcessingRunResultPersister::class),
-                app(ProcessingRunActivator::class),
-            );
+        $job = (new ProcessDocumentJob($processingRun->id))
+            ->withFakeQueueInteractions();
 
-            $this->fail('Expected AI service failure was not thrown.');
-        } catch (AiServiceException $exception) {
-            $this->assertSame(
-                'AI service failed.',
-                $exception->getMessage(),
-            );
-        }
+        $job->handle(
+            app(AiServiceClient::class),
+            app(ProcessingRunProgressor::class),
+            app(ProcessingRunResultPersister::class),
+            app(ProcessingRunActivator::class),
+            app(ProcessingRunFailureClassifier::class),
+            app(ProcessingRunFailureFinalizer::class),
+        );
+
+        $job->assertFailedWith(AiServiceException::class);
 
         $freshRun = $processingRun->fresh();
 
         $this->assertSame(
-            ProcessingRunStatus::Processing,
+            ProcessingRunStatus::Failed,
             $freshRun->status,
         );
 
         $this->assertNotNull($freshRun->started_at);
         $this->assertNull($freshRun->indexing_started_at);
+        $this->assertNotNull($freshRun->failed_at);
+
+        $this->assertSame(
+            'processing_terminal_failure',
+            $freshRun->error_code,
+        );
+
+        $this->assertSame(
+            'Document processing failed and cannot be retried.',
+            $freshRun->failure_reason,
+        );
 
         $this->assertSame(
             [],
@@ -423,8 +461,15 @@ class ProcessDocumentJobTest extends TestCase
             $freshRun->indexed_at,
         );
 
+        $freshDocument = $document->fresh();
+
+        $this->assertSame(
+            DocumentStatus::Failed,
+            $freshDocument->status,
+        );
+
         $this->assertNull(
-            $document->fresh()->active_processing_run_id,
+            $freshDocument->active_processing_run_id,
         );
     }
 
@@ -547,6 +592,8 @@ class ProcessDocumentJobTest extends TestCase
             app(ProcessingRunProgressor::class),
             app(ProcessingRunResultPersister::class),
             app(ProcessingRunActivator::class),
+            app(ProcessingRunFailureClassifier::class),
+            app(ProcessingRunFailureFinalizer::class),
         );
 
         $this->assertSame(
@@ -565,7 +612,7 @@ class ProcessDocumentJobTest extends TestCase
         );
     }
 
-    public function test_failed_reprocessing_keeps_old_run_active_without_cleanup(): void
+    public function test_terminal_reprocessing_failure_keeps_old_run_active_without_cleanup(): void
     {
         Storage::fake('documents');
 
@@ -602,41 +649,60 @@ class ProcessDocumentJobTest extends TestCase
             function (MockInterface $mock): void {
                 $mock->shouldReceive('processDocument')
                     ->once()
-                    ->andThrow(new AiServiceException('AI service failed.'));
+                    ->andThrow(
+                        new AiServiceException(
+                            'AI service failed.',
+                        ),
+                    );
 
                 $mock->shouldNotReceive('deleteProcessingRunPoints');
             },
         );
 
-        try {
-            (new ProcessDocumentJob($newRun->id))->handle(
-                app(AiServiceClient::class),
-                app(ProcessingRunProgressor::class),
-                app(ProcessingRunResultPersister::class),
-                app(ProcessingRunActivator::class),
-            );
+        $job = (new ProcessDocumentJob($newRun->id))
+            ->withFakeQueueInteractions();
 
-            $this->fail('Expected AI service failure was not thrown.');
-        } catch (AiServiceException $exception) {
-            $this->assertSame(
-                'AI service failed.',
-                $exception->getMessage(),
-            );
-        }
+        $job->handle(
+            app(AiServiceClient::class),
+            app(ProcessingRunProgressor::class),
+            app(ProcessingRunResultPersister::class),
+            app(ProcessingRunActivator::class),
+            app(ProcessingRunFailureClassifier::class),
+            app(ProcessingRunFailureFinalizer::class),
+        );
+
+        $job->assertFailedWith(AiServiceException::class);
+
+        $freshDocument = $document->fresh();
+        $freshNewRun = $newRun->fresh();
 
         $this->assertSame(
             $activeRun->id,
-            $document->fresh()->active_processing_run_id,
+            $freshDocument->active_processing_run_id,
         );
 
         $this->assertSame(
             DocumentStatus::Ready,
-            $document->fresh()->status,
+            $freshDocument->status,
         );
 
         $this->assertSame(
-            ProcessingRunStatus::Processing,
-            $newRun->fresh()->status,
+            ProcessingRunStatus::Failed,
+            $freshNewRun->status,
+        );
+
+        $this->assertSame(
+            'processing_terminal_failure',
+            $freshNewRun->error_code,
+        );
+
+        $this->assertSame(
+            'Document processing failed and cannot be retried.',
+            $freshNewRun->failure_reason,
+        );
+
+        $this->assertNotNull(
+            $freshNewRun->failed_at,
         );
     }
 }

@@ -97,8 +97,8 @@ services:
       - redis
       - --queue=${REDIS_QUEUE:-default}
       - --sleep=1
-      - --tries=1
-      - --timeout=0
+      - --tries=3
+      - --timeout=330
     env_file:
       - .env
     environment:

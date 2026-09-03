@@ -11,8 +11,9 @@ class AiServiceException extends RuntimeException
         string $message,
         public readonly ?int $statusCode = null,
         public readonly ?string $correlationId = null,
+        public readonly ?string $errorCode = null,
         ?Throwable $previous = null,
     ) {
-        parent::__construct($message, 0, $previous);
+        parent::__construct($message, previous: $previous);
     }
 }

@@ -321,6 +321,10 @@ class AiServiceClient
             ?? 'AI service request failed.'
             : 'AI service request failed.';
 
+        $errorCode = is_array($payload)
+            ? data_get($payload, 'error.code')
+            : null;
+
         return new AiServiceException(
             message: (string) $message,
             statusCode: $response->status(),
@@ -328,6 +332,9 @@ class AiServiceClient
                 response: $response,
                 fallback: $fallbackCorrelationId,
             ),
+            errorCode: is_string($errorCode) && $errorCode !== ''
+                ? $errorCode
+                : null,
         );
     }
 
