@@ -2,8 +2,8 @@
 
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
-> **آخر تحديث:** 2026-09-02
-> **الحالة العامة:** قيد التنفيذ — H7 مكتملة ومدموجة في PR #87؛ H8 هي المهمة الحالية
+> **آخر تحديث:** 2026-09-03
+> **الحالة العامة:** قيد التنفيذ — H7 مكتملة ومدموجة في PR #87؛ H8 هي المهمة الحالية؛ H8–H13 أصبحت بوابة Backend إلزامية قبل المرحلة I
 
 ---
 
@@ -17,10 +17,11 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: a31b449989081d58b1230465c995f55c57ddf3e0
+Verified Main Commit: 3ff97f46b5286679dbd78425ee9a0b70a7dfe430
 Last Merged Feature PR on main: #87 — feat(H7): add safe reprocessing replacement
 Latest Task PR: #87 — feat(H7): add safe reprocessing replacement
 Verified H7 Feature Commit: 91e8be13eae5a1873fcdb15462d27b84a66d94cb
+Latest Planning Commit on main: 3ff97f46b5286679dbd78425ee9a0b70a7dfe430 — docs: align active planning baseline with merged main
 
 Current Working Branch: main
 
@@ -42,6 +43,11 @@ Architectural Result:
 - active_processing_run_id is the document pointer to the current indexed run.
 - Reprocessing keeps the old active run usable until the replacement is indexed and switched transactionally.
 - Old-run Qdrant cleanup starts only after a successful active-run switch.
+- Document.status represents current document availability; ProcessingRun.status represents one attempt's progress.
+- Reprocessing progress is displayed separately while the document remains Ready through its valid old active run.
+- v1 progress must be truthful: Queued → Processing → Indexing → Ready/Failed.
+- FastAPI reports indexing_started to an authenticated Laravel internal callback before the first Qdrant write.
+- H8–H13 must finish before phase I so the UI consumes stable read/command contracts instead of reopening Domain/Schema/Internal APIs.
 
 Latest Verification:
 PR #87 merged on GitHub: PASS
@@ -82,6 +88,7 @@ Open Blockers: none
 8. لا Push/PR/Merge تلقائياً؛ المستخدم ينفذ Git operations ما لم يطلب خلاف ذلك صراحةً.
 9. المهام غير المطلوبة في Target Architecture تزال من خريطة التنفيذ النشطة بالكامل؛ تاريخها محفوظ في Git.
 10. عند حذف مهمة من الخطة النشطة يعاد ترقيم المهام اللاحقة داخل المرحلة، وإذا أزيلت مرحلة كاملة يعاد ترقيم المراحل اللاحقة.
+11. لا تبدأ المرحلة I قبل اكتمال Frontend Backend Readiness Gate في H8–H13 والتحقق من عقود الحالات والقراءة والأوامر.
 
 ---
 
@@ -264,7 +271,7 @@ assert "comparison_report" not in payload
 
 # 6. خريطة التنفيذ المتبقية — الترقيم المعتمد الجديد
 
-## H — Processing Orchestration
+## H — Processing Orchestration and Documents UI Backend Readiness
 
 | المهمة | الحالة |
 |---|---|
@@ -276,8 +283,11 @@ assert "comparison_report" not in payload
 | H6 Active-run transaction after successful indexing | DONE |
 | H7 Safe reprocessing replacement | DONE |
 | H8 Aggregate status projector | TODO |
-| H9 Queue retries / timeouts / idempotency | TODO |
-| H10 Serialized `ai-local` queue + global heavy-resource lock | TODO |
+| H9 Accurate processing progress callback + run kind/stage timestamps | TODO |
+| H10 Queue retries / timeouts / idempotency / terminal failure finalization | TODO |
+| H11 Serialized `ai-local` queue + global heavy-resource lock | TODO |
+| H12 Documents presentation read model / polling / capability availability | TODO |
+| H13 Upload / reprocess / delete application commands and authorization | TODO |
 
 **معيار انتهاء المرحلة:**
 
@@ -291,7 +301,164 @@ one file
 → Laravel persists report
 → active_processing_run_id switches only after success
 → document ready
+→ truthful processing progress persisted in Laravel
+→ frontend-ready read and command contracts
 ```
+
+## Frontend Backend Readiness Gate — القرار المعتمد
+
+لا تبدأ المرحلة I قبل إكمال H8–H13. الهدف هو ألا نكتشف أثناء بناء Blade/Livewire
+حاجة متأخرة لتغيير Domain/Schema/Internal API أو قواعد الأعمال الأساسية.
+
+المقصود ليس منع كتابة Livewire/PHP presentation wiring في المرحلة I؛ الممنوع
+هو أن تعتمد الواجهة على تخمين `latest run` أو حالات محلية أو اتصال مباشر
+بـFastAPI/Qdrant.
+
+### معنى الحالتين
+
+```text
+Document.status
+→ هل توجد الآن نسخة فعالة وصالحة يمكن للنظام استخدامها؟
+
+ProcessingRun.status
+→ أين وصلت محاولة Initial Processing أو Reprocessing محددة؟
+```
+
+مثال إعادة معالجة ملف `آثار تدمر.pdf`:
+
+```text
+Document.status = ready
+active_processing_run_id = Run A
+
+latest_attempt:
+kind = reprocessing
+run = Run B
+status = indexing
+```
+
+تبقى Run A مستخدمة في المحادثات حتى نجاح B. ولا تخفي `Ready` تقدم B؛ تعرض
+الواجهة الجاهزية وتقدم المحاولة في عنصرين منفصلين.
+
+### H8 — Aggregate status projector
+
+**النطاق:**
+
+- إنشاء مصدر مركزي لقرارات `Document.status` خارج Controller/Job/UI.
+- أول معالجة تعكس `queued → processing → indexing → ready/failed`.
+- Reprocessing لا تخفض Document من `ready` ما دامت active run القديمة صحيحة ومفهرسة.
+- activation يثبت `active_processing_run_id + ready` داخل transaction واحدة.
+- failed replacement تبقى محاولة منفصلة ولا تكسر النسخة الفعالة.
+- لا يعتمد projector على أحدث Run تلقائياً؛ يستقبل الـRun المقصودة صراحة ويتحقق منها.
+
+**معيار القبول:**
+
+```text
+no active run + pending attempt       → queued
+no active run + processing attempt    → processing
+no active run + indexing attempt      → indexing
+indexed + activated run               → ready
+terminal initial failure              → failed
+valid active A + B in progress         → ready + B progress remains visible
+valid active A + failed B              → ready + failed latest attempt
+invalid active pointer                 → never ready; no silent fallback
+```
+
+### H9 — Accurate processing progress callback
+
+**Schema target عبر Forward Migration:**
+
+```text
+kind: initial | reprocessing
+created_at = queued_at
+started_at nullable
+indexing_started_at nullable
+indexed_at nullable
+failed_at nullable
+```
+
+**التسلسل:**
+
+```text
+Laravel starts ProcessDocumentJob
+→ Run = processing + started_at
+→ FastAPI parses/chunks/embeds/builds sparse representation
+→ FastAPI sends indexing_started callback
+→ Laravel validates Run and stores indexing + indexing_started_at
+→ only then FastAPI may perform the first Qdrant write
+→ exact count verification
+→ indexed response
+→ Laravel persists result and activates Run
+```
+
+**قواعد الأمان والاتساق:**
+
+- callback URL من FastAPI trusted configuration، وليست قيمة يقبلها request أو Browser.
+- secret مستقل لاتجاه FastAPI → Laravel.
+- Laravel يتحقق من route/payload IDs وRun ownership والحالة السابقة.
+- `indexing_started` idempotent؛ التكرار لا يكرر side effects ولا يعيد الحالة للخلف.
+- callback تستخدم bounded retries.
+- الفشل النهائي للـcallback يوقف المعالجة قبل أول Qdrant write.
+- FastAPI يبلغ عن المرحلة فقط؛ Laravel يبقى مالك Business State.
+- الواجهة تعمل polling على Laravel/MySQL فقط.
+
+### H10 — Queue reliability and terminal failure
+
+- retries/timeouts/generalized idempotency.
+- تصنيف retryable مقابل terminal failures.
+- بعد نفاد retries تحفظ Run كـ`failed` مع `error_code`, safe `failure_reason`, `failed_at`.
+- فشل Initial Processing النهائي يجعل Document `failed`.
+- فشل Reprocessing النهائي يبقي Document `ready` إذا بقيت active run صالحة.
+- retry لا ينشئ Run جديدة ولا يكرر Qdrant points.
+
+### H11 — Serialized local execution
+
+- serialized `ai-local` queue.
+- global heavy-resource lock المشترك مع ClamAV.
+- لا تداخل لعمليات Local AI الثقيلة ولا silent fallback.
+
+### H12 — Documents presentation read contract
+
+ينشئ Backend read/query layer مستقرة للـBlade/Livewire وتعيد:
+
+```text
+Document summary
+- id/title/original_name/file_type/file_size
+- document_availability
+- active_run summary
+- latest_attempt summary
+- reprocessing_in_progress
+- safe_failure
+- poll_required
+- allowed_actions
+
+Document details
+- summary fields
+- processing timeline
+- profile/pages/chunks/timings/warnings
+- queued/started/indexing/indexed/failed timestamps
+
+Dashboard summary
+- owner-scoped counts by document status
+- active processing/reprocessing counts
+- recent documents/failures
+```
+
+كما تشمل:
+
+- paginated list مع search/status/file-type/profile filters.
+- eager loading/query strategy تمنع N+1.
+- typed Capability availability service مع validation للـresponse.
+- fail-closed عند بدء Initial/Reprocessing بProfile غير متاحة.
+- تعذر capability lookup لا يخفض Ready document تلقائياً؛ J8 يملك runtime-capable chat filtering لاحقاً.
+
+### H13 — Documents application commands
+
+- تثبيت Upload response/redirect contract الذي تستهلكه I4.
+- Reprocess route/request/policy/action تستخدم H7 وتتحقق من ownership وactive run وعدم وجود محاولة جارية وتوفر Profile.
+- Delete route/request/policy وDocumentDeletionService بترتيب external cleanup صريح.
+- منع Delete Server-side عند وجود Run `pending/processing/indexing` لتجنب Queue/Qdrant/file/DB race.
+- تحويل Domain errors إلى رسائل ثابتة وآمنة للواجهة.
+- اختبارات ownership/IDOR/concurrency/unavailable profile/cleanup ordering.
 
 ## I — Blade Documents Experience
 
@@ -305,6 +472,16 @@ one file
 | I6 Accessibility / responsive / error states | TODO |
 
 الواجهة تعرض فقط Processing Profiles المتاحة فعلياً من Capabilities.
+
+تبعيات المرحلة I الملزمة:
+
+```text
+I2 ← H12 dashboard summary
+I3 ← H12 list/filter/read contract
+I4 ← H12 capability availability + H13 Upload command
+I5 ← H12 details/timeline + H13 Reprocess/Delete commands
+I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
+```
 
 ## J — Conversations Database
 
@@ -447,6 +624,16 @@ Cloud وHybrid Local يعملان كلٌ كمسار مستقل End-to-End، وا
 | DPL-24 Mac / ASUS Local topology verification | TODO |
 | DPL-25 Hybrid Local end-to-end processing / chat verification | TODO |
 
+Progress callback dependencies:
+
+```text
+DPL-7  → Laravel internal base URL + separate callback secret in Cloud secrets
+DPL-10 → Cloud FastAPI can emit indexing_started before Qdrant write
+DPL-21 → callback route is internal/authenticated and rejects forged transitions
+DPL-24 → Host FastAPI can reach Docker Laravel on Mac/ASUS without request-supplied URLs
+DPL-25 → Hybrid Local E2E observes processing → indexing → indexed/failed
+```
+
 ---
 
 # 8. الـSchema الفعلي بعد ARC-1
@@ -506,6 +693,20 @@ updated_at
 ```
 
 لا توجد حقول خاصة بالمقارنة أو الـtemporary artifacts.
+
+## 8.2.1 H9 target extension
+
+تضاف عبر Forward Migration:
+
+```text
+kind: initial | reprocessing
+started_at nullable
+indexing_started_at nullable
+failed_at nullable
+```
+
+`created_at` يمثل `queued_at`، و`indexed_at` يبقى توقيت النجاح. لا تستخدم
+الواجهة `updated_at` لتخمين المرحلة أو نوع المحاولة.
 
 ## 8.3 DocumentStatus
 
@@ -715,8 +916,11 @@ polling + completed-answer visual reveal
 لم يتم ضمن H7:
 
 - Aggregate Document Status Projector وتحويل الحالة المجمعة إلى `Ready` المخصصان لـH8.
-- retries / timeouts / generalized idempotency / recovery المخصصة لـH9.
-- serialized `ai-local` queue والـglobal heavy-resource lock المخصصان لـH10.
+- Accurate Processing Progress Callback وحقول run kind/stage timestamps المخصصة لـH9.
+- retries / timeouts / generalized idempotency / terminal failure المخصصة لـH10.
+- serialized `ai-local` queue والـglobal heavy-resource lock المخصصان لـH11.
+- Documents presentation read contract المخصصة لـH12.
+- Upload/Reprocess/Delete application commands المكتملة للواجهة والمخصصة لـH13.
 - أي Compare/Winner/temporary artifact lifecycle.
 
 ## Verification
@@ -755,8 +959,14 @@ Baseline المهمة التالية:
 H7 is merged into main and safely replaces an existing active ProcessingRun only after the replacement is fully indexed.
 The old active run remains usable while the replacement is processing or when it fails.
 Old-run Qdrant cleanup starts only after the transactional active-run switch succeeds.
-H8 owns aggregate Document status projection and the transition to Ready.
-H9 owns retries, timeouts, generalized idempotency, and recovery.
+Document.status represents availability; ProcessingRun.status represents one attempt's progress.
+H8 owns aggregate Document status projection and the transactional transition to Ready.
+H9 owns truthful processing progress, the authenticated indexing_started callback, run kind, and stage timestamps.
+H10 owns retries, timeouts, generalized idempotency, and terminal failure finalization.
+H11 owns serialized ai-local execution and the global heavy-resource lock.
+H12 owns the frontend-ready dashboard/list/details read contract and capability availability.
+H13 owns stable Upload/Reprocess/Delete commands, authorization, and safe UI errors.
+Phase I must not start before H8-H13 pass the Frontend Backend Readiness Gate.
 No Compare/Winner/temporary artifact lifecycle exists in the target architecture.
 ```
 
