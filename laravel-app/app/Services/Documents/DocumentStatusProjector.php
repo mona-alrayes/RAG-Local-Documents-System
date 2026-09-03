@@ -20,7 +20,10 @@ class DocumentStatusProjector
             $this->assertValidActiveRun($document);
 
             $document->status = DocumentStatus::Ready;
-            $document->save();
+
+            if ($document->isDirty()) {
+                $document->save();
+            }
 
             return;
         }
@@ -35,7 +38,9 @@ class DocumentStatusProjector
             ),
         };
 
-        $document->save();
+        if ($document->isDirty()) {
+            $document->save();
+        }
     }
 
     public function projectActivation(
@@ -52,7 +57,9 @@ class DocumentStatusProjector
 
         $document->active_processing_run_id = $processingRun->getKey();
         $document->status = DocumentStatus::Ready;
-        $document->save();
+        if ($document->isDirty()) {
+            $document->save();
+        }
     }
 
     private function assertRunBelongsToDocument(

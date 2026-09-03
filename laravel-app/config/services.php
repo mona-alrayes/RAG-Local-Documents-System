@@ -48,4 +48,8 @@ return [
         ),
     ],
 
+    'processing_callback' => [
+        'secret' => env('PROCESSING_CALLBACK_SECRET'),
+    ],
+
 ];

@@ -49,6 +49,24 @@ class Settings(BaseSettings):
     internal_api_key: SecretStr | None = None
     llama_cloud_api_key: SecretStr | None = None
 
+    laravel_internal_base_url: str | None = None
+    processing_callback_secret: SecretStr | None = None
+    processing_callback_timeout_seconds: float = Field(
+        default=5.0,
+        gt=0,
+        le=30,
+    )
+    processing_callback_max_attempts: int = Field(
+        default=3,
+        ge=1,
+        le=5,
+    )
+    processing_callback_retry_delay_seconds: float = Field(
+        default=0.25,
+        ge=0,
+        le=5,
+    )
+
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_cloud_collection: str = "rag_documents_cloud"
     qdrant_hybrid_local_collection: str = "rag_documents_hybrid_local"
@@ -111,4 +129,3 @@ def validate_startup_configuration(settings: Settings) -> None:
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

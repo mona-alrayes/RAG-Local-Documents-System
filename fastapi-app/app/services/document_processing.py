@@ -4,6 +4,7 @@ from time import perf_counter
 
 from app.core.config import Settings
 from app.core.exceptions import ApplicationException
+from app.core.logging import get_correlation_id
 from app.infrastructure.qdrant.indexer import (
     IndexingContext,
     QdrantDocumentIndexer,
@@ -11,7 +12,6 @@ from app.infrastructure.qdrant.indexer import (
 from app.parsing.base import BaseDocumentLoader
 from app.parsing.normalization import normalize_llamaparse_pages
 from app.parsing.providers.llamaparse import LlamaParsePage
-from app.processing.base import ProcessingProfile
 from app.processing.indexing import resolve_qdrant_collection
 from app.processing.profiles import ExecutableProcessingProfile
 from app.processing.registry import ProcessingProfileRegistry
@@ -25,6 +25,7 @@ from app.schemas.documents import (
     ProcessDocumentRequest,
     ProcessDocumentResponse,
 )
+from app.services.processing_progress import ProcessingProgressNotifier
 
 
 class ProcessDocumentService:
@@ -40,12 +41,14 @@ class ProcessDocumentService:
             ExecutableProcessingProfile
         ],
         indexer: QdrantDocumentIndexer,
+        progress_notifier: ProcessingProgressNotifier,
         report_builder: ProcessingReportBuilder | None = None,
     ) -> None:
         self._settings = settings
         self._loaders = loaders
         self._profile_registry = profile_registry
         self._indexer = indexer
+        self._progress_notifier = progress_notifier
         self._report_builder = report_builder or ProcessingReportBuilder()
 
     def process(
@@ -88,6 +91,11 @@ class ProcessDocumentService:
         collection_name = resolve_qdrant_collection(
             profile=request.processing_profile,
             settings=self._settings,
+        )
+
+        self._progress_notifier.notify_indexing_started(
+            request=request,
+            correlation_id=get_correlation_id(),
         )
 
         indexing_result = self._index_document(
