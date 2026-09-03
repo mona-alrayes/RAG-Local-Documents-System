@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — H11 مكتملة ومدموجة في PR #91؛ H12 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
+> **الحالة العامة:** قيد التنفيذ — H12 مكتملة ومدموجة في PR #92؛ H13 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 766322491ee4701c90bb6bb3cf4b5ec00a1c739d
-Last Merged Feature PR on main: #91 — feat(H11): serialize local AI processing with shared resource lock
-Latest Task PR: #91 — feat(H11): serialize local AI processing with shared resource lock
-Verified H11 Feature Commit:
-- 5d68f21e3db921a045606ff0060a32999c6c587a — feat(H11): serialize local AI processing with shared resource lock
-Verified H11 Merge Commit: 766322491ee4701c90bb6bb3cf4b5ec00a1c739d
-Documentation Baseline: تم تسجيل اكتمال H11 وتسليم H12 كمهمة حالية.
+Verified Main Commit: abda4d358f027213556c9cedb6a7b45984a57f50
+Last Merged Feature PR on main: #92 — H12 Documents Presentation Read Model / Polling / Capability Availability
+Latest Task PR: #92 — H12 Documents Presentation Read Model / Polling / Capability Availability
+Verified H12 Feature Commit:
+- cabd2c5bfb5f016ff12eb838fd228fd1e114c236 — H12 documents presentation read model and capability availability
+Verified H12 Merge Commit: abda4d358f027213556c9cedb6a7b45984a57f50
+Documentation Baseline: تم تسجيل اكتمال H12 وتسليم H13 كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H11 — Serialized ai-local Queue + Global Heavy-Resource Lock
+H12 — Documents Presentation Read Model / Polling / Capability Availability
 
 Current Phase:
 H — Processing Orchestration
@@ -65,21 +65,30 @@ Architectural Result:
 - اكتساب القفل للـLocal AI bounded؛ lock contention حالة retryable ولا يؤدي إلى انتظار غير محدود.
 - retry يحافظ على نفس `processing_run_id` ونفس Processing Profile، ويحرر القفل بأمان داخل `finally`.
 - لا يوجد silent fallback من Local إلى Cloud.
-- يجب إكمال H12–H13 قبل المرحلة I حتى تستهلك الواجهة عقود Backend مستقرة.
+- أصبحت طبقة Documents presentation تقرأ `active_run` و`latest_attempt` كحقيقتين منفصلتين وتحدد `document_availability` من active indexed run الصالحة قبل النظر إلى المحاولة الأحدث.
+- أصبحت list/detail/dashboard read models user-scoped، مع eager loading للـactive/latest runs، وsearch/filter/sort موثوق، وtimeline آمن للعرض.
+- أصبحت `poll_required` و`reprocessing_in_progress` و`allowed_actions` مشتقة Server-side من الحالة الفعلية بدل إعادة تفسيرها في الواجهة.
+- لا تعرض presentation resources `qdrant_collection` أو raw `failure_reason` أو `profile_snapshot`؛ وتعرض failure message عامة localized وتحصر warnings في `code` و`stage`.
+- أصبح Laravel يملك `ProcessingCapabilityService` typed يتحقق من `available_profiles` ويفشل مغلقًا عند response غير صالحة أو Profile غير متاحة.
+- يتحقق `DocumentProcessingDispatcher` من capability قبل إنشاء Initial/Reprocessing Run وقبل أي transaction؛ ففشل lookup أو عدم توفر Profile لا يغير Document state ولا ينشئ Run جديدة.
+- FastAPI `/api/v1/capabilities` يفرق بين `supported_profiles` المعمارية و`available_profiles` القابلة للتشغيل فعليًا حسب credentials والـlocal runtime.
+- في Cloud تتطلب `cloud` وجود LlamaParse وJina credentials، وفي Local لا تتاح `hybrid_local` إلا مع LlamaParse وruntime محلي `ready`؛ وتعرض provider availability دون كشف secrets.
+- تبقى Ready document والـactive indexed run القديمة صالحة عند تعذر بدء reprocessing بسبب capability، كما تبقى محفوظة عند فشل reprocessing وفق H10/H12 presentation semantics.
+- أضيف localization عربي/إنكليزي لحالات Document availability وProcessingRun status/kind/profile ورسالة الفشل الآمنة وSecure Upload validation.
+- يجب إكمال H13 قبل المرحلة I حتى تستهلك الواجهة عقود Backend مستقرة.
 
 Latest Verification:
-PR #91 merged on GitHub: PASS
-PR head commit: 5d68f21e3db921a045606ff0060a32999c6c587a
-PR merge commit: 766322491ee4701c90bb6bb3cf4b5ec00a1c739d
-main verified at H11 merge commit 766322491ee4701c90bb6bb3cf4b5ec00a1c739d before this progress update: PASS
-H11 focused tests: 10 passed (56 assertions)
-H10 / C1 compatibility tests: 18 passed (161 assertions)
-Laravel full regression: 127 passed (602 assertions)
-Laravel Pint: PASS; تم إصلاح مشكلتي style فقط، ثم أُعيد تشغيل full Laravel regression ونجح مجددًا: 127 passed (602 assertions)
-FastAPI production code unchanged in H11: pytest/Ruff not required for this task
+PR #92 merged on GitHub: PASS
+PR head commit: cabd2c5bfb5f016ff12eb838fd228fd1e114c236
+PR merge commit: abda4d358f027213556c9cedb6a7b45984a57f50
+main verified at H12 merge commit abda4d358f027213556c9cedb6a7b45984a57f50 before this progress update: PASS
+Laravel full regression reported in PR #92: 131 passed (614 assertions)
+FastAPI full regression reported in PR #92: 157 passed
+Laravel Pint: PASS
+FastAPI Ruff: All checks passed
 
 Current Task:
-H12 — Documents presentation read model / polling / capability availability
+H13 — Upload / reprocess / delete application commands and authorization
 
 Open Blockers: none
 ```
@@ -306,7 +315,7 @@ assert "comparison_report" not in payload
 | H9 Accurate processing progress callback + run kind/stage timestamps | DONE |
 | H10 Queue retries / timeouts / idempotency / terminal failure finalization | DONE |
 | H11 Serialized `ai-local` queue + global heavy-resource lock | DONE |
-| H12 Documents presentation read model / polling / capability availability | TODO |
+| H12 Documents presentation read model / polling / capability availability | DONE |
 | H13 Upload / reprocess / delete application commands and authorization | TODO |
 
 **معيار انتهاء المرحلة:**
@@ -451,38 +460,39 @@ Laravel starts ProcessDocumentJob
 
 ### H12 — Documents presentation read contract
 
-ينشئ Backend read/query layer مستقرة للـBlade/Livewire وتعيد:
+**الحالة:** `DONE` ومتحقق منها في PR #92 والمدمجة في `main`.
+
+تم تنفيذ:
+
+- `DocumentAvailability` typed presentation state مع `DocumentAvailabilityResolver` يعلن `Ready` فقط عند وجود active indexed run صالحة، ويحافظ على Ready أثناء محاولة reprocessing أحدث.
+- فصل `active_run` عن `latest_attempt` صراحة في Document summary/detail contracts وعدم استخدام latest attempt وحدها لتقرير الجاهزية.
+- `DocumentSummaryMapper` يشتق `reprocessing_in_progress`, `poll_required`, `safe_failure`, و`allowed_actions` من الحالة الفعلية.
+- `DocumentReadService` يقدم owner-scoped Dashboard/List/Detail read models:
+  - Dashboard counts حسب status، active processing count، reprocessing count، recent documents، recent failures.
+  - Paginated list مع search على title/original_name، وفلاتر status/file type/profile، وترتيب موثوق.
+  - Detail read model مع كامل processing timeline للوثيقة.
+- eager loading للـ`activeProcessingRun` و`latestAttempt` والـtimeline لمنع N+1 داخل mappers.
+- timeline يعرض profile/status/kind/is_active، pages/chunks، stage timings، timestamps الفعلية `queued/started/indexing/indexed/failed`، وwarnings الآمنة فقط.
+- presentation layer لا تمرر `qdrant_collection` أو raw `failure_reason` أو `profile_snapshot`؛ failure المعروضة رسالة عامة localized، وwarnings تختزل إلى `code` و`stage`.
+- إضافة Laravel `ProcessingCapabilityService` typed لتحويل `available_profiles` إلى `ProcessingProfile` enums ورفض response غير صالح.
+- `DocumentProcessingDispatcher` ينفذ capability check قبل أي Initial/Reprocessing transaction أو إنشاء Run؛ Profile غير متاحة أو capability lookup فاشل يؤدي إلى fail-closed بلا state mutation.
+- FastAPI `/api/v1/capabilities` يميز بين:
+  - `supported_profiles`: ما يسمح به deployment mode.
+  - `available_profiles`: ما يمكن تشغيله فعليًا الآن.
+- Cloud profile تتاح عند وجود LlamaParse وJina credentials، وHybrid Local تتاح فقط في local deployment مع LlamaParse وlocal runtime جاهز؛ provider statuses تعكس availability القابلة للتحقق منها دون كشف secrets.
+- اختبار reprocessing غير المتاح يثبت بقاء `Document.status = ready` و`active_processing_run_id` القديمة وعدم إنشاء Run جديدة أو Queue job.
+- فشل reprocessing النهائي يبقى ظاهرًا كـlatest attempt مع الحفاظ على active indexed run القديمة حسب lifecycle المثبت في H10 والمستهلك في H12.
+- إضافة localization عربي/إنكليزي لـdocument availability وProcessingRun status/kind/profile ورسالة processing failure الآمنة وSecure Upload validation، مع Resources تعيد labels localized.
+- تحديث الاختبارات المتأثرة لعزل FastAPI عبر HTTP fakes/typed capability seam.
+
+Verification المثبت في PR #92:
 
 ```text
-Document summary
-- id/title/original_name/file_type/file_size
-- document_availability
-- active_run summary
-- latest_attempt summary
-- reprocessing_in_progress
-- safe_failure
-- poll_required
-- allowed_actions
-
-Document details
-- summary fields
-- processing timeline
-- profile/pages/chunks/timings/warnings
-- queued/started/indexing/indexed/failed timestamps
-
-Dashboard summary
-- owner-scoped counts by document status
-- active processing/reprocessing counts
-- recent documents/failures
+Laravel: 131 passed (614 assertions)
+FastAPI: 157 passed
+Ruff: All checks passed
+Pint: PASS
 ```
-
-كما تشمل:
-
-- paginated list مع search/status/file-type/profile filters.
-- eager loading/query strategy تمنع N+1.
-- typed Capability availability service مع validation للـresponse.
-- fail-closed عند بدء Initial/Reprocessing بProfile غير متاحة.
-- تعذر capability lookup لا يخفض Ready document تلقائياً؛ J8 يملك runtime-capable chat filtering لاحقاً.
 
 ### H13 — Documents application commands
 
@@ -806,13 +816,25 @@ ProcessDocumentResponse
 
 ## 9.2 Capabilities
 
-Capabilities تصف:
+Capabilities الحالية تميز بوضوح بين:
 
-- deployment mode.
-- supported profiles.
-- available profiles.
-- provider capabilities.
-- local runtime عند الحاجة.
+```text
+supported_profiles
+→ Profiles المسموحة معماريًا حسب RAG_DEPLOYMENT_MODE
+
+available_profiles
+→ Profiles القابلة لبدء processing فعليًا الآن
+```
+
+Semantics المثبتة في H12:
+
+- Cloud deployment يدعم `cloud` فقط.
+- Local deployment يدعم `cloud` و`hybrid_local`.
+- `cloud` تكون available فقط عند وجود LlamaParse وJina credentials.
+- `hybrid_local` تكون available فقط في Local deployment مع LlamaParse credential وlocal runtime snapshot بحالة `ready`.
+- provider statuses لـLlamaParse/Jina/BGE تعكس `available/unavailable` عندما يمكن التحقق منها، بينما providers غير المفحوصة مباشرة تبقى `not_checked`.
+- `local_runtime` لا يعاد في Cloud mode ويعاد في Local mode عند توفر snapshot.
+- Laravel لا يثق بقائمة raw؛ `ProcessingCapabilityService` يحولها إلى `ProcessingProfile` typed ويرفض response غير صالحة.
 
 لا يوجد Compare capability.
 
@@ -923,7 +945,7 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H11 Serialized `ai-local` Queue + Global Heavy-Resource Lock
+## المهمة السابقة المكتملة — H11 Serialized `ai-local` Queue + Global Heavy-Resource Lock
 
 **الحالة:** `DONE` ومتحقق منها في PR #91 — `feat(H11): serialize local AI processing with shared resource lock`، والمدمجة في `main`.
 
@@ -947,14 +969,13 @@ polling + completed-answer visual reveal
 - أي Blade/Livewire UI أو Compare/Winner/temporary artifact lifecycle.
 - أي تعديل على FastAPI production code؛ لذلك لم تكن هناك حاجة إلى pytest/Ruff لهذه المهمة.
 
-## Verification
+### Verification H11
 
 ```text
 PR #91 merged on GitHub: PASS
 Feature commit:
 - 5d68f21e3db921a045606ff0060a32999c6c587a
 Merge commit: 766322491ee4701c90bb6bb3cf4b5ec00a1c739d
-main verified at H11 merge commit before this progress update: PASS
 
 H11 focused tests:
 10 passed (56 assertions)
@@ -967,33 +988,66 @@ Laravel full regression:
 
 Laravel Pint:
 PASS
-تم إصلاح مشكلتي style فقط، ثم أُعيد تشغيل full Laravel regression ونجح بنفس النتيجة:
-127 passed (602 assertions)
+```
 
-FastAPI production code:
-لم يتم تعديله في H11؛ pytest/Ruff غير مطلوبين لهذه المهمة.
+## آخر مهمة مكتملة — H12 Documents Presentation Read Model / Polling / Capability Availability
+
+**الحالة:** `DONE` ومتحقق منها في PR #92، والمدمجة في `main` عند merge commit `abda4d358f027213556c9cedb6a7b45984a57f50`.
+
+تم تنفيذ:
+
+- Documents presentation read/query layer مستقرة للـBlade/Livewire بدون نقل business-state interpretation إلى الواجهة.
+- `DocumentAvailability` وresolver يفصلان جاهزية الوثيقة عن حالة أحدث محاولة Processing، مع أولوية active indexed run الصالحة.
+- `DocumentSummaryData` / `DocumentDetailData` وProcessingRun summary/detail data مع HTTP Resources جاهزة للعرض.
+- فصل صريح بين `active_run` و`latest_attempt`، ودعم `reprocessing_in_progress`, `poll_required`, `allowed_actions`, وsafe failure presentation.
+- `DocumentReadService` يقدم user-scoped dashboard/list/detail، مع search/filter/sort/pagination وeager loading لتجنب N+1.
+- detail timeline تعرض pages/chunks/stage timings وtimestamps الفعلية، وتحذف من العرض raw failure details وQdrant internals/profile snapshot.
+- typed `ProcessingCapabilityService` في Laravel، مع fail-closed عند unavailable/invalid capability قبل إنشاء أو dispatch أي Initial/Reprocessing Run.
+- FastAPI `/api/v1/capabilities` صار يقرر `available_profiles` من credentials/runtime الفعلية بدل إرجاع قائمة فارغة ثابتة، مع فصلها عن `supported_profiles`.
+- Ready document والـactive run القديمة لا تتغيران عند رفض reprocessing بسبب capability غير متاحة؛ ولا تنشأ Run أو Queue job جديدة في هذه الحالة.
+- Safe reprocessing failure semantics السابقة تبقى ظاهرة عبر latest attempt دون إسقاط Ready active version.
+- Localization عربي/إنكليزي لحالات الوثيقة والـProcessingRun والرسائل الآمنة وsecure-upload validation.
+
+### Verification H12
+
+```text
+PR #92 merged on GitHub: PASS
+Feature commit:
+- cabd2c5bfb5f016ff12eb838fd228fd1e114c236
+Merge commit:
+- abda4d358f027213556c9cedb6a7b45984a57f50
+
+Laravel:
+131 passed (614 assertions)
+
+FastAPI:
+157 passed
+
+Pint:
+PASS
+
+Ruff:
+All checks passed
 ```
 
 ## المهمة الحالية/التالية
 
 ```text
-H12 — Documents presentation read model / polling / capability availability
+H13 — Upload / reprocess / delete application commands and authorization
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت H11 في main عبر PR #91.
-أصبح hybrid_local يذهب إلى Queue مستقلة باسم ai-local، بينما بقي Cloud processing على default queue.
-يعمل ai-local عبر Worker واحد بتنفيذ serialized وconcurrency = 1.
-يعاد استخدام LocalHeavyResourceLock نفسه كقفل Redis عالمي مشترك بين ClamAV وHybrid Local AI.
-اكتساب القفل للـLocal AI bounded، وlock contention حالة retryable ولا يسبب انتظاراً غير محدود.
-تعيد retry استخدام نفس processing_run_id ونفس Processing Profile، ويحرر القفل بأمان داخل finally.
-لا يوجد silent fallback من Local إلى Cloud.
-بقي عقد H10 كما هو: tries = 3، backoff = 15s ثم 60s، FastAPI timeout = 300s، Job/worker timeout = 330s، Redis retry_after = 360s.
-تمتلك H12 document read models الجاهزة للواجهة وcapability availability.
+دُمجت H12 في main عبر PR #92.
+أصبحت Documents presentation read models تفصل document availability عن processing attempt status.
+active_run تمثل النسخة المفهرسة الحالية، وlatest_attempt تمثل أحدث محاولة وتظهر مستقلة أثناء reprocessing أو الفشل.
+أصبح dashboard/list/detail query contract user-scoped وجاهزًا للواجهة، مع polling hints وallowed actions وsafe timeline data.
+أصبح FastAPI capabilities يميز supported_profiles عن available_profiles الفعلية حسب credentials/runtime.
+أصبح Laravel يرفض بدء Initial/Reprocessing إذا لم تكن Profile متاحة أو كان capability response غير صالح، قبل إنشاء أي Run أو تعديل حالة الوثيقة.
+تبقى Ready document والـactive run الصالحة محفوظتين عند رفض reprocessing بسبب capability أو عند فشل replacement وفق lifecycle الحالي.
 تمتلك H13 أوامر Upload/Reprocess/Delete المستقرة والauthorization وأخطاء UI الآمنة.
-لا تبدأ المرحلة I قبل إكمال H12–H13 لبوابة Frontend Backend Readiness.
+لا تبدأ المرحلة I قبل إكمال H13 لبوابة Frontend Backend Readiness.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
