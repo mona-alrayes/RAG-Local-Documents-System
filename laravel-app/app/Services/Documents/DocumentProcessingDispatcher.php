@@ -53,7 +53,7 @@ class DocumentProcessingDispatcher
                 $processingRun,
             );
 
-            ProcessDocumentJob::dispatch($processingRun->id)->afterCommit();
+            $this->dispatchProcessingJob($processingRun);
 
             return $processingRun;
         });
@@ -119,9 +119,35 @@ class DocumentProcessingDispatcher
                 'stage_timings_ms' => [],
             ]);
 
-            ProcessDocumentJob::dispatch($processingRun->id)->afterCommit();
+            $this->dispatchProcessingJob($processingRun);
 
             return $processingRun;
         });
+    }
+
+    private function dispatchProcessingJob(
+        ProcessingRun $processingRun,
+    ): void {
+        ProcessDocumentJob::dispatch($processingRun->id)
+            ->onQueue(
+                $this->queueForProfile($processingRun->profile),
+            )
+            ->afterCommit();
+    }
+
+    private function queueForProfile(
+        ProcessingProfile $profile,
+    ): string {
+        return match ($profile) {
+            ProcessingProfile::Cloud => (string) config(
+                'queue.processing.cloud_queue',
+                'default',
+            ),
+
+            ProcessingProfile::HybridLocal => (string) config(
+                'queue.processing.local_queue',
+                'ai-local',
+            ),
+        };
     }
 }
