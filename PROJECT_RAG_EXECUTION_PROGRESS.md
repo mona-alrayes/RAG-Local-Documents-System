@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — H10 مكتملة ومدموجة في PR #90؛ H11 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
+> **الحالة العامة:** قيد التنفيذ — H11 مكتملة ومدموجة في PR #91؛ H12 هي المهمة الحالية؛ H8–H13 هي بوابة Backend إلزامية قبل المرحلة I
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: cb3120f3db313be939934117064caa7cb5436f4e
-Last Merged Feature PR on main: #90 — feat(H10): harden processing queue reliability and failure handling
-Latest Task PR: #90 — feat(H10): harden processing queue reliability and failure handling
-Verified H10 Feature Commit:
-- 328c6eaa98a33db58d3bdf95c971feebcafe3a9e — feat(H10): harden processing queue reliability and failure handling
-Verified H10 Merge Commit: cb3120f3db313be939934117064caa7cb5436f4e
-Documentation Baseline: تم تسجيل اكتمال H10 وتسليم H11 كمهمة حالية.
+Verified Main Commit: 766322491ee4701c90bb6bb3cf4b5ec00a1c739d
+Last Merged Feature PR on main: #91 — feat(H11): serialize local AI processing with shared resource lock
+Latest Task PR: #91 — feat(H11): serialize local AI processing with shared resource lock
+Verified H11 Feature Commit:
+- 5d68f21e3db921a045606ff0060a32999c6c587a — feat(H11): serialize local AI processing with shared resource lock
+Verified H11 Merge Commit: 766322491ee4701c90bb6bb3cf4b5ec00a1c739d
+Documentation Baseline: تم تسجيل اكتمال H11 وتسليم H12 كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-H10 — Queue Retries / Timeouts / Idempotency / Terminal Failure Finalization
+H11 — Serialized ai-local Queue + Global Heavy-Resource Lock
 
 Current Phase:
 H — Processing Orchestration
@@ -59,22 +59,27 @@ Architectural Result:
 - terminal finalization تحفظ `status = failed`, `error_code`, safe `failure_reason`, `failed_at`، ولا تغيّر Run أصبحت `indexed` ولا تعيد كتابة `failed_at` عند تكرار finalization.
 - Document availability منفصلة عن ProcessingRun attempt status: الفشل النهائي لأول معالجة يجعل Document `failed`، بينما فشل reprocessing يبقي Document `ready` وactive_processing_run_id القديمة دون تغيير إذا بقيت صالحة.
 - Qdrant indexing idempotent عند retry لأن deterministic Point IDs مع `upsert` تمنع إنشاء duplicate points لنفس Run.
-- يجب إكمال H11–H13 قبل المرحلة I حتى تستهلك الواجهة عقود Backend مستقرة.
+- يوجه `hybrid_local` إلى Queue مستقلة باسم `ai-local`، بينما يبقى Cloud processing على الـdefault queue.
+- يعمل `ai-local` عبر Worker واحد بتنفيذ serialized و`concurrency = 1`.
+- يعاد استخدام `LocalHeavyResourceLock` نفسه كقفل Redis عالمي مشترك بين ClamAV وHybrid Local AI.
+- اكتساب القفل للـLocal AI bounded؛ lock contention حالة retryable ولا يؤدي إلى انتظار غير محدود.
+- retry يحافظ على نفس `processing_run_id` ونفس Processing Profile، ويحرر القفل بأمان داخل `finally`.
+- لا يوجد silent fallback من Local إلى Cloud.
+- يجب إكمال H12–H13 قبل المرحلة I حتى تستهلك الواجهة عقود Backend مستقرة.
 
 Latest Verification:
-PR #90 merged on GitHub: PASS
-PR head commit: 328c6eaa98a33db58d3bdf95c971feebcafe3a9e
-PR merge commit: cb3120f3db313be939934117064caa7cb5436f4e
-main verified at H10 merge commit cb3120f3db313be939934117064caa7cb5436f4e before this progress update: PASS
-H10 scope audit: no H11 serialized ai-local execution or global heavy-resource lock implementation in PR #90
-Focused Laravel H10 tests: 40 passed (217 assertions)
-Laravel full regression: 117 passed (546 assertions)
-Laravel Pint: PASS
-FastAPI Qdrant idempotency focused tests: 5 passed
-FastAPI full regression: 154 passed
+PR #91 merged on GitHub: PASS
+PR head commit: 5d68f21e3db921a045606ff0060a32999c6c587a
+PR merge commit: 766322491ee4701c90bb6bb3cf4b5ec00a1c739d
+main verified at H11 merge commit 766322491ee4701c90bb6bb3cf4b5ec00a1c739d before this progress update: PASS
+H11 focused tests: 10 passed (56 assertions)
+H10 / C1 compatibility tests: 18 passed (161 assertions)
+Laravel full regression: 127 passed (602 assertions)
+Laravel Pint: PASS; تم إصلاح مشكلتي style فقط، ثم أُعيد تشغيل full Laravel regression ونجح مجددًا: 127 passed (602 assertions)
+FastAPI production code unchanged in H11: pytest/Ruff not required for this task
 
 Current Task:
-H11 — Serialized ai-local Queue + Global Heavy-Resource Lock
+H12 — Documents presentation read model / polling / capability availability
 
 Open Blockers: none
 ```
@@ -300,7 +305,7 @@ assert "comparison_report" not in payload
 | H8 Aggregate status projector | DONE |
 | H9 Accurate processing progress callback + run kind/stage timestamps | DONE |
 | H10 Queue retries / timeouts / idempotency / terminal failure finalization | DONE |
-| H11 Serialized `ai-local` queue + global heavy-resource lock | TODO |
+| H11 Serialized `ai-local` queue + global heavy-resource lock | DONE |
 | H12 Documents presentation read model / polling / capability availability | TODO |
 | H13 Upload / reprocess / delete application commands and authorization | TODO |
 
@@ -433,9 +438,16 @@ Laravel starts ProcessDocumentJob
 
 ### H11 — Serialized local execution
 
-- serialized `ai-local` queue.
-- global heavy-resource lock المشترك مع ClamAV.
-- لا تداخل لعمليات Local AI الثقيلة ولا silent fallback.
+- يوجه `hybrid_local` إلى Queue مستقلة باسم `ai-local`، بينما يبقى Cloud processing على الـdefault queue.
+- يعمل `ai-local` عبر Worker واحد بتنفيذ serialized و`concurrency = 1`.
+- يعاد استخدام `LocalHeavyResourceLock` الحالي بدل إنشاء Lock جديد.
+- تشترك عمليات ClamAV وHybrid Local AI في نفس Redis global heavy-resource lock.
+- Local AI تستخدم bounded lock acquisition ولا تنتظر القفل إلى ما لا نهاية.
+- lock contention حالة retryable وتدخل ضمن سياسة H10 المحدودة.
+- retry يحافظ على نفس `processing_run_id` ونفس Processing Profile ولا ينشئ Run بديلة.
+- يحرر القفل بأمان داخل `finally` بعد استدعاء FastAPI.
+- لا يوجد silent fallback من Local إلى Cloud.
+- تبقى reliability contract الخاصة بـH10 كما هي: `tries = 3`، backoff `15s, 60s`، FastAPI process timeout `300s`، Job/worker timeout `330s`، Redis `retry_after = 360s`.
 
 ### H12 — Documents presentation read contract
 
@@ -911,79 +923,77 @@ polling + completed-answer visual reveal
 
 # 11. نقطة الاستلام التالية
 
-## آخر مهمة مكتملة — H10 Queue Retries / Timeouts / Idempotency / Terminal Failure Finalization
+## آخر مهمة مكتملة — H11 Serialized `ai-local` Queue + Global Heavy-Resource Lock
 
-**الحالة:** `DONE` ومتحقق منها في PR #90 — `feat(H10): harden processing queue reliability and failure handling`، والمدمجة في `main`.
+**الحالة:** `DONE` ومتحقق منها في PR #91 — `feat(H11): serialize local AI processing with shared resource lock`، والمدمجة في `main`.
 
 تم تنفيذ:
 
-- ضبط `ProcessDocumentJob` على 3 محاولات كحد أقصى مع backoff `15s` ثم `60s`.
-- تثبيت timeout alignment: FastAPI processing HTTP timeout = `300s`، Queue job/worker timeout = `330s`، Redis `retry_after = 360s`.
-- إضافة `ProcessingRunFailureClassifier` لتصنيف retryable temporary failures مقابل terminal permanent failures.
-- الحفاظ على structured FastAPI `error.code` داخل `AiServiceException` عبر `AiServiceClient`.
-- إضافة `ProcessingRunFailureFinalizer` لحفظ الفشل النهائي بصورة آمنة.
-- terminal finalization تحفظ `status = failed`, `error_code`, safe `failure_reason`, `failed_at` داخل transaction + row locking.
-- finalization idempotent: لا تغيّر Run أصبحت `Indexed`، ولا تعيد كتابة `failed_at` أو بيانات الفشل الأول عند تكرارها على Run فاشلة.
-- الأخطاء المؤقتة يعاد رميها لتستفيد Queue من retries المحدودة مع إعادة استخدام نفس `ProcessingRun` وعدم إنشاء Run جديدة.
-- exhausted retries وtimeout النهائي يثبتان failure نهائياً عبر hook موحد وآمن.
-- أول Processing نهائية الفشل تجعل `Document.status = failed`.
-- Reprocessing نهائية الفشل مع active run قديمة صالحة تبقي `Document.status = ready` وتحافظ على `active_processing_run_id` القديمة.
-- تثبيت Qdrant retry idempotency عبر deterministic Point IDs و`upsert`، بحيث إعادة نفس ProcessingRun لا تنشئ duplicate points.
+- تخصيص Queue مستقلة باسم `ai-local` لمعالجة `hybrid_local`، مع بقاء Cloud processing على الـdefault queue.
+- تشغيل `ai-local` بشكل serialized عبر Worker واحد و`concurrency = 1`.
+- إعادة استخدام `LocalHeavyResourceLock` الحالي بدل إنشاء Lock جديد.
+- مشاركة نفس Redis global heavy-resource lock بين ClamAV وHybrid Local AI.
+- تطبيق bounded acquisition للـLocal AI لمنع الانتظار غير المحدود.
+- اعتبار lock contention حالة Retryable ضمن سياسة retries الحالية.
+- الحفاظ على نفس `processing_run_id` ونفس Processing Profile أثناء retry دون إنشاء Run بديلة.
+- تحرير الـlock بأمان داخل `finally` بعد استدعاء FastAPI.
+- عدم وجود silent fallback من Local إلى Cloud.
+- الحفاظ على H10 reliability contract دون تغيير: `tries = 3`، backoff `15s, 60s`، FastAPI process timeout = `300s`، Job/worker timeout = `330s`، Redis `retry_after = 360s`.
 
-لم يتم ضمن H10:
+لم يتم ضمن H11:
 
-- serialized `ai-local` queue أو global heavy-resource lock المخصصان لـH11.
 - Documents presentation read contract المخصصة لـH12.
 - Upload/Reprocess/Delete application commands المكتملة للواجهة والمخصصة لـH13.
 - أي Blade/Livewire UI أو Compare/Winner/temporary artifact lifecycle.
+- أي تعديل على FastAPI production code؛ لذلك لم تكن هناك حاجة إلى pytest/Ruff لهذه المهمة.
 
 ## Verification
 
 ```text
-PR #90 merged on GitHub: PASS
+PR #91 merged on GitHub: PASS
 Feature commit:
-- 328c6eaa98a33db58d3bdf95c971feebcafe3a9e
-Merge commit: cb3120f3db313be939934117064caa7cb5436f4e
-main verified at H10 merge commit before this progress update: PASS
-H10 scope audit: no H11 serialized ai-local execution or global heavy-resource lock implementation in PR #90
+- 5d68f21e3db921a045606ff0060a32999c6c587a
+Merge commit: 766322491ee4701c90bb6bb3cf4b5ec00a1c739d
+main verified at H11 merge commit before this progress update: PASS
 
-Focused Laravel H10 tests:
-40 passed (217 assertions)
+H11 focused tests:
+10 passed (56 assertions)
+
+H10 / C1 compatibility tests:
+18 passed (161 assertions)
 
 Laravel full regression:
-117 passed (546 assertions)
+127 passed (602 assertions)
 
 Laravel Pint:
 PASS
+تم إصلاح مشكلتي style فقط، ثم أُعيد تشغيل full Laravel regression ونجح بنفس النتيجة:
+127 passed (602 assertions)
 
-FastAPI Qdrant idempotency focused tests:
-5 passed
-
-FastAPI full regression:
-154 passed
+FastAPI production code:
+لم يتم تعديله في H11؛ pytest/Ruff غير مطلوبين لهذه المهمة.
 ```
 
 ## المهمة الحالية/التالية
 
 ```text
-H11 — Serialized ai-local Queue + Global Heavy-Resource Lock
+H12 — Documents presentation read model / polling / capability availability
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت H10 في main عبر PR #90.
-أصبحت Queue retries محدودة بثلاث محاولات مع backoff 15s ثم 60s.
-مواءمة timeouts المعتمدة هي FastAPI 300s ثم Queue job/worker 330s ثم Redis retry_after 360s.
-تصنف الأعطال إلى retryable temporary وterminal permanent مع الحفاظ على FastAPI error.code.
-تعيد retry المؤقتة استخدام نفس ProcessingRun ولا تنشئ Run جديدة.
-تثبت terminal/exhausted failures داخل Laravel بصورة transaction-safe وidempotent وتحفظ error_code وsafe failure_reason وfailed_at.
-لا تكسر reprocessing الفاشلة active indexed run السابقة، وتبقى Document ready إذا بقيت النسخة القديمة صالحة.
-إعادة فهرسة نفس Run إلى Qdrant idempotent عبر deterministic IDs وupsert.
-تمتلك H11 serialized ai-local execution والـglobal heavy-resource lock المشترك مع ClamAV.
+دُمجت H11 في main عبر PR #91.
+أصبح hybrid_local يذهب إلى Queue مستقلة باسم ai-local، بينما بقي Cloud processing على default queue.
+يعمل ai-local عبر Worker واحد بتنفيذ serialized وconcurrency = 1.
+يعاد استخدام LocalHeavyResourceLock نفسه كقفل Redis عالمي مشترك بين ClamAV وHybrid Local AI.
+اكتساب القفل للـLocal AI bounded، وlock contention حالة retryable ولا يسبب انتظاراً غير محدود.
+تعيد retry استخدام نفس processing_run_id ونفس Processing Profile، ويحرر القفل بأمان داخل finally.
+لا يوجد silent fallback من Local إلى Cloud.
+بقي عقد H10 كما هو: tries = 3، backoff = 15s ثم 60s، FastAPI timeout = 300s، Job/worker timeout = 330s، Redis retry_after = 360s.
 تمتلك H12 document read models الجاهزة للواجهة وcapability availability.
 تمتلك H13 أوامر Upload/Reprocess/Delete المستقرة والauthorization وأخطاء UI الآمنة.
-لا تبدأ المرحلة I قبل إكمال H11–H13 لبوابة Frontend Backend Readiness.
+لا تبدأ المرحلة I قبل إكمال H12–H13 لبوابة Frontend Backend Readiness.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
