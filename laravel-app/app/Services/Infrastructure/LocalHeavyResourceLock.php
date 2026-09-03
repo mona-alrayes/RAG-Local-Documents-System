@@ -38,6 +38,48 @@ class LocalHeavyResourceLock
             : null;
     }
 
+    public function acquireWithin(
+        ?int $waitSeconds = null,
+        ?int $retryIntervalMilliseconds = null,
+    ): ?string {
+        $waitSeconds ??= $this->waitTimeout();
+
+        $retryIntervalMilliseconds ??=
+            $this->retryIntervalMilliseconds();
+
+        $waitSeconds = max(0, $waitSeconds);
+        $retryIntervalMilliseconds = max(
+            1,
+            $retryIntervalMilliseconds,
+        );
+
+        $deadline = microtime(true) + $waitSeconds;
+
+        do {
+            $token = $this->acquire();
+
+            if ($token !== null) {
+                return $token;
+            }
+
+            $remainingSeconds = $deadline - microtime(true);
+
+            if ($remainingSeconds <= 0) {
+                return null;
+            }
+
+            $sleepMilliseconds = min(
+                $retryIntervalMilliseconds,
+                max(
+                    1,
+                    (int) ceil($remainingSeconds * 1000),
+                ),
+            );
+
+            usleep($sleepMilliseconds * 1000);
+        } while (true);
+    }
+
     public function refresh(string $token): bool
     {
         $refreshed = Redis::eval(<<<'LUA'
@@ -86,6 +128,22 @@ class LocalHeavyResourceLock
         return (int) config(
             'security.local_heavy_resource_lock.timeout',
             600,
+        );
+    }
+
+    private function waitTimeout(): int
+    {
+        return (int) config(
+            'security.local_heavy_resource_lock.wait_timeout',
+            10,
+        );
+    }
+
+    private function retryIntervalMilliseconds(): int
+    {
+        return (int) config(
+            'security.local_heavy_resource_lock.retry_interval_ms',
+            250,
         );
     }
 }

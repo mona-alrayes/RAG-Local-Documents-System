@@ -17,6 +17,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Document Processing Queues
+    |--------------------------------------------------------------------------
+    |
+    | Cloud processing remains on the regular processing queue, while local
+    | heavy AI processing is isolated on a serialized dedicated queue.
+    |
+    */
+
+    'processing' => [
+        'cloud_queue' => env('PROCESSING_QUEUE', 'default'),
+        'local_queue' => env('LOCAL_AI_QUEUE', 'ai-local'),
+        'local_concurrency' => (int) env(
+            'LOCAL_AI_QUEUE_CONCURRENCY',
+            1,
+        ),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Queue Connections
     |--------------------------------------------------------------------------
     |
@@ -48,7 +67,10 @@ return [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),
             'queue' => env('BEANSTALKD_QUEUE', 'default'),
-            'retry_after' => (int) env('BEANSTALKD_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => (int) env(
+                'BEANSTALKD_QUEUE_RETRY_AFTER',
+                90,
+            ),
             'block_for' => 0,
             'after_commit' => false,
         ],
@@ -57,7 +79,10 @@ return [
             'driver' => 'sqs',
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'prefix' => env('SQS_PREFIX', 'https://sqs.us-east-1.amazonaws.com/your-account-id'),
+            'prefix' => env(
+                'SQS_PREFIX',
+                'https://sqs.us-east-1.amazonaws.com/your-account-id',
+            ),
             'queue' => env('SQS_QUEUE', 'default'),
             'suffix' => env('SQS_SUFFIX'),
             'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
@@ -66,9 +91,15 @@ return [
 
         'redis' => [
             'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'connection' => env(
+                'REDIS_QUEUE_CONNECTION',
+                'default',
+            ),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => (int) env(
+                'REDIS_QUEUE_RETRY_AFTER',
+                90,
+            ),
             'block_for' => null,
             'after_commit' => false,
         ],
@@ -98,7 +129,7 @@ return [
     |
     | The following options configure the database and table that store job
     | batching information. These options can be updated to any database
-    | connection and table which has been defined by your application.
+    | connection which has been defined by your application.
     |
     */
 
@@ -113,15 +144,15 @@ return [
     |--------------------------------------------------------------------------
     |
     | These options configure the behavior of failed queue job logging so you
-    | can control how and where failed jobs are stored. Laravel ships with
-    | support for storing failed jobs in a simple file or in a database.
-    |
-    | Supported drivers: "database-uuids", "dynamodb", "file", "null"
+    | can control how and where failed jobs are stored.
     |
     */
 
     'failed' => [
-        'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
+        'driver' => env(
+            'QUEUE_FAILED_DRIVER',
+            'database-uuids',
+        ),
         'database' => env('DB_CONNECTION', 'sqlite'),
         'table' => 'failed_jobs',
     ],

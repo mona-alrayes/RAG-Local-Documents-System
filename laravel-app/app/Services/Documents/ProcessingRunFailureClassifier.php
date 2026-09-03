@@ -3,6 +3,7 @@
 namespace App\Services\Documents;
 
 use App\Exceptions\AiServiceException;
+use App\Exceptions\LocalHeavyResourceBusyException;
 use Illuminate\Http\Client\ConnectionException;
 use Throwable;
 
@@ -26,6 +27,10 @@ class ProcessingRunFailureClassifier
 
     public function isRetryable(Throwable $exception): bool
     {
+        if ($exception instanceof LocalHeavyResourceBusyException) {
+            return true;
+        }
+
         if (! $exception instanceof AiServiceException) {
             return false;
         }
