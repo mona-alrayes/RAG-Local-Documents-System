@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — I2 مكتملة ومدموجة في PR #95؛ أصبحت Workspace Dashboard والوثائق الحديثة في Sidebar جاهزة؛ I3 هي المهمة الحالية
+> **الحالة العامة:** قيد التنفيذ — I3 مكتملة ومدموجة في PR #96؛ أصبحت صفحة Documents إدارة وثائق فعلية ببطاقات وفلاتر وبحث؛ I4 هي المهمة الحالية
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: fa8041b3afc78e4d21419ece8dd405d425702aba
-Last Merged Feature PR on main: #95 — I2 Workspace Dashboard
-Latest Task PR: #95 — I2 Workspace Dashboard
-Verified I2 Feature Commit:
-- 67f96f5da27f528f2fe57bbdd79136d78e255058 — I2 workspace dashboard and document sidebar
-Verified I2 Merge Commit: fa8041b3afc78e4d21419ece8dd405d425702aba
-Documentation Baseline: تم تسجيل اكتمال I2 وتسليم I3 Documents list / cards / filters كمهمة حالية.
+Verified Main Commit: 356a897b20dfee543e20791664baa2dec7b45038
+Last Merged Feature PR on main: #96 — I3 Documents List / Cards / Filters
+Latest Task PR: #96 — I3 Documents List / Cards / Filters
+Verified I3 Feature Commit:
+- e5e6c0b119578eb1753f2072a50afb2ab8448fcd — I3 documents list / cards / filters
+Verified I3 Merge Commit: 356a897b20dfee543e20791664baa2dec7b45038
+Documentation Baseline: تم تسجيل اكتمال I3 وتسليم I4 One-file upload + capability-aware Cloud/Hybrid Local choice كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-I2 — Workspace Dashboard
+I3 — Documents List / Cards / Filters
 
 Current Phase:
 I — Blade Documents Experience
@@ -91,22 +91,31 @@ Architectural Result:
 - أضيفت قائمة إجراءات موحدة للوثيقة: عرض التفاصيل، التحميل، إعادة المعالجة، والحذف، مع احترام presentation hints: `canDownload`, `canReprocess`, `canDelete`.
 - أعيد استخدام `DocumentReadService::recentForUser()` مع eager loading للـ`activeProcessingRun` و`latestAttempt` لمنع N+1، وبقيت كل Queries user-scoped لمنع تسريب وثائق مستخدم آخر.
 - أضيفت اختبارات I2 للـWorkspace Dashboard والـApp Shell/Sidebar بما يشمل عزل بيانات المستخدم وعرض الحالات والإجراءات.
+- حولت I3 `/documents` إلى صفحة إدارة وثائق فعلية داخل App Shell الحالي، واستخدمت `DocumentReadService` وH12 Presentation DTOs بدل query مباشر داخل Controller/Blade.
+- تدعم I3 pagination والبحث وفلتر Document status وفلتر file type عبر query string، وتحافظ على قيم الفلاتر أثناء pagination.
+- تستخدم I3 document cards responsive بدل جدول إداري ثقيل، وتعرض title/original filename/type/file size/status/timestamp.
+- تعيد I3 استخدام `documents.status-indicator` و`documents.actions-menu` وتحترم `canDownload`, `canReprocess`, `canDelete`، وتعرض reprocessing indicator عند الحاجة.
+- لا تعرض I3 raw `failure_reason`؛ تستخدم safe failure presentation، وتفصل بين no documents empty state وfiltered no-results empty state.
+- بقيت Queries user-scoped مع eager loading للـactive/latest processing runs لمنع N+1.
+- أضيف `DocumentReadService::hasAnyForUser()` لدعم empty-state distinction، وأصلح بناء user-scoped query باستخدام relation `getQuery()` ليتوافق مع typed Builder المستخدم في filter/search methods.
 
 Latest Verification:
-PR #95 merged on GitHub: PASS
-PR head commit: 67f96f5da27f528f2fe57bbdd79136d78e255058
-PR merge commit: fa8041b3afc78e4d21419ece8dd405d425702aba
-main verified at I2 merge commit fa8041b3afc78e4d21419ece8dd405d425702aba before this progress update: PASS
-WorkspaceDashboardTest: 2 passed (9 assertions)
-AppShellTest: 2 passed (27 assertions)
-Laravel full regression: 144 passed (715 assertions)
-Laravel Pint on I2 files: PASS
-Frontend build: npm run build — PASS
+PR #96 merged on GitHub: PASS
+PR head commit: e5e6c0b119578eb1753f2072a50afb2ab8448fcd
+PR merge commit: 356a897b20dfee543e20791664baa2dec7b45038
+main verified at I3 merge commit 356a897b20dfee543e20791664baa2dec7b45038 before this progress update: PASS
+DocumentPagesTest: 8 passed (21 assertions)
+I1/I2 regression — AppShellTest + WorkspaceDashboardTest: 4 passed (36 assertions)
+Laravel full regression: 149 passed (728 assertions)
+Laravel Pint on I3 files: PASS
+Frontend: npm run build — PASS
 Manual browser verification: PASS
-FastAPI: لم تُشغّل الاختبارات لأن I2 لم تغيّر FastAPI.
+Visual verification: /documents cards, search, status filter, file type filter, and empty states — PASS
+Status filter verified to display actual values such as pending, processing, ready, failed instead of translation keys such as documents.availability.pending — PASS
+FastAPI: لم تُشغّل الاختبارات لأن I3 لم تغيّر FastAPI.
 
 Current Task:
-I3 — Documents list / cards / filters
+I4 — One-file upload + capability-aware Cloud/Hybrid Local choice
 
 Open Blockers: none
 ```
@@ -562,7 +571,7 @@ FastAPI:
 |---|---|
 | I1 Responsive app shell / sidebar | DONE |
 | I2 Workspace dashboard | DONE |
-| I3 Documents list / cards / filters | TODO |
+| I3 Documents list / cards / filters | DONE |
 | I4 One-file upload + capability-aware Cloud/Hybrid Local choice | TODO |
 | I5 Document details / processing timeline | TODO |
 | I6 Accessibility / responsive / error states | TODO |
@@ -664,6 +673,66 @@ PASS
 
 FastAPI:
 لم تُشغّل الاختبارات لأن I2 لم تغيّر FastAPI.
+```
+
+### I3 — Documents List / Cards / Filters
+
+**الحالة:** `DONE` ومتحقق منها في PR #96 والمدمجة في `main`.
+
+تم تنفيذ:
+
+- تحويل `/documents` إلى صفحة إدارة وثائق فعلية داخل App Shell الحالي.
+- استخدام `DocumentReadService` وH12 Presentation DTOs بدل query مباشر داخل Controller/Blade.
+- دعم pagination والبحث وفلتر Document status وفلتر file type.
+- تشغيل الفلاتر عبر query string والحفاظ على قيمها أثناء pagination.
+- استخدام document cards responsive بدل جدول إداري ثقيل.
+- عرض title/original filename/type/file size/status/timestamp.
+- إعادة استخدام `documents.status-indicator` و`documents.actions-menu`.
+- احترام `canDownload`, `canReprocess`, `canDelete` وعدم إعادة تعريف صلاحيات الإجراءات في Blade.
+- إظهار reprocessing indicator عند الحاجة.
+- عدم عرض raw `failure_reason` للمستخدم، واستخدام safe failure presentation.
+- التمييز بين no documents empty state وfiltered no-results empty state.
+- الحفاظ على user scoping في كل القراءة.
+- eager loading للـactive/latest processing runs ومنع N+1.
+- إضافة `hasAnyForUser()` إلى `DocumentReadService` لدعم empty-state distinction.
+- إصلاح بناء user-scoped query باستخدام relation `getQuery()` بما يتوافق مع typed Builder المستخدم في filter/search methods.
+- إصلاح عرض status filter بحيث يعرض القيم الفعلية مثل `pending`, `processing`, `ready`, `failed` بدل ظهور translation keys مثل `documents.availability.pending`.
+
+Verification المثبت لـI3:
+
+```text
+PR #96 merged on GitHub: PASS
+Feature commit:
+- e5e6c0b119578eb1753f2072a50afb2ab8448fcd
+Merge commit:
+- 356a897b20dfee543e20791664baa2dec7b45038
+
+DocumentPagesTest:
+8 passed (21 assertions)
+
+I1/I2 regression — AppShellTest + WorkspaceDashboardTest:
+4 passed (36 assertions)
+
+Laravel full regression:
+149 passed (728 assertions)
+
+Laravel Pint on I3 files:
+PASS
+
+Frontend:
+npm run build — PASS
+
+Manual browser verification:
+PASS
+- `/documents`
+- cards
+- search
+- status filter
+- file type filter
+- empty states
+
+FastAPI:
+لم تُشغّل الاختبارات لأن I3 لم تغيّر FastAPI.
 ```
 
 الواجهة تعرض فقط Processing Profiles المتاحة فعلياً من Capabilities.
@@ -1230,7 +1299,7 @@ FastAPI:
 لم تُشغّل الاختبارات لأن I1 لم تغيّر FastAPI.
 ```
 
-## آخر مهمة مكتملة — I2 Workspace Dashboard
+## المهمة السابقة المكتملة — I2 Workspace Dashboard
 
 **الحالة:** `DONE` ومتحقق منها في PR #95، والمدمجة في `main` عند merge commit `fa8041b3afc78e4d21419ece8dd405d425702aba`.
 
@@ -1278,18 +1347,81 @@ FastAPI:
 لم تُشغّل الاختبارات لأن I2 لم تغيّر FastAPI.
 ```
 
+## آخر مهمة مكتملة — I3 Documents List / Cards / Filters
+
+**الحالة:** `DONE` ومتحقق منها في PR #96، والمدمجة في `main` عند merge commit `356a897b20dfee543e20791664baa2dec7b45038`.
+
+تم تنفيذ:
+
+- تحويل `/documents` إلى صفحة إدارة وثائق فعلية داخل App Shell الحالي.
+- استخدام `DocumentReadService` وH12 Presentation DTOs بدل query مباشر داخل Controller/Blade.
+- دعم pagination.
+- إضافة البحث.
+- إضافة فلتر Document status.
+- إضافة فلتر file type.
+- الفلاتر تعمل عبر query string وتحافظ على قيمها أثناء pagination.
+- استخدام document cards responsive بدل جدول إداري ثقيل.
+- عرض title/original filename/type/file size/status/timestamp.
+- إعادة استخدام `documents.status-indicator` و`documents.actions-menu`.
+- احترام `canDownload`, `canReprocess`, `canDelete`.
+- إظهار reprocessing indicator عند الحاجة.
+- عدم عرض raw `failure_reason` للمستخدم، واستخدام safe failure presentation.
+- التمييز بين no documents empty state وfiltered no-results empty state.
+- الحفاظ على user scoping.
+- eager loading للـactive/latest processing runs ومنع N+1.
+- إضافة `hasAnyForUser()` إلى `DocumentReadService` لدعم empty-state distinction.
+- إصلاح بناء user-scoped query باستخدام relation `getQuery()` بما يتوافق مع typed Builder المستخدم في filter/search methods.
+- إصلاح عرض status filter بحيث يعرض القيم الفعلية مثل `pending`, `processing`, `ready`, `failed` بدل ظهور translation keys مثل `documents.availability.pending`.
+
+### Verification I3
+
+```text
+PR #96 merged on GitHub: PASS
+Feature commit:
+- e5e6c0b119578eb1753f2072a50afb2ab8448fcd
+Merge commit:
+- 356a897b20dfee543e20791664baa2dec7b45038
+
+DocumentPagesTest:
+8 passed (21 assertions)
+
+I1/I2 regression — AppShellTest + WorkspaceDashboardTest:
+4 passed (36 assertions)
+
+Laravel full regression:
+149 passed (728 assertions)
+
+Laravel Pint on I3 files:
+PASS
+
+Frontend:
+npm run build — PASS
+
+Manual browser verification:
+PASS
+- `/documents`
+- cards
+- search
+- status filter
+- file type filter
+- empty states
+
+FastAPI:
+لم تُشغّل الاختبارات لأن I3 لم تغيّر FastAPI.
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-I3 — Documents list / cards / filters
+I4 — One-file upload + capability-aware Cloud/Hybrid Local choice
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت I2 في main عبر PR #95 وأصبحت Workspace Dashboard الفعلية وقائمة أحدث الوثائق داخل الـSidebar جاهزتين.
-تبدأ I3 — Documents list / cards / filters وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك H12 list/filter/read contract بدلاً من إعادة تفسير حالات Documents محلياً.
-يبقى App Shell وWorkspace Dashboard الناتجان عن I1/I2 قاعدة الواجهة؛ لا يعاد تصميمهما ضمن I3 إلا بما يلزم لدمج صفحة الوثائق ضمن نفس العقود.
+دُمجت I3 في main عبر PR #96 وأصبحت صفحة Documents إدارة وثائق فعلية ببطاقات responsive وبحث وفلاتر status/file type وpagination تحافظ على query string، مع empty states منفصلة وآمنة.
+تبدأ I4 — One-file upload + capability-aware Cloud/Hybrid Local choice وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك H12 capability availability وH13 Upload command بدلاً من إعادة تعريف قواعد Availability أو orchestration داخل الواجهة.
+يبقى App Shell وWorkspace Dashboard وصفحة Documents الناتجة عن I1/I2/I3 قاعدة الواجهة؛ لا يعاد تصميمها ضمن I4 إلا بما يلزم لدمج one-file upload ضمن العقود الحالية.
 لا تغيّر المرحلة I عقود H12/H13 أو Business State داخل Blade/JavaScript دون توثيق gap معماري صريح.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
