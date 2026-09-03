@@ -1,12 +1,13 @@
 <?php
 
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('/workspace', 'workspace.index')
+    Route::get('/workspace', WorkspaceController::class)
         ->name('workspace');
 
     Route::view('/settings/account', 'settings.account')
