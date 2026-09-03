@@ -130,6 +130,38 @@ final class DocumentReadService
     }
 
     /**
+     * Get the most recent presentation-ready documents for the given user.
+     *
+     * يتم استخدام هذا الـmethod من الأماكن التي تحتاج قائمة صغيرة
+     * من أحدث وثائق المستخدم، مثل الـDashboard والـSidebar.
+     *
+     * يتم تحميل العلاقات المطلوبة مسبقًا لتجنب N+1،
+     * ثم تحويل الوثائق إلى DocumentSummaryData جاهزة للعرض.
+     *
+     * @return list<DocumentSummaryData>
+     */
+    public function recentForUser(
+        User $user,
+        int $limit = 5,
+    ): array {
+        return $user->documents()
+            ->with([
+                'activeProcessingRun',
+                'latestAttempt',
+            ])
+            ->latest('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(
+                fn (Document $document): DocumentSummaryData => $this
+                    ->summaryMapper
+                    ->map($document),
+            )
+            ->values()
+            ->all();
+    }
+
+    /**
      * Build the user-scoped documents dashboard summary.
      *
      * هذا الـmethod يعطي البيانات الأساسية المطلوبة للـDashboard بدون
@@ -180,21 +212,7 @@ final class DocumentReadService
             })
             ->count();
 
-        $recentDocuments = $user->documents()
-            ->with([
-                'activeProcessingRun',
-                'latestAttempt',
-            ])
-            ->latest('created_at')
-            ->limit(5)
-            ->get()
-            ->map(
-                fn (Document $document): DocumentSummaryData => $this
-                    ->summaryMapper
-                    ->map($document),
-            )
-            ->values()
-            ->all();
+        $recentDocuments = $this->recentForUser($user);
 
         $recentFailures = $user->documents()
             ->with([
