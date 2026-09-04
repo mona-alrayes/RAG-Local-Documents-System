@@ -2,8 +2,8 @@
 
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
-> **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — J7 مكتملة ومدموجة في PR #106؛ أصبح اختيار وربط وثيقة واحدة أو عدة وثائق بالمحادثة user-scoped ومحمياً، وأصبحت J8 — Ready / indexed / runtime-capable document filtering هي المهمة الحالية وفق الـMaster Plan
+> **آخر تحديث:** 2026-09-05
+> **الحالة العامة:** قيد التنفيذ — J8 مكتملة ومدموجة في PR #107؛ أصبح اختيار الوثائق منفصلاً عن صلاحيتها التشغيلية، وأصبحت واجهات الوثائق والمحادثة Reactive عبر Livewire وtargeted conditional polling دون Manual Browser Refresh، والمهمة الحالية هي K1 — Trusted document_targets وفق الـMaster Plan
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: c519fe270a6383e687e203a360bb7963f97a0df3
-Last Merged Feature PR on main: #106 — J7 Multi-document selection
-Latest Task PR: #106 — J7 Multi-document selection
-Verified J7 Feature Commit:
-- 6ac9a0406968d3b26db5a8a04ba141a17d286aec — J7 add multi-document conversation selection
-Verified J7 Merge Commit: c519fe270a6383e687e203a360bb7963f97a0df3
-Documentation Baseline: تم تسجيل اكتمال J7 وتسليم J8 — Ready / indexed / runtime-capable document filtering كمهمة حالية؛ أصبح المستخدم المسجل يستطيع إدارة وثائق Conversation يملكها عبر اختيار وثيقة واحدة أو عدة وثائق من وثائقه فقط، وتغيير الاختيار أو إزالته بالكامل باستخدام علاقة `Conversation::documents()` و`sync()`، مع حماية Conversation عبر `ConversationPolicy` والتحقق Server-side من ملكية كل `document_id`. لم تنفذ J7 أي Ready/Indexed/runtime-capable filtering أو Retrieval أو FastAPI أو Qdrant retrieval أو LLM/Chat execution؛ هذه الحدود تبدأ في J8 وما بعدها.
+Verified Main Commit: 5d4804fec694b26a102802965c28720f0664580e
+Last Merged Feature PR on main: #107 — J8 Ready / indexed / runtime-capable document filtering and reactive UI
+Latest Task PR: #107 — J8 Ready / indexed / runtime-capable document filtering and reactive UI
+Verified J8 Feature Commit:
+- fee362ea9dd031d53e0516ec800ed0ab0b01df29 — J8 runtime-capable document filtering and reactive UI
+Verified J8 Merge Commit: 5d4804fec694b26a102802965c28720f0664580e
+Documentation Baseline: تم تسجيل اكتمال J8 وتسليم K1 — Trusted document_targets كمهمة حالية؛ أصبح `conversation_document` يمثل اختيار/ربط المستخدم فقط، بينما يحدد `ConversationRuntimeDocumentService` مجموعة الوثائق runtime-capable بصورة مستقلة وuser-scoped، مع إعادة استخدام `DocumentAvailabilityResolver` كمصدر الحقيقة للجاهزية والفشل المغلق عند active run مفقودة/فاسدة/cross-document. الوثيقة المختارة غير الجاهزة تبقى مرتبطة بالمحادثة ولا تدخل runtime set، وعندما تصبح جاهزة لاحقاً تدخل تلقائياً دون detach/reattach. كما أصبحت واجهة اختيار وثائق المحادثة Livewire reactive، وتحديثات Workspace/Documents/Sidebar/Document Details تعتمد Laravel/MySQL وPresentation Layer مع targeted conditional Livewire polling وتتوقف عند stable/terminal states. أزيل اعتماد الواجهة على `window.location.reload()` كآلية polling، ويستخدم Livewire navigation عند الحاجة. لم تنفذ J8 Retrieval أو FastAPI query أو Qdrant retrieval أو LLM/Chat execution؛ تبدأ هذه الحدود من K وما بعدها.
 
 Current Working Branch: main
 
@@ -31,10 +31,10 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-J7 — Multi-document selection
+J8 — Ready / indexed / runtime-capable document filtering
 
 Current Phase:
-J — Conversations Database
+K — Retrieval and Reranking
 
 Architectural Result:
 - كل ProcessingRun تستخدم Processing Profile واحدة موثوقة: cloud | hybrid_local.
@@ -116,7 +116,9 @@ Architectural Result:
 - حسنت I6 Responsive لواجهات Workspace وDocuments list وDocument details والإجراءات والنوافذ على الشاشات الصغيرة 320–375px والتابلت والديسكتوب، مع معالجة النصوص وأسماء الملفات الطويلة والـoverflow.
 - وحّدت I6 حالات النجاح والتحذير والخطأ برسائل localized وآمنة، ومنعت كشف raw `failure_reason` أو تفاصيل داخلية حساسة للمستخدم.
 - حافظت I6 على الفصل بين `Document.status` وجاهزية الوثيقة وبين `ProcessingRun.status` وتقدم المحاولة، ولم تنشئ Business State Machine داخل JavaScript.
-- أضافت I6 polling endpoint في Laravel لطبقة العرض؛ يحدد السيرفر `poll_required`، وتستخدم JavaScript هذا القرار فقط لتحديث الواجهة وتتوقف عند الحالات النهائية دون إعادة تفسير الحالة محليًا.
+- أضافت I6 polling endpoint في Laravel لطبقة العرض، لكن J8 استبدلت آلية التحديث القديمة المعتمدة على JavaScript fetch + `window.location.reload()` بـtargeted conditional Livewire polling وLivewire navigation عند تغير snapshot.
+- أصبحت Workspace/Documents/Sidebar/Document Details تتحدث تلقائيًا اعتمادًا على Laravel/MySQL وPresentation Layer، مع تشغيل polling فقط عند `poll_required` أو hint موثوقة مكافئة وإيقافه عند stable/terminal state.
+- لا يوجد Browser polling مباشر إلى FastAPI أو Qdrant، ولا يعاد تفسير lifecycle داخل JavaScript.
 - حافظت I6 على private preview/download behavior وصلاحيات الوصول الحالية دون تحويل الملفات إلى Public URLs.
 - أضافت J1 جدول `conversations` في Laravel/MySQL، وكل Conversation مملوكة لمستخدم عبر `user_id` مع FK يستخدم `restrictOnDelete()` بما يتوافق مع النمط الحالي.
 - أضافت J1 حقل `title` nullable لدعم توليد اسم افتراضي للمحادثة لاحقًا من محتواها وإتاحة إعادة التسمية لاحقًا، دون تنفيذ منطق التوليد أو UI/API لإعادة التسمية في هذه المهمة.
@@ -124,7 +126,7 @@ Architectural Result:
 - لم تضف J1 document selection أو Messages أو Message sources أو Policies أو Conversation UI/controllers أو RAG/Retrieval/FastAPI/Qdrant/streaming/conversation memory.
 - أضافت J2 جدول pivot باسم `conversation_document` وعلاقة Many-to-Many بين `Conversation` و`Document` مع علاقات Eloquent من الجهتين.
 - تمنع J2 تكرار نفس `conversation_id/document_id` عبر unique constraint، وتستخدم Foreign Keys إلى `conversations` و`documents` مع `cascadeOnDelete()` لأن سجلات العلاقة ليست Business Entity مستقلة.
-- لا يوجد Pivot Model مستقل لأن الجدول يمثل علاقة فقط ولا يحمل business state، وتبقى Laravel/MySQL مصدر الحقيقة لهذه العلاقة.
+- لا يوجد Pivot Model مستقل لأن الجدول يمثل العلاقة فقط ولا يحمل business state، وتبقى Laravel/MySQL مصدر الحقيقة لهذه العلاقة.
 - لم تضف J2 document selection flow أو authorization أو UI أو RAG، كما لم تحاول حل cross-user document selection عبر schema معقد أو trigger؛ يفرض ذلك لاحقًا في application layer عند تنفيذ document selection flow.
 - أضافت J3 جدول `messages` و`Message` model وربط `Conversation -> Messages`، مع `MessageRole` (`user`, `assistant`) و`MessageStatus` (`pending`, `completed`, `failed`).
 - تخزن J3 `content` و`execution_snapshot` و`metrics`، مع casts مناسبة للـenums وحقول JSON.
@@ -146,37 +148,51 @@ Architectural Result:
 - أضافت J7 workflow لاختيار وثيقة واحدة أو عدة وثائق وربطها بمحادثة يملكها المستخدم، مع تغيير الاختيار أو إزالته بالكامل لاحقًا.
 - تستخدم J7 علاقة `Conversation::documents()` و`sync()` لمزامنة الاختيار الحالي ومنع duplicate pivot rows، وتعرض فقط وثائق المستخدم الحالي.
 - تحمي J7 الـConversation عبر `ConversationPolicy` وتتحقق Server-side من أن كل `document_id` يعود للمستخدم الحالي، وتغطي owner / other user / guest وترفض cross-user document linking.
-- لا تنفذ J7 أي Ready / Indexed / runtime-capable filtering؛ هذا مؤجل صراحةً إلى J8، كما لا تنفذ Retrieval أو FastAPI أو Qdrant retrieval أو LLM/Chat execution.
+- J8 فصلت `selected/attached` عن `runtime-capable`: الوثيقة غير الجاهزة تبقى مرتبطة بالمحادثة لكن تستبعد من runtime set حتى تصبح جاهزة.
+- أضيف `ConversationRuntimeDocumentService` لحل الوثائق القابلة للاستخدام فعلياً في RAG للمحادثة، مع owner scoping وإعادة استخدام `DocumentAvailabilityResolver` والفشل المغلق عند active run غير صالحة أو cross-document.
+- تحافظ J8 على Safe Reprocessing invariant: Run A الفعالة والمفهرسة تبقي الوثيقة `Ready` حتى لو كانت Run B الجديدة pending/processing/indexing/failed.
+- أصبحت واجهة اختيار وثائق المحادثة Livewire component؛ اختيار المستخدم يتحدث فورياً، وتغير readiness في الخلفية يظهر عبر targeted conditional Livewire polling دون detach/reattach أو Manual Browser Refresh.
+- أضيفت Livewire components مستقلة لتحديث حالات Workspace/Documents/Sidebar/Document Details بصورة تفاعلية اعتمادًا على Presentation Layer الحالية.
+- يستمر polling فقط عندما يقرر السيرفر `poll_required`، ويتوقف عند stable/terminal state؛ لا polling دائم ولا Browser polling مباشر إلى FastAPI/Qdrant.
+- أزيل اعتماد الواجهة القديمة على `data-document-poll-url`, `data-document-poll-error`, و`window.location.reload()` كمسار التحديث، ويستخدم `Livewire.navigate()` عند تغير snapshot مع الحفاظ على scroll عند الحاجة.
+- لم تنفذ J8 Retrieval أو FastAPI query أو Qdrant retrieval أو LLM answer generation أو Messages/Chat execution.
 
 Latest Verification:
-PR #106 merged on GitHub: PASS
-PR head commit: 6ac9a0406968d3b26db5a8a04ba141a17d286aec
-PR merge commit: c519fe270a6383e687e203a360bb7963f97a0df3
-main verified at J7 merge commit c519fe270a6383e687e203a360bb7963f97a0df3 before this progress update: PASS
+PR #107 merged on GitHub: PASS
+PR head commit: fee362ea9dd031d53e0516ec800ed0ab0b01df29
+PR merge commit: 5d4804fec694b26a102802965c28720f0664580e
+main verified at J8 merge commit 5d4804fec694b26a102802965c28720f0664580e before this documentation update: PASS
 
-Focused J7 tests:
-18 passed (73 assertions)
+Focused J8 + reactive tests:
+14 passed (35 assertions)
+
+DocumentDetailsPage regression:
+5 passed (23 assertions)
 
 Laravel Pint:
 PASS
 
+Frontend production build:
+PASS
+
 Full Laravel suite:
-194 passed (923 assertions)
+207 passed (956 assertions)
 
 Current Task:
-J8 — Ready / indexed / runtime-capable document filtering
+K1 — Trusted document_targets
 
-J7 Completion:
-- أضيفت صفحة لإدارة وثائق المحادثة.
-- تعرض الصفحة وثائق المستخدم الحالي فقط.
-- يدعم الاختيار وثيقة واحدة أو عدة وثائق.
-- يمكن تغيير الاختيار لاحقًا أو إزالة وثيقة أو إلغاء تحديد جميع الوثائق.
-- تستخدم العلاقة الحالية `Conversation::documents()` مع `sync()` لمزامنة الاختيار ومنع duplicate pivot rows.
-- تتحقق ملكية Conversation عبر `ConversationPolicy`.
-- يتحقق Server-side من أن كل `document_id` يعود للمستخدم الحالي، وتُرفض محاولة ربط وثيقة مملوكة لمستخدم آخر.
-- تغطي الحماية owner / other user / guest.
-- لم ينفذ Ready / Indexed / runtime-capable filtering أو Retrieval أو FastAPI أو Qdrant retrieval أو LLM answer generation أو Messages / Chat execution ضمن J7.
-- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي J8 — Ready / indexed / runtime-capable document filtering.
+J8 Completion:
+- أضيف `ConversationRuntimeDocumentService` وفصل selection عن runtime capability.
+- التحقق user-scoped ويفشل مغلقًا عند active run مفقودة/فاسدة/cross-document.
+- يعاد استخدام `DocumentAvailabilityResolver` كمصدر الحقيقة للجاهزية بدل إنشاء lifecycle جديد.
+- selected/unready document تبقى attached وتستبعد من runtime set فقط.
+- عندما تصبح الوثيقة جاهزة لاحقاً تصبح runtime-capable تلقائياً دون detach/reattach.
+- Safe Reprocessing يحافظ على Ready طالما active indexed Run A ما زالت صالحة، مهما كانت latest Run B جارية أو فاشلة.
+- Conversation document selector أصبح Livewire/reactive مع targeted polling للجاهزية المتغيرة في الخلفية.
+- Workspace/Documents/Sidebar/Document Details أصبحت تتحدث تلقائياً عبر Laravel/MySQL + existing presentation services + targeted conditional Livewire polling.
+- أزيلت آلية polling القديمة القائمة على fetch + `window.location.reload()`، ويستخدم Livewire navigation حيث يلزم.
+- لم تضف J8 Retrieval أو FastAPI query أو Qdrant retrieval أو LLM/Chat execution.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K1 — Trusted document_targets.
 
 Open Blockers: none
 ```
@@ -206,6 +222,7 @@ Open Blockers: none
 9. المهام غير المطلوبة في Target Architecture تزال من خريطة التنفيذ النشطة بالكامل؛ تاريخها محفوظ في Git.
 10. عند حذف مهمة من الخطة النشطة يعاد ترقيم المهام اللاحقة داخل المرحلة، وإذا أزيلت مرحلة كاملة يعاد ترقيم المراحل اللاحقة.
 11. لا تبدأ المرحلة I قبل اكتمال Frontend Backend Readiness Gate في H8–H13 والتحقق من عقود الحالات والقراءة والأوامر.
+12. Livewire يبقى Presentation/Interaction layer؛ أي state متغيرة في الخلفية تقرأ من Laravel/MySQL عبر العقود الحالية وتحدث عبر targeted conditional polling فقط عند الحاجة، بينما Chat token output يستخدم streaming لا polling.
 
 ---
 
@@ -704,6 +721,7 @@ FastAPI:
 - الحفاظ على user scoping في كل القراءة ومنع تسريب وثائق مستخدم آخر.
 - استخدام eager loading للـ`activeProcessingRun` و`latestAttempt` لتجنب N+1.
 - إضافة `WorkspaceDashboardTest` وامتداد `AppShellTest` لتغطية الـDashboard والـSidebar وعزل بيانات المستخدم.
+- بعد J8 تتحدث counters/status summaries والـrecent documents والـSidebar تلقائياً عند تغيّر الحالة في الخلفية عبر targeted Livewire polling فقط عندما تكون `poll_required` فعالة.
 
 Verification المثبت لـI2:
 
@@ -758,6 +776,7 @@ FastAPI:
 - إضافة `hasAnyForUser()` إلى `DocumentReadService` لدعم empty-state distinction.
 - إصلاح بناء user-scoped query باستخدام relation `getQuery()` بما يتوافق مع typed Builder المستخدم في filter/search methods.
 - إصلاح عرض status filter بحيث يعرض القيم الفعلية مثل `pending`, `processing`, `ready`, `failed` بدل ظهور translation keys مثل `documents.availability.pending`.
+- بعد J8 تتحدث document cards/statuses تلقائياً عندما تتغير processing state في الخلفية عبر targeted conditional Livewire polling، دون إعادة تفسير lifecycle داخل الواجهة ودون polling دائم.
 
 Verification المثبت لـI3:
 
@@ -860,6 +879,7 @@ FastAPI:
   - PDF → inline browser preview.
   - TXT → inline browser preview كـUTF-8 plain text.
   - DOCX → Download فقط بدون browser preview.
+- بعد J8 تتحدث `document_availability`, `active_run`, `latest_attempt` والـtimeline تلقائياً أثناء processing/reprocessing عبر targeted Livewire polling، مع بقاء Safe Reprocessing invariant أعلى من latest attempt.
 
 Verification المثبت لـI5:
 
@@ -909,8 +929,9 @@ PASS
 - تحسين عرض حالات النجاح والتحذير والخطأ برسائل localized وآمنة للمستخدم.
 - منع كشف raw `failure_reason` أو أي تفاصيل داخلية حساسة في واجهات الوثائق.
 - الحفاظ على الفصل بين Document status وجاهزية الوثيقة وبين ProcessingRun status وتقدم محاولة المعالجة، بما يشمل reprocessing مع بقاء النسخة الفعالة مستقلة عن أحدث محاولة.
-- إضافة `DocumentPollingController` وendpoint polling داخل Laravel لطبقة العرض فقط؛ يعيد السيرفر `poll_required` ويظل Laravel/MySQL مصدر الحقيقة للحالة.
-- JavaScript لا تنشئ Business State Machine ولا تستنتج الانتقالات؛ تستخدم `poll_required` Server-side لتحديد استمرار polling وتتوقف عند terminal states، مع معالجة محدودة وآمنة لفشل الاتصال.
+- كانت I6 قد أضافت `DocumentPollingController` وpolling endpoint في Laravel مع JavaScript محدود؛ J8 أبقت Laravel/MySQL مصدر الحقيقة لكنها نقلت آلية الواجهة إلى Livewire targeted/conditional polling و`Livewire.navigate()` عند تغير snapshot.
+- لا تنشئ Livewire أو JavaScript Business State Machine ولا تستنتج الانتقالات؛ `poll_required` أو presentation hint موثوقة مكافئة تحدد استمرار polling، ويتوقف عند stable/terminal states.
+- لا تعتمد الواجهة الحالية على `data-document-poll-url`, `data-document-poll-error`, أو `window.location.reload()` كتصميم polling مستهدف.
 - تحسين document details / workspace / documents list / actions / modals دون تغيير Domain أو H12/H13 contracts.
 - الحفاظ على private preview/download behavior والـauthorization الحالية دون كشف Public Storage URL.
 
@@ -940,11 +961,11 @@ Full Laravel suite:
 تبعيات المرحلة I الملزمة:
 
 ```text
-I2 ← H12 dashboard summary
-I3 ← H12 list/filter/read contract
+I2 ← H12 dashboard summary + J8 targeted reactive polling
+I3 ← H12 list/filter/read contract + J8 targeted reactive polling
 I4 ← H12 capability availability + H13 Upload command
-I5 ← H12 details/timeline + H13 Reprocess/Delete commands
-I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
+I5 ← H12 details/timeline + H13 Reprocess/Delete commands + J8 reactive state refresh
+I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 ```
 
 ## J — Conversations Database
@@ -958,7 +979,7 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 | J5 Conversation policies | DONE |
 | J6 Create / list conversations | DONE |
 | J7 Multi-document selection | DONE |
-| J8 Ready / indexed / runtime-capable document filtering | TODO |
+| J8 Ready / indexed / runtime-capable document filtering | DONE |
 
 > **J4 finalized in PR #103:** يعتمد `message_sources` على `processing_run_id` للوصول إلى الـProcessingRun ثم Document/Profile/Qdrant provenance دون تكرار حقول مشتقة. أصبح FK الخاص بالـProcessingRun يستخدم `cascadeOnDelete()` بحيث يحذف حذف الـRun مصادرها فقط وتبقى Message نفسها، وتم Consolidate أعمدة `kind` وstage timestamps داخل migration إنشاء ProcessingRun الأصلية مع حذف migration الإضافية القديمة وتحديث اختبارات schema/provenance.
 
@@ -966,7 +987,9 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 
 > **J6 completed in PR #105:** أضيف workflow لإنشاء Conversation وصفحة لعرض Conversations الخاصة بالمستخدم الحالي فقط؛ تستخدم القائمة `viewAny` والإنشاء `create` من `ConversationPolicy`، وتبقى القراءة والإنشاء user-scoped Server-side دون الثقة بـ`user_id` من client. بقي `title` nullable وأضيفت Conversations إلى App Shell / Sidebar، دون تنفيذ document selection أو Messages أو Retrieval أو Chat workflow.
 
-> **J7 completed in PR #106:** أضيف workflow لإدارة اختيار وثيقة واحدة أو عدة وثائق للمحادثة، مع عرض وثائق المستخدم الحالي فقط، وتغيير الاختيار أو إزالته بالكامل عبر `Conversation::documents()->sync()`. تحمي `ConversationPolicy` المحادثة، ويتحقق Server-side من ملكية كل `document_id` ويرفض cross-user linking. لا تتضمن J7 Ready/Indexed/runtime-capable filtering؛ هذا مؤجل إلى J8.
+> **J7 completed in PR #106:** أضيف workflow لإدارة اختيار وثيقة واحدة أو عدة وثائق للمحادثة، مع عرض وثائق المستخدم الحالي فقط، وتغيير الاختيار أو إزالته بالكامل عبر `Conversation::documents()->sync()`. تحمي `ConversationPolicy` المحادثة، ويتحقق Server-side من ملكية كل `document_id` ويرفض cross-user linking. `selected/attached` تعني اختيار المستخدم فقط ولا تعني runtime capability.
+
+> **J8 completed in PR #107:** أضيف `ConversationRuntimeDocumentService` لفصل الوثائق المختارة عن الوثائق القابلة للاستخدام فعلياً، مع owner scoping وإعادة استخدام `DocumentAvailabilityResolver` والفشل المغلق عند active run مفقودة/فاسدة/cross-document. الوثيقة المختارة غير الجاهزة تبقى attached وتصبح runtime-capable تلقائياً عند جاهزيتها. كما أصبح selector Livewire reactive، واعتمدت واجهات Workspace/Documents/Sidebar/Details targeted conditional Livewire polling وLivewire navigation بدل reload polling القديم، مع الحفاظ على Safe Reprocessing.
 
 كل Document جاهزة تشير إلى `active_processing_run_id`.
 
@@ -1013,10 +1036,24 @@ Cross-profile هنا يعني دمج نتائج وثائق مفهرسة مسبق
 | M5 Save snapshots / answer / metrics | TODO |
 | M6 Sources drawer / relevance score | TODO |
 | M7 Timings | TODO |
-| M8 Pending / failure / retry + visual completed-answer reveal | TODO |
+| M8 Pending / failure / retry + streamed answer rendering | TODO |
 | M9 Mixed-profile / context / accessibility E2E | TODO |
 
-v1 يستخدم polling + visual completed-answer reveal، بدون Streaming backend.
+العقد المعتمد داخل مهام M الحالية:
+
+```text
+Livewire
+→ chat interaction/state/forms/navigation
+
+Background non-token state
+→ targeted polling where needed
+
+LLM answer tokens
+→ token-by-token streaming
+→ NOT ordinary polling
+```
+
+لا توجد Task مستقلة للStreaming أو Livewire؛ تم دمج المتطلبات داخل المهام الحالية فقط، وتبقى M8 مسؤولة عن streamed answer rendering مع pending/failure/retry.
 
 ## N — Filament
 
@@ -1419,10 +1456,21 @@ Conversation context:
 آخر تبادلين مكتملين فقط
 ```
 
-Answer delivery في v1:
+Frontend background state delivery:
 
 ```text
-polling + completed-answer visual reveal
+Laravel/MySQL source of truth
+→ existing read/presentation contracts
+→ targeted conditional Livewire polling
+→ stop at stable/terminal state
+```
+
+Chat answer delivery:
+
+```text
+LLM answer tokens
+→ token-by-token streaming
+→ not ordinary polling
 ```
 
 ---
@@ -1807,6 +1855,8 @@ Full Laravel suite:
 168 tests / 823 assertions PASS
 ```
 
+> **J8 frontend reactivity update:** أبقت J8 حقيقة أن I6 أسست polling server-side لكنها استبدلت مسار الواجهة القديم بـLivewire components وtargeted conditional polling. لم يعد `window.location.reload()` جزءاً من التصميم المستهدف، وتعمل Workspace/Documents/Sidebar/Document Details بصورة reactive مع إيقاف polling عند الاستقرار.
+
 ## المهمة السابقة المكتملة — J1 Conversations migration / model
 
 **الحالة:** `DONE` ومتحقق منها في PR #100، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `e84467a971e42b88ce88349e8d3a39c1f70a861f`.
@@ -2051,7 +2101,7 @@ Laravel Pint:
 PASS — 164 files
 ```
 
-## آخر مهمة مكتملة — J7 Multi-document selection
+## المهمة السابقة المكتملة — J7 Multi-document selection
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #106، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `c519fe270a6383e687e203a360bb7963f97a0df3`.
 
@@ -2098,19 +2148,69 @@ Laravel Pint:
 PASS
 ```
 
+## آخر مهمة مكتملة — J8 Ready / indexed / runtime-capable document filtering
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #107، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `5d4804fec694b26a102802965c28720f0664580e`.
+
+تم تنفيذ:
+
+- إضافة `ConversationRuntimeDocumentService` كطبقة Application/Domain-facing مستقلة تفصل معنى `selected/attached` عن معنى `runtime-capable`.
+- قراءة Documents المختارة من علاقة المحادثة، مع حصرها بالمستخدم authenticated وإعادة تحميل `activeProcessingRun` اللازمة للتحقق.
+- إعادة استخدام `DocumentAvailabilityResolver` كمصدر الحقيقة لقرار الجاهزية، وعدم إنشاء منطق Ready/Indexed موازٍ داخل Conversation UI أو service.
+- fail-closed عند active processing run مفقودة أو فاسدة أو لا تعود لنفس Document؛ لا تصبح الوثيقة runtime-capable في هذه الحالات.
+- الوثيقة المختارة غير الجاهزة تبقى مرتبطة بالمحادثة ولا تحذف من `conversation_document`؛ تستبعد فقط من runtime-capable set.
+- عند اكتمال فهرسة الوثيقة لاحقاً تصبح runtime-capable تلقائياً دون detach/reattach.
+- الحفاظ على Safe Reprocessing: active indexed Run A تبقي الوثيقة `Ready` وصالحة runtime أثناء Run B الجديدة pending/processing/indexing، كما يبقى A فعالاً إذا فشلت B.
+- تحويل Conversation document selector إلى Livewire component مع immediate user-driven selection state، مع server-side validation/ownership قبل `sync()`.
+- إضافة targeted Livewire polling لاختيار الوثائق عندما توجد Documents ذات `poll_required` لتظهر readiness الجديدة تلقائياً.
+- إضافة `DocumentStatePoller` و`DocumentUiSnapshotService` لتحديث Workspace/Documents library/Document details من Laravel/MySQL وPresentation Layer الحالية دون Browser business logic.
+- إضافة `SidebarDocuments` كـLivewire component مستقل لتحديث قائمة الوثائق في Sidebar دون جعل الصفحة كاملة poll بلا حاجة.
+- إزالة مسار JavaScript القديم الذي كان ينفذ fetch دوري ثم `window.location.reload()` عند تغير snapshot.
+- استخدام `Livewire.navigate()` عند تغير document-state fingerprint مع حفظ/استعادة scroll، واستخدام Livewire navigation في الواجهة حيث يلزم.
+- لا Browser polling مباشر إلى FastAPI أو Qdrant، ولا ثقة بـprocessing_run_id أو qdrant_collection قادمة من Browser.
+- لم تنفذ J8 Retrieval أو FastAPI query أو Qdrant retrieval أو LLM answer generation أو AskConversationJob.
+
+### Verification J8
+
+```text
+PR #107 merged on GitHub: PASS
+Feature branch:
+- task/J8-runtime-capable-document-filtering
+Feature commit:
+- fee362ea9dd031d53e0516ec800ed0ab0b01df29
+Merge commit:
+- 5d4804fec694b26a102802965c28720f0664580e
+
+Focused J8 + reactive tests:
+14 passed (35 assertions)
+
+DocumentDetailsPage regression:
+5 passed (23 assertions)
+
+Laravel Pint:
+PASS
+
+Frontend production build:
+PASS
+
+Full Laravel suite:
+207 passed (956 assertions)
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-J8 — Ready / indexed / runtime-capable document filtering
+K1 — Trusted document_targets
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت J7 ودمجت في main عبر PR #106. أصبح المستخدم المسجل يستطيع اختيار وربط وثيقة واحدة أو عدة وثائق يملكها بمحادثة يملكها، وتغيير الاختيار أو إزالته بالكامل، مع التحقق Server-side من ownership لكل document_id واستخدام sync() للعلاقة الحالية.
-لم تنفذ J7 أي filtering خاص بجاهزية الوثائق أو كونها Indexed/runtime-capable، كما لم تنفذ Retrieval أو FastAPI أو Qdrant retrieval أو LLM/Chat execution.
-يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفيًا هي J8 — Ready / indexed / runtime-capable document filtering.
-تبقى K وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
+اكتملت J8 ودمجت في main عبر PR #107. أصبح اختيار Documents في conversation_document مستقلاً عن صلاحيتها التشغيلية؛ selected/unready document تبقى attached، بينما يقرر ConversationRuntimeDocumentService وDocumentAvailabilityResolver أي selected documents تملك active indexed run صحيحة وتستطيع دخول runtime RAG بصورة fail-closed وuser-scoped.
+أصبحت واجهة Conversation document selector Livewire/reactive، كما أصبحت Workspace/Documents/Sidebar/Document Details تتحدث تلقائياً من Laravel/MySQL عبر Presentation Layer وtargeted conditional Livewire polling الذي يتوقف عند stable/terminal state، دون window.location.reload() polling أو Browser access مباشر إلى FastAPI/Qdrant.
+لم تنفذ J8 Retrieval أو FastAPI query أو Qdrant retrieval أو LLM/Chat execution.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K1 — Trusted document_targets.
+تبقى K وما بعدها دون تغيير من حيث الترقيم، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
 ---

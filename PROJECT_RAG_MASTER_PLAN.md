@@ -15,9 +15,9 @@
 > **إستراتيجية المعالجة:** يختار المستخدم Profile واحداً موثوقاً قبل المعالجة: `cloud` أو `hybrid_local` حسب قدرات البيئة  
 > **إستراتيجية LLM:** `Qwen/Qwen3.5-9B` عبر Hugging Face Router في Cloud، و`qwen3.5:4b` عبر Ollama محلياً  
 > **خطة النشر المرجعية:** Oracle Cloud-only للـ`cloud`، وLocal Demo منفصل للـ`cloud` أو `hybrid_local`  
-> **آخر تحديث معماري:** 2026-09-03
+> **آخر تحديث معماري:** 2026-09-05
 > **Baseline GitHub التاريخي قبل ARC-1:** `main@a1f28097b398b9bb277f85990a55e489bd54d880`
-> **Baseline التطبيقي النشط:** `main` بعد H9 المدمجة في PR #89؛ H10 هي المهمة الحالية
+> **Baseline التطبيقي النشط:** `main` بعد J8 المدمجة في PR #107؛ K1 هي المهمة الحالية
 
 > [!IMPORTANT]
 > هذه النسخة **تستبدل جميع النسخ المعمارية السابقة كمرجع نشط**.
@@ -62,8 +62,9 @@ Git / Pull Requests
 
 ## 0.3 الـBaseline المدموج والقرار التخطيطي الحالي
 
-تم دمج ARC-1 إلى `main` عبر PR #80، ثم اكتملت مهام orchestration حتى H9 عبر
-PR #89. الفرع التاريخي الذي نفذت عليه ARC-1 هو:
+تم دمج ARC-1 إلى `main` عبر PR #80، واكتملت لاحقاً مهام Processing Orchestration
+والـDocuments Experience ثم Conversations حتى J8 المدمجة عبر PR #107. الفرع
+التاريخي الذي نفذت عليه ARC-1 هو:
 
 ```text
 task/remove-compare-winner-flow
@@ -80,8 +81,9 @@ one trusted profile per ProcessingRun
 ```
 
 تمت إزالة كل ما يخص Upload Compare/Winner/temporary comparison artifacts من
-الـactive architecture والكود المدموج. اكتملت H9، والقرار التخطيطي النشط التالي
-هو إنهاء H10–H13 لإكمال Frontend Backend Readiness Gate قبل بدء المرحلة I.
+الـactive architecture والكود المدموج. اكتملت J8، وفُصل اختيار الوثيقة عن
+runtime capability مع Reactive Livewire UI دون تغيير Business State ownership.
+المهمة التنفيذية النشطة التالية هي K1 — Trusted document_targets.
 
 ---
 
@@ -706,7 +708,6 @@ Document.status = ready
 لا يستخدم وجود Run أحدث أو `latest()` وحده لتقرير جاهزية الوثيقة؛ الجاهزية
 تعتمد فقط على active run صريحة وصالحة.
 
-
 ---
 
 # 10. Direct Persistent Indexing
@@ -911,6 +912,9 @@ delete/retire old Run A points safely
 - أي Cleanup للـold points يأتي بعد نجاح switch.
 - deterministic IDs تمنع duplication داخل الـRun نفسه.
 - تغيير Profile أثناء Reprocess مسموح إذا البيئة تدعم Profile الجديدة.
+- Livewire أو targeted polling أو latest attempt لا يجوز أن يخفض `Ready` الفعلية
+  للوثيقة ما دامت Run A active + indexed وصالحة؛ Primary readiness تأتي من
+  `DocumentAvailabilityResolver`، بينما تعرض latest attempt بصورة مستقلة.
 
 ---
 
@@ -1091,6 +1095,9 @@ hybrid_local active run
 
 لا يوجد silent fallback من Local إلى Cloud.
 
+إخراج جواب المحادثة النهائي يستخدم token-by-token streaming في طبقة Chat، ولا
+يستخدم ordinary polling كبديل عن تدفق Tokens.
+
 ---
 
 # 19. Local AI Resource Management
@@ -1183,7 +1190,8 @@ Compare both
 المحاولة الجديدة: Run B
 ```
 
-لا تختزل الواجهة هاتين الحقيقتين في badge واحدة.
+لا تختزل الواجهة هاتين الحقيقتين في badge واحدة، وتتحدث الجاهزية وlatest attempt
+والـtimeline تلقائياً وفق قاعدة Reactivity في 20.6 دون Manual Browser Refresh.
 
 لا تعرض:
 
@@ -1271,12 +1279,61 @@ Dashboard summary
 - كل Queries scoped بالمستخدم ومختبرة ضد IDOR.
 - لا يستخدم Browser `active_processing_run_id` أو collection كمدخل موثوق.
 - list/cards لا تسبب N+1 queries للـactive/latest runs.
-- polling يتوقف عند terminal state ويقرأ من Laravel/MySQL فقط.
+- targeted Livewire polling يقرأ Laravel/MySQL فقط، يعمل فقط عندما تكون
+  `poll_required` أو presentation hint موثوقة مكافئة فعالة، ويتوقف عند stable/terminal state.
 - I2 تستهلك dashboard summary من H12.
 - I3 تستهلك list/filter/read contract من H12.
 - I4 تستهلك Upload + capability availability contract من H12/H13.
 - I5 تستهلك details/timeline وReprocess/Delete commands من H12/H13.
 - I6 تعرض الحالات والأخطاء الآمنة التي يثبتها العقد، ولا تعيد تفسيرها محلياً.
+
+## 20.6 Frontend Reactivity — Cross-cutting architecture requirement
+
+القاعدة العامة:
+
+```text
+Visible state that changes while the user remains on the page
+→ must update without manual refresh
+```
+
+الآلية المعتمدة:
+
+```text
+User-driven state change
+→ Livewire action / reactive state update
+→ immediate UI update
+
+Background async state change
+→ Laravel/MySQL remains source of truth
+→ existing domain/read/presentation services
+→ targeted + conditional Livewire polling
+→ UI updates automatically
+
+Stable / terminal state
+→ polling stops
+
+Navigation
+→ wire:navigate / Livewire.navigate where appropriate
+
+Chat token-by-token output
+→ streaming
+→ NOT ordinary polling
+```
+
+قواعد إلزامية:
+
+- Livewire طبقة Presentation/Interaction فقط، ولا يعيد تنفيذ Business State Machine.
+- JavaScript لا يعيد تفسير Document/ProcessingRun lifecycle.
+- `DocumentAvailabilityResolver` يبقى مصدر الحقيقة للجاهزية.
+- يعاد استخدام `DocumentSummaryMapper`, `DocumentReadService` وPresentation DTOs الحالية.
+- Polling يقرأ من Laravel/MySQL فقط؛ لا Browser polling مباشر إلى FastAPI أو Qdrant.
+- `poll_required` أو server-side presentation hint موثوقة مكافئة تحدد الحاجة إلى استمرار polling.
+- لا polling دائم عند عدم وجود حالة متحركة، ويتوقف عند Stable/Terminal state.
+- لا تعمل الصفحة كاملة polling إذا أمكن تحديث Component أصغر بصورة مستقلة.
+- Sidebar أو region مستقل يتغير أثناء بقاء المستخدم في صفحة أخرى يمكن أن يملك Livewire component مستقلاً.
+- Static Blade content لا يحول إلى Livewire بلا سبب.
+- Safe Reprocessing invariant أعلى من latest attempt: Run B الجارية أو الفاشلة لا تخفض Primary readiness إذا بقيت Run A active + indexed وصالحة.
+- العقد القديم المعتمد على `data-document-poll-url`, `data-document-poll-error`, و`window.location.reload()` ليس التصميم المستهدف؛ التحديث المعتمد Livewire/targeted polling مع navigation تفاعلية عند الحاجة.
 
 ---
 
@@ -1397,7 +1454,6 @@ source correctness
 التقييم يقارن Cloud وHybrid Local أكاديمياً أو في الاختبارات، لكنه **ليس workflow للمستخدم ولا ينشئ Winner للوثيقة**.
 
 ---
-
 # 25. Definition of Done للوثيقة
 
 تعتبر الوثيقة Ready عندما:
@@ -1446,6 +1502,7 @@ source correctness
 - LLM أعاد جواباً.
 - Answer + Sources + Timings محفوظة.
 - Sources تعود للوثائق المخولة فقط.
+- Answer tokens تصل للمستخدم عبر streaming في تجربة Chat النهائية.
 
 ---
 
@@ -1465,7 +1522,7 @@ source correctness
 12. لا silent provider/device fallback.
 13. Local heavy work = one active model/operation.
 14. Security Scan enabled افتراضياً وFail-Closed عند التفعيل.
-15. لا Streaming backend في v1.
+15. Chat answer delivery النهائي يستخدم token-by-token streaming؛ ordinary polling لا يستخدم بديلاً عن streaming.
 16. آخر تبادلين مكتملين فقط كسياق محادثة.
 17. Reprocess لا يحذف النسخة العاملة قبل نجاح البديل.
 18. `active_processing_run_id` لا يتغير إلا بعد نجاح indexing/count verification.
@@ -1475,6 +1532,7 @@ source correctness
 22. لا تعرض `Indexing` قبل وصول حدث حقيقي من FastAPI وقبل أول Qdrant write.
 23. Laravel يتحقق Server-side من Capabilities قبل Initial Processing أو Reprocessing.
 24. لا تبدأ المرحلة I قبل نجاح Frontend Backend Readiness Gate في H8–H13.
+25. Livewire طبقة Presentation/Interaction؛ Laravel/MySQL وعقود الـDomain/Read/Presentation تبقى Source of Truth، والـpolling targeted/conditional فقط.
 
 ---
 # 28. ARC-1 — التبسيط المعماري المكتمل
@@ -1709,6 +1767,13 @@ I6 Accessibility / responsive / error states
 داخل Blade/JavaScript. يسمح بكتابة Livewire presentation wiring، لكن أي تغيير
 Domain/Schema/Internal API بعد بدء I يعد gap يجب توثيقه ومراجعته صراحةً.
 
+Reactivity داخل المهام القائمة تتبع 20.6 فقط:
+
+- I2: counters/status summaries والـrecent documents التي تتأثر بمعالجة خلفية تتحدث تلقائياً عبر targeted Livewire polling فقط أثناء وجود `poll_required`؛ لا Manual Refresh.
+- I3: document cards/statuses تتحدث تلقائياً مع بقاء search/filters stateful وآمنة؛ لا تعيد الواجهة تفسير lifecycle، ويتوقف polling عندما لا توجد وثائق تحتاج متابعة.
+- I5: Document readiness وlatest attempt والprocessing/reprocessing timeline تتحدث تلقائياً؛ يعتمد Livewire/targeted polling بدل `fetch → detect change → window.location.reload()`.
+- I6: Accessibility/responsive/error states تستهلك Laravel/MySQL → presentation layer → targeted Livewire polling، ولا تملك JavaScript polling state machine.
+
 ## المرحلة J — Conversations Database
 
 ```text
@@ -1721,6 +1786,53 @@ J6 Create / list conversations
 J7 Multi-document selection
 J8 Ready / indexed / runtime-capable document filtering
 ```
+
+### J7 — Multi-document selection
+
+- `selected / attached` تعني أن المستخدم اختار الوثيقة وربطها بالمحادثة فقط.
+- Readiness لا تفك الارتباط ولا تغير `conversation_document`؛ الوثيقة غير الجاهزة تبقى selected.
+
+### J8 — Runtime-capable filtering + reactive selector
+
+العقد المنفذ:
+
+```text
+selected / attached
+!=
+runtime-capable
+```
+
+Runtime-capable Document يجب أن:
+
+- تكون مرتبطة بالمحادثة.
+- تعود للمستخدم نفسه.
+- تملك active processing run صالحة.
+- active run تعود لنفس Document.
+- active run status = `indexed`.
+- تعتمد على `DocumentAvailabilityResolver` كمصدر الحقيقة للجاهزية.
+- تفشل مغلقاً عند فساد invariant أو cross-document active run.
+- لا تعتمد على processing IDs أو Qdrant collection يرسلها Browser.
+
+وثيقة selected لكنها غير جاهزة:
+
+```text
+remains selected
+→ excluded from runtime-capable set
+```
+
+وعندما تصبح جاهزة لاحقاً:
+
+```text
+remains selected
+→ automatically becomes runtime-capable
+→ no detach/reattach
+→ no manual refresh
+```
+
+Conversation document selector Livewire/reactive؛ user-driven selection تتحدث فوراً،
+والـbackground readiness تتحدث تلقائياً عبر targeted conditional Livewire polling.
+Safe Reprocessing يبقى نافذاً: active indexed Run A تحافظ على `Ready` حتى لو كانت
+Run B الجديدة pending/processing/indexing/failed.
 
 ## المرحلة K — Retrieval and Reranking
 
@@ -1764,9 +1876,26 @@ M4 AskConversationJob
 M5 Save snapshots / answer / metrics
 M6 Sources drawer / relevance score
 M7 Timings
-M8 Pending / failure / retry + visual completed-answer reveal
+M8 Pending / failure / retry + streamed answer rendering
 M9 Mixed-profile / context / accessibility E2E
 ```
+
+Phase M تطبق الفصل التالي داخل المهام الموجودة فقط:
+
+```text
+Livewire
+→ chat interaction/state/forms/navigation
+
+Background non-token state
+→ targeted polling where needed
+
+LLM answer tokens
+→ streaming
+→ NOT ordinary polling
+```
+
+لا توجد Task مستقلة للStreaming أو Livewire؛ M8 مسؤولة عن progressive streamed
+answer rendering وحالات pending/failure/retry، بينما تبقى persistence/metrics ضمن M5.
 
 ## المرحلة N — Filament
 
@@ -2007,12 +2136,16 @@ Original Documents + MySQL
 - concurrent Reprocess rejected.
 - Delete during an active processing attempt rejected.
 - Upload/Reprocess/Delete responses expose stable user-safe errors.
-- polling observes `queued/processing/indexing/indexed/failed` and stops on terminal state.
+- targeted Livewire polling observes moving states via Laravel/MySQL only and stops when `poll_required` becomes false / state is stable or terminal.
+- no `window.location.reload()` polling state machine; navigation refresh uses Livewire navigation where appropriate.
 
 ## Conversations
 
 - single document.
 - multiple documents.
+- selected/attached remains distinct from runtime-capable.
+- unready selected document remains attached and becomes runtime-capable automatically when ready.
+- corrupt/cross-document active run fails closed.
 - mixed profiles.
 - source correctness.
 - no cross-user leakage.
