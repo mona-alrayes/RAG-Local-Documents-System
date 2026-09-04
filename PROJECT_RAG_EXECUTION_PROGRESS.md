@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — I4 مكتملة ومدموجة في PR #97؛ أصبح رفع وثيقة واحدة واختيار Cloud/Hybrid Local مرتبطين بالـCapabilities الفعلية مع fail-closed وبدون fallback؛ I5 هي المهمة الحالية
+> **الحالة العامة:** قيد التنفيذ — I5 مكتملة ومدموجة في PR #98؛ أصبحت صفحة تفاصيل الوثيقة تعرض النسخة الفعالة وآخر محاولة معالجة كحقيقتين منفصلتين مع timeline موثقة وprivate preview آمن؛ I6 هي المهمة الحالية
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107
-Last Merged Feature PR on main: #97 — I4 One-file upload + capability-aware Cloud/Hybrid Local choice
-Latest Task PR: #97 — I4 One-file upload + capability-aware Cloud/Hybrid Local choice
-Verified I4 Feature Commit:
-- 014a1a91bd9d84746c29d2c35fd04b5488dbb812 — I4 one-file upload + capability-aware profile choice
-Verified I4 Merge Commit: 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107
-Documentation Baseline: تم تسجيل اكتمال I4 وتسليم I5 Document details / processing timeline كمهمة حالية.
+Verified Main Commit: 2844d0f5bba7371b56b2df11c2e489b68a3846ca
+Last Merged Feature PR on main: #98 — I5 Document details / processing timeline
+Latest Task PR: #98 — I5 Document details / processing timeline
+Verified I5 Feature Commit:
+- 94b4e24dbcdd77622909e190e16f16454ee4af42 — I5 document details / processing timeline
+Verified I5 Merge Commit: 2844d0f5bba7371b56b2df11c2e489b68a3846ca
+Documentation Baseline: تم تسجيل اكتمال I5 وتسليم I6 Accessibility / responsive / error states كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-I4 — One-file upload + capability-aware Cloud/Hybrid Local choice
+I5 — Document details / processing timeline
 
 Current Phase:
 I — Blade Documents Experience
@@ -106,21 +106,29 @@ Architectural Result:
 - حافظت I4 على redirect/flash contract المثبت في H13 ولم تنشئ مسار Upload موازياً.
 - أصبحت ملفات ترجمة Documents في المسار القياسي `lang/ar` و`lang/en` مع رسائل I4 الجديدة.
 - أضيفت اختبارات I4 لحالات one-file upload، capability-aware UI، unavailable profile، fail-closed، وغياب fallback.
+- أعادت I5 بناء صفحة تفاصيل الوثيقة باستخدام `DocumentReadService` وpresentation DTOs الحالية بدل تمرير Eloquent مباشرة إلى Blade.
+- تعرض I5 `active_run` و`latest_attempt` منفصلتين صراحة، وتحافظ على النسخة السابقة فعالة أثناء reprocessing، كما تبقي الوثيقة Ready عند فشل آخر reprocessing إذا بقيت active run السابقة صالحة.
+- يعرض processing timeline في I5 فقط timestamps المسجلة فعليًا للـQueued/Processing/Indexing/Completed/Failed، مع pages/chunks/stage timings والتحذيرات الآمنة.
+- لا تعرض I5 raw `failure_reason` أو Qdrant/profile internals؛ وتستخدم safe failure presentation للمستخدم.
+- تحترم I5 صلاحيات Download/Reprocess/Delete، وتمنع Reprocess في الواجهة إذا كانت Processing Profile الفعالة غير متاحة ضمن Capabilities الحالية.
+- أضافت I5 private browser preview محميًا بنفس authorization الخاصة بمحتوى الوثيقة: PDF وTXT inline preview، بينما DOCX يبقى Download فقط، دون كشف public storage URL.
 
 Latest Verification:
-PR #97 merged on GitHub: PASS
-PR head commit: 014a1a91bd9d84746c29d2c35fd04b5488dbb812
-PR merge commit: 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107
-main verified at I4 merge commit 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107 before this progress update: PASS
+PR #98 merged on GitHub: PASS
+PR head commit: 94b4e24dbcdd77622909e190e16f16454ee4af42
+PR merge commit: 2844d0f5bba7371b56b2df11c2e489b68a3846ca
+main verified at I5 merge commit 2844d0f5bba7371b56b2df11c2e489b68a3846ca before this progress update: PASS
+DocumentDetailsPageTest: 3 passed (17 assertions)
 DocumentPagesTest: 11 passed (51 assertions)
-DocumentUploadValidationTest: 8 passed (62 assertions)
-ProcessingCapabilityServiceTest: 3 passed (6 assertions)
-Laravel full regression: 153 passed (765 assertions)
-Laravel Pint on I4 files: PASS
-FastAPI: لم يتم تعديل FastAPI في I4.
+Private preview/download tests: 6 passed (22 assertions)
+H13 regression tests: 26 passed (148 assertions)
+Documents feature suite: 97 passed (562 assertions)
+Full Laravel suite: 160 passed (796 assertions)
+Laravel Pint: PASS
+Frontend build: PASS
 
 Current Task:
-I5 — Document details / processing timeline
+I6 — Accessibility / responsive / error states
 
 Open Blockers: none
 ```
@@ -578,7 +586,7 @@ FastAPI:
 | I2 Workspace dashboard | DONE |
 | I3 Documents list / cards / filters | DONE |
 | I4 One-file upload + capability-aware Cloud/Hybrid Local choice | DONE |
-| I5 Document details / processing timeline | TODO |
+| I5 Document details / processing timeline | DONE |
 | I6 Accessibility / responsive / error states | TODO |
 
 ### I1 — Responsive App Shell / Sidebar
@@ -785,7 +793,62 @@ FastAPI:
 لم يتم تعديل FastAPI في I4.
 ```
 
-الواجهة تتيح الاختيار فقط للـProcessing Profiles المتاحة فعلياً من Capabilities؛ وتظهر غير المتاحة بحالة disabled دون fallback.
+### I5 — Document Details / Processing Timeline
+
+**الحالة:** `DONE` ومتحقق منها في PR #98 والمدمجة في `main` بتاريخ 2026-09-04.
+
+تم تنفيذ:
+
+- إعادة بناء صفحة `/documents/{document}` باستخدام `DocumentReadService` وpresentation DTOs الحالية بدل الاعتماد المباشر على Eloquent داخل Blade.
+- فصل `active_run` عن `latest_attempt` بوضوح وعرض كل منهما بصورة مستقلة.
+- عرض processing timeline اعتمادًا على timestamps المسجلة فعليًا فقط: queued، processing، indexing، completed، failed.
+- عرض نوع المحاولة `initial | reprocessing` مع pages/chunks وstage timings والتحذيرات الآمنة المتاحة من read contract.
+- دعم reprocessing مع إبقاء النسخة السابقة الفعالة متاحة إلى أن تنجح المحاولة الجديدة.
+- عند فشل آخر reprocessing مع وجود active indexed run سابقة صالحة، تبقى الوثيقة `Ready` وتظهر رسالة فشل آمنة بدل تحويل الوثيقة إلى `Failed`.
+- عدم عرض raw `failure_reason` أو `qdrant_collection` أو `profile_snapshot` أو أي بيانات داخلية حساسة.
+- احترام صلاحيات Download / Reprocess / Delete من العقود الحالية وعدم إعادة تعريف authorization داخل الواجهة.
+- تعطيل/إخفاء Reprocess في الواجهة عندما تكون Processing Profile الفعالة غير متاحة ضمن Capabilities الحالية، مع بقاء التحقق Server-side مصدر الحقيقة.
+- إضافة private browser preview على مسار محمي بالـauthorization نفسه للوصول إلى محتوى الوثيقة، مع إبقاء الملفات في private documents storage:
+  - PDF → inline browser preview.
+  - TXT → inline browser preview كـUTF-8 plain text.
+  - DOCX → Download فقط بدون browser preview.
+
+Verification المثبت لـI5:
+
+```text
+PR #98 merged on GitHub: PASS
+Merged at: 2026-09-04T08:44:29Z
+Feature commit:
+- 94b4e24dbcdd77622909e190e16f16454ee4af42
+Merge commit:
+- 2844d0f5bba7371b56b2df11c2e489b68a3846ca
+
+DocumentDetailsPageTest:
+3 passed (17 assertions)
+
+DocumentPagesTest:
+11 passed (51 assertions)
+
+Private preview/download tests:
+6 passed (22 assertions)
+
+H13 regression tests:
+26 passed (148 assertions)
+
+Documents feature suite:
+97 passed (562 assertions)
+
+Full Laravel suite:
+160 passed (796 assertions)
+
+Laravel Pint:
+PASS
+
+Frontend build:
+PASS
+```
+
+الواجهة تعرض جاهزية الوثيقة ومحاولة المعالجة الأحدث كحقيقتين منفصلتين، وتحافظ على النسخة السابقة الفعالة أثناء reprocessing أو بعد فشل محاولة replacement، مع private preview للأنواع التي يدعمها المتصفح بأمان.
 
 تبعيات المرحلة I الملزمة:
 
@@ -1460,7 +1523,7 @@ FastAPI:
 لم تُشغّل الاختبارات لأن I3 لم تغيّر FastAPI.
 ```
 
-## آخر مهمة مكتملة — I4 One-file upload + capability-aware Cloud/Hybrid Local choice
+## المهمة السابقة المكتملة — I4 One-file upload + capability-aware Cloud/Hybrid Local choice
 
 **الحالة:** `DONE` ومتحقق منها في PR #97، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107`.
 
@@ -1505,18 +1568,68 @@ FastAPI:
 لم يتم تعديل FastAPI في I4.
 ```
 
+## آخر مهمة مكتملة — I5 Document Details / Processing Timeline
+
+**الحالة:** `DONE` ومتحقق منها في PR #98، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `2844d0f5bba7371b56b2df11c2e489b68a3846ca`.
+
+تم تنفيذ:
+
+- بناء صفحة تفاصيل الوثيقة باستخدام `DocumentReadService` وpresentation/read contracts الحالية بدل تمرير Eloquent مباشرة إلى Blade.
+- الفصل الصريح بين `active_run` و`latest_attempt` وإظهار جاهزية الوثيقة وتقدم أحدث محاولة بصورة مستقلة.
+- عرض processing timeline من timestamps المسجلة فعليًا فقط، مع pages/chunks/stage timings والتحذيرات الآمنة.
+- دعم reprocessing مع بقاء النسخة السابقة فعالة أثناء المحاولة الجديدة، وبقاء الوثيقة `Ready` إذا فشلت آخر إعادة معالجة مع وجود active indexed run سابقة صالحة.
+- عدم عرض raw `failure_reason` أو بيانات Qdrant/profile الداخلية الحساسة، والاكتفاء برسائل فشل آمنة للمستخدم.
+- احترام صلاحيات Download/Reprocess/Delete من العقود الحالية.
+- منع Reprocess في الواجهة عندما تكون الـProcessing Profile الفعالة غير متاحة ضمن Capabilities الحالية، مع بقاء التحقق Server-side مصدر الحقيقة.
+- إضافة private browser preview محمي على private documents storage: PDF وTXT يدعمان inline preview، بينما DOCX يبقى Download فقط.
+
+### Verification I5
+
+```text
+PR #98 merged on GitHub: PASS
+Merged at: 2026-09-04T08:44:29Z
+Feature commit:
+- 94b4e24dbcdd77622909e190e16f16454ee4af42
+Merge commit:
+- 2844d0f5bba7371b56b2df11c2e489b68a3846ca
+
+DocumentDetailsPageTest:
+3 passed (17 assertions)
+
+DocumentPagesTest:
+11 passed (51 assertions)
+
+Private preview/download tests:
+6 passed (22 assertions)
+
+H13 regression tests:
+26 passed (148 assertions)
+
+Documents feature suite:
+97 passed (562 assertions)
+
+Full Laravel suite:
+160 passed (796 assertions)
+
+Laravel Pint:
+PASS
+
+Frontend build:
+PASS
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-I5 — Document details / processing timeline
+I6 — Accessibility / responsive / error states
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت I4 في main عبر PR #97 وأصبح رفع وثيقة واحدة بصيغ PDF/DOCX/TXT واختيار cloud أو hybrid_local مرتبطين بالـCapabilities الفعلية، مع تعطيل Profile غير المتاحة وfail-closed وعدم وجود automatic fallback.
-تبدأ I5 — Document details / processing timeline وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك H12 details/timeline وH13 Reprocess/Delete commands بدل إعادة تعريف Business State أو orchestration داخل الواجهة.
-يبقى App Shell وWorkspace Dashboard وصفحة Documents وUpload flow الناتجة عن I1–I4 قاعدة الواجهة.
+دُمجت I5 في main عبر PR #98 وأصبحت صفحة تفاصيل الوثيقة تعتمد H12 presentation/read contracts، وتفصل بين active_run وlatest_attempt، وتعرض timeline موثقة بالتوقيتات الفعلية مع private preview آمن للـPDF/TXT وبقاء DOCX download-only.
+تبدأ I6 — Accessibility / responsive / error states وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك safe states وpolling terminals وuser-safe errors المثبتة في H8/H9/H10 دون إعادة تفسير Business State داخل الواجهة.
+يبقى App Shell وWorkspace Dashboard وصفحة Documents وUpload flow وصفحة Document Details الناتجة عن I1–I5 قاعدة الواجهة.
 لا تغيّر المرحلة I عقود H12/H13 أو Business State داخل Blade/JavaScript دون توثيق gap معماري صريح.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
