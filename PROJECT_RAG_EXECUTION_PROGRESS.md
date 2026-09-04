@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — I5 مكتملة ومدموجة في PR #98؛ أصبحت صفحة تفاصيل الوثيقة تعرض النسخة الفعالة وآخر محاولة معالجة كحقيقتين منفصلتين مع timeline موثقة وprivate preview آمن؛ I6 هي المهمة الحالية
+> **الحالة العامة:** قيد التنفيذ — I6 مكتملة ومدموجة في PR #99؛ اكتملت تحسينات Accessibility/Responsive وحالات النجاح والتحذير والخطأ مع polling متحكم به Server-side عبر Laravel دون نقل Business State إلى JavaScript؛ J1 هي المهمة الحالية
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 2844d0f5bba7371b56b2df11c2e489b68a3846ca
-Last Merged Feature PR on main: #98 — I5 Document details / processing timeline
-Latest Task PR: #98 — I5 Document details / processing timeline
-Verified I5 Feature Commit:
-- 94b4e24dbcdd77622909e190e16f16454ee4af42 — I5 document details / processing timeline
-Verified I5 Merge Commit: 2844d0f5bba7371b56b2df11c2e489b68a3846ca
-Documentation Baseline: تم تسجيل اكتمال I5 وتسليم I6 Accessibility / responsive / error states كمهمة حالية.
+Verified Main Commit: a8aa3df94bbc4ee31336133cfef09f0ed263f640
+Last Merged Feature PR on main: #99 — I6 Accessibility / responsive / error states
+Latest Task PR: #99 — I6 Accessibility / responsive / error states
+Verified I6 Feature Commit:
+- 3464ea1a91c1d62ecfd8bb1ce38fccaeafbcc723 — I6 accessibility / responsive / error states
+Verified I6 Merge Commit: a8aa3df94bbc4ee31336133cfef09f0ed263f640
+Documentation Baseline: تم تسجيل اكتمال I6 وتسليم J1 Conversations migration / model كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,10 +31,10 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-I5 — Document details / processing timeline
+I6 — Accessibility / responsive / error states
 
 Current Phase:
-I — Blade Documents Experience
+J — Conversations Database
 
 Architectural Result:
 - كل ProcessingRun تستخدم Processing Profile واحدة موثوقة: cloud | hybrid_local.
@@ -112,23 +112,25 @@ Architectural Result:
 - لا تعرض I5 raw `failure_reason` أو Qdrant/profile internals؛ وتستخدم safe failure presentation للمستخدم.
 - تحترم I5 صلاحيات Download/Reprocess/Delete، وتمنع Reprocess في الواجهة إذا كانت Processing Profile الفعالة غير متاحة ضمن Capabilities الحالية.
 - أضافت I5 private browser preview محميًا بنفس authorization الخاصة بمحتوى الوثيقة: PDF وTXT inline preview، بينما DOCX يبقى Download فقط، دون كشف public storage URL.
+- حسنت I6 Accessibility لرسائل الحالة والتحقق من النماذج والإجراءات والنوافذ التأكيدية، مع الحفاظ على تجربة RTL قابلة للاستخدام بلوحة المفاتيح وتقنيات المساعدة.
+- حسنت I6 Responsive لواجهات Workspace وDocuments list وDocument details والإجراءات والنوافذ على الشاشات الصغيرة 320–375px والتابلت والديسكتوب، مع معالجة النصوص وأسماء الملفات الطويلة والـoverflow.
+- وحّدت I6 حالات النجاح والتحذير والخطأ برسائل localized وآمنة، ومنعت كشف raw `failure_reason` أو تفاصيل داخلية حساسة للمستخدم.
+- حافظت I6 على الفصل بين `Document.status` وجاهزية الوثيقة وبين `ProcessingRun.status` وتقدم المحاولة، ولم تنشئ Business State Machine داخل JavaScript.
+- أضافت I6 polling endpoint في Laravel لطبقة العرض؛ يحدد السيرفر `poll_required`، وتستخدم JavaScript هذا القرار فقط لتحديث الواجهة وتتوقف عند الحالات النهائية دون إعادة تفسير الحالة محليًا.
+- حافظت I6 على private preview/download behavior وصلاحيات الوصول الحالية دون تحويل الملفات إلى Public URLs.
 
 Latest Verification:
-PR #98 merged on GitHub: PASS
-PR head commit: 94b4e24dbcdd77622909e190e16f16454ee4af42
-PR merge commit: 2844d0f5bba7371b56b2df11c2e489b68a3846ca
-main verified at I5 merge commit 2844d0f5bba7371b56b2df11c2e489b68a3846ca before this progress update: PASS
-DocumentDetailsPageTest: 3 passed (17 assertions)
-DocumentPagesTest: 11 passed (51 assertions)
-Private preview/download tests: 6 passed (22 assertions)
-H13 regression tests: 26 passed (148 assertions)
-Documents feature suite: 97 passed (562 assertions)
-Full Laravel suite: 160 passed (796 assertions)
-Laravel Pint: PASS
-Frontend build: PASS
+PR #99 merged on GitHub: PASS
+PR head commit: 3464ea1a91c1d62ecfd8bb1ce38fccaeafbcc723
+PR merge commit: a8aa3df94bbc4ee31336133cfef09f0ed263f640
+main verified at I6 merge commit a8aa3df94bbc4ee31336133cfef09f0ed263f640 before this progress update: PASS
+Pint: PASS
+Vite production build: PASS
+Focused Documents + Workspace regression: 108 tests / 602 assertions PASS
+Full Laravel suite: 168 tests / 823 assertions PASS
 
 Current Task:
-I6 — Accessibility / responsive / error states
+J1 — Conversations migration / model
 
 Open Blockers: none
 ```
@@ -587,7 +589,7 @@ FastAPI:
 | I3 Documents list / cards / filters | DONE |
 | I4 One-file upload + capability-aware Cloud/Hybrid Local choice | DONE |
 | I5 Document details / processing timeline | DONE |
-| I6 Accessibility / responsive / error states | TODO |
+| I6 Accessibility / responsive / error states | DONE |
 
 ### I1 — Responsive App Shell / Sidebar
 
@@ -849,6 +851,45 @@ PASS
 ```
 
 الواجهة تعرض جاهزية الوثيقة ومحاولة المعالجة الأحدث كحقيقتين منفصلتين، وتحافظ على النسخة السابقة الفعالة أثناء reprocessing أو بعد فشل محاولة replacement، مع private preview للأنواع التي يدعمها المتصفح بأمان.
+
+### I6 — Accessibility / Responsive / Error States
+
+**الحالة:** `DONE` ومتحقق منها في PR #99 والمدمجة في `main` بتاريخ 2026-09-04.
+
+تم تنفيذ:
+
+- تحسين Accessibility لرسائل الحالة والتحقق من النماذج والإجراءات والنوافذ التأكيدية مع الحفاظ على واجهة RTL قابلة للاستخدام بوضوح.
+- تحسين Responsive لواجهات Workspace وDocuments list وDocument details والإجراءات والنوافذ على الشاشات الصغيرة 320–375px والتابلت والديسكتوب، ومعالجة النصوص وأسماء الملفات الطويلة والـoverflow.
+- تحسين عرض حالات النجاح والتحذير والخطأ برسائل localized وآمنة للمستخدم.
+- منع كشف raw `failure_reason` أو أي تفاصيل داخلية حساسة في واجهات الوثائق.
+- الحفاظ على الفصل بين Document status وجاهزية الوثيقة وبين ProcessingRun status وتقدم محاولة المعالجة، بما يشمل reprocessing مع بقاء النسخة الفعالة مستقلة عن أحدث محاولة.
+- إضافة `DocumentPollingController` وendpoint polling داخل Laravel لطبقة العرض فقط؛ يعيد السيرفر `poll_required` ويظل Laravel/MySQL مصدر الحقيقة للحالة.
+- JavaScript لا تنشئ Business State Machine ولا تستنتج الانتقالات؛ تستخدم `poll_required` Server-side لتحديد استمرار polling وتتوقف عند terminal states، مع معالجة محدودة وآمنة لفشل الاتصال.
+- تحسين document details / workspace / documents list / actions / modals دون تغيير Domain أو H12/H13 contracts.
+- الحفاظ على private preview/download behavior والـauthorization الحالية دون كشف Public Storage URL.
+
+Verification المثبت لـI6:
+
+```text
+PR #99 merged on GitHub: PASS
+Merged at: 2026-09-04T10:23:36Z
+Feature commit:
+- 3464ea1a91c1d62ecfd8bb1ce38fccaeafbcc723
+Merge commit:
+- a8aa3df94bbc4ee31336133cfef09f0ed263f640
+
+Pint:
+PASS
+
+Vite production build:
+PASS
+
+Focused Documents + Workspace regression:
+108 tests / 602 assertions PASS
+
+Full Laravel suite:
+168 tests / 823 assertions PASS
+```
 
 تبعيات المرحلة I الملزمة:
 
@@ -1568,7 +1609,7 @@ FastAPI:
 لم يتم تعديل FastAPI في I4.
 ```
 
-## آخر مهمة مكتملة — I5 Document Details / Processing Timeline
+## المهمة السابقة المكتملة — I5 Document Details / Processing Timeline
 
 **الحالة:** `DONE` ومتحقق منها في PR #98، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `2844d0f5bba7371b56b2df11c2e489b68a3846ca`.
 
@@ -1618,19 +1659,57 @@ Frontend build:
 PASS
 ```
 
+## آخر مهمة مكتملة — I6 Accessibility / Responsive / Error States
+
+**الحالة:** `DONE` ومتحقق منها في PR #99، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `a8aa3df94bbc4ee31336133cfef09f0ed263f640`.
+
+تم تنفيذ:
+
+- تحسين Accessibility لرسائل الحالة والتحقق من النماذج والإجراءات والنوافذ التأكيدية.
+- تحسين Responsive للشاشات الصغيرة 320–375px والتابلت والديسكتوب، مع معالجة النصوص وأسماء الملفات الطويلة والـoverflow.
+- تحسين حالات النجاح والتحذير والخطأ برسائل localized وآمنة للمستخدم.
+- منع عرض raw `failure_reason` أو تفاصيل داخلية حساسة.
+- الحفاظ على الفصل بين Document status وProcessingRun status وعدم دمجهما في حالة UI واحدة.
+- إضافة polling endpoint في Laravel لطبقة العرض، مع اعتماد `poll_required` Server-side لتحديد استمرار التحديث وإيقافه عند terminal states.
+- عدم إنشاء Business State Machine في JavaScript أو تخمين انتقالات الحالة محليًا.
+- تحسين document details / workspace / documents list / actions / modals ضمن العقود الحالية.
+- الحفاظ على private preview/download behavior والـauthorization الحالية.
+
+### Verification I6
+
+```text
+PR #99 merged on GitHub: PASS
+Merged at: 2026-09-04T10:23:36Z
+Feature commit:
+- 3464ea1a91c1d62ecfd8bb1ce38fccaeafbcc723
+Merge commit:
+- a8aa3df94bbc4ee31336133cfef09f0ed263f640
+
+Pint:
+PASS
+
+Vite production build:
+PASS
+
+Focused Documents + Workspace regression:
+108 tests / 602 assertions PASS
+
+Full Laravel suite:
+168 tests / 823 assertions PASS
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-I6 — Accessibility / responsive / error states
+J1 — Conversations migration / model
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت I5 في main عبر PR #98 وأصبحت صفحة تفاصيل الوثيقة تعتمد H12 presentation/read contracts، وتفصل بين active_run وlatest_attempt، وتعرض timeline موثقة بالتوقيتات الفعلية مع private preview آمن للـPDF/TXT وبقاء DOCX download-only.
-تبدأ I6 — Accessibility / responsive / error states وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك safe states وpolling terminals وuser-safe errors المثبتة في H8/H9/H10 دون إعادة تفسير Business State داخل الواجهة.
-يبقى App Shell وWorkspace Dashboard وصفحة Documents وUpload flow وصفحة Document Details الناتجة عن I1–I5 قاعدة الواجهة.
-لا تغيّر المرحلة I عقود H12/H13 أو Business State داخل Blade/JavaScript دون توثيق gap معماري صريح.
+دُمجت I6 في main عبر PR #99 واكتملت مرحلة Blade Documents Experience مع تحسين Accessibility/Responsive وحالات النجاح والتحذير والخطأ، وبقيت رسائل الفشل آمنة دون raw failure_reason أو تفاصيل داخلية.
+يعتمد polling في الواجهة على Laravel/MySQL وقرار poll_required المتحكم به Server-side، ولا توجد Business State Machine في JavaScript، مع الحفاظ على الفصل بين Document status وProcessingRun status وعلى private preview/download behavior.
+تبدأ J1 — Conversations migration / model حرفيًا وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md ضمن مرحلة Conversations Database.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
