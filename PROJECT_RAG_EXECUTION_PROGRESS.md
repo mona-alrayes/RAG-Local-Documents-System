@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — J4 مكتملة ومدموجة في PR #103؛ اكتمل أساس `message_sources` provenance بالاعتماد على `processing_run_id` للوصول إلى Document/Profile provenance دون تكرار حقول مشتقة، وأصبحت J5 — Conversation policies هي المهمة الحالية وفق الـMaster Plan
+> **الحالة العامة:** قيد التنفيذ — J5 مكتملة ومدموجة في PR #104؛ أضيفت `ConversationPolicy` مع Laravel Gate / Policy authorization لحصر إدارة المحادثة بمالكها، وأصبحت J6 — Create / list conversations هي المهمة الحالية وفق الـMaster Plan
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: cd74de40c10d56fed93c8bc80489747bd056bd16
-Last Merged Feature PR on main: #103 — J4 message_sources + processing run / profile provenance
-Latest Task PR: #103 — J4 message_sources + processing run / profile provenance
-Verified J4 Feature Commit:
-- 3ec50ec782e24c727b8bac8f3ad3ef23600f8bdd — J4 finalize message source provenance schema
-Verified J4 Merge Commit: cd74de40c10d56fed93c8bc80489747bd056bd16
-Documentation Baseline: تم تسجيل اكتمال J4 وتسليم J5 Conversation policies كمهمة حالية، مع تثبيت أن `MessageSource.processing_run_id -> ProcessingRun` هو مسار provenance المعتمد للوصول إلى Document/Profile/Qdrant provenance دون تكرار `document_id` أو `processing_profile` أو `qdrant_collection` داخل `message_sources`.
+Verified Main Commit: 61332b33af8828fefa7c6cc2673561bf9e996393
+Last Merged Feature PR on main: #104 — J5 Conversation policies
+Latest Task PR: #104 — J5 Conversation policies
+Verified J5 Feature Commit:
+- 3656cc74600b2bfae2452b06ebaa62a8f4355415 — J5 add conversation authorization policy
+Verified J5 Merge Commit: 61332b33af8828fefa7c6cc2673561bf9e996393
+Documentation Baseline: تم تسجيل اكتمال J5 وتسليم J6 — Create / list conversations كمهمة حالية؛ أصبحت `ConversationPolicy` تسمح للمستخدم المسجل بـ`viewAny` و`create`، وتقصر `view` و`update` و`delete` على مالك المحادثة وفق `conversation.user_id === user.id` باستخدام Laravel Gate / Policy authorization، دون إضافة Routes أو Controllers أو UI أو workflow جديد للمحادثات ضمن J5.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-J4 — message_sources + processing run / profile provenance
+J5 — Conversation policies
 
 Current Phase:
 J — Conversations Database
@@ -125,7 +125,7 @@ Architectural Result:
 - أضافت J2 جدول pivot باسم `conversation_document` وعلاقة Many-to-Many بين `Conversation` و`Document` مع علاقات Eloquent من الجهتين.
 - تمنع J2 تكرار نفس `conversation_id/document_id` عبر unique constraint، وتستخدم Foreign Keys إلى `conversations` و`documents` مع `cascadeOnDelete()` لأن سجلات العلاقة ليست Business Entity مستقلة.
 - لا يوجد Pivot Model مستقل لأن الجدول يمثل علاقة فقط ولا يحمل business state، وتبقى Laravel/MySQL مصدر الحقيقة لهذه العلاقة.
-- لم تضف J2 document selection flow أو authorization أو UI أو RAG، كما لم تحاول حل cross-user document selection عبر schema معقد أو trigger؛ يفرض ذلك لاحقًا في application layer عند تنفيذ selection flow.
+- لم تضف J2 document selection flow أو authorization أو UI أو RAG، كما لم تحاول حل cross-user document selection عبر schema معقد أو trigger؛ يفرض ذلك لاحقًا في application layer عند تنفيذ document selection flow.
 - أضافت J3 جدول `messages` و`Message` model وربط `Conversation -> Messages`، مع `MessageRole` (`user`, `assistant`) و`MessageStatus` (`pending`, `completed`, `failed`).
 - تخزن J3 `content` و`execution_snapshot` و`metrics`، مع casts مناسبة للـenums وحقول JSON.
 - أسست J3 مبكرًا جدول `message_sources` و`MessageSource` model وربط `Message -> MessageSources` و`MessageSource -> ProcessingRun`، مع حفظ `processing_run_id`, `qdrant_point_id`, `chunk_index`, `source_snapshot`, و`relevance_score`.
@@ -133,24 +133,41 @@ Architectural Result:
 - غيرت J4 FK الخاصة بـ`message_sources.processing_run_id` إلى `CASCADE ON DELETE`؛ حذف ProcessingRun يحذف MessageSources التابعة لها فقط بينما تبقى Message نفسها.
 - دمجت J4 أعمدة `kind`, `started_at`, `indexing_started_at`, و`failed_at` داخل migration الإنشاء الأصلية لـ`document_processing_runs`، وحذفت migration الإضافية `2026_09_03_060000_add_progress_fields_to_document_processing_runs_table.php` لأن قاعدة التطوير تبنى من الصفر.
 - حدثت J4 اختبارات schema/provenance لتتوافق مع الـbaseline النهائي، بما في ذلك default/casts وحذف backfill test القديم المرتبط بالـmigration المحذوفة.
+- أضافت J5 `ConversationPolicy` باستخدام Laravel Gate / Policy authorization.
+- تسمح J5 للمستخدم المسجل بـ`viewAny` و`create`.
+- تقصر J5 صلاحيات `view` و`update` و`delete` على مالك المحادثة وفق `conversation.user_id === user.id`، وتمنع مستخدمًا آخر من إدارة Conversation لا يملكها.
+- لم تضف J5 Routes أو Controllers أو UI أو workflow جديد للمحادثات.
 
 Latest Verification:
-PR #103 merged on GitHub: PASS
-PR head commit: 3ec50ec782e24c727b8bac8f3ad3ef23600f8bdd
-PR merge commit: cd74de40c10d56fed93c8bc80489747bd056bd16
-main verified at J4 merge commit cd74de40c10d56fed93c8bc80489747bd056bd16 before this progress update: PASS
-PR #103 schema/provenance test files were updated to match the finalized baseline; no test-count numbers were published in the PR or its GitHub discussion, so none are recorded here.
+PR #104 merged on GitHub: PASS
+PR head commit: 3656cc74600b2bfae2452b06ebaa62a8f4355415
+PR merge commit: 61332b33af8828fefa7c6cc2673561bf9e996393
+main verified at J5 merge commit 61332b33af8828fefa7c6cc2673561bf9e996393 before this progress update: PASS
+
+Focused J5 tests:
+3 passed (8 assertions)
+
+Laravel Pint:
+PASS
+
+Full Laravel suite:
+183 passed (869 assertions)
 
 Current Task:
-J5 — Conversation policies
+J6 — Create / list conversations
 
-J4 Completion:
-- اكتمل schema/provenance baseline الخاص بـ`message_sources` دون أعمدة provenance مكررة.
-- `processing_run_id` هو المرجع المعتمد للوصول إلى ProcessingRun ثم Document/Profile/Qdrant provenance.
-- FK الخاصة بالـProcessingRun أصبحت `CASCADE ON DELETE`: تحذف المصادر التابعة للـRun مع بقاء الرسالة.
-- أعمدة ProcessingRun الخاصة بالنوع وتوقيتات المراحل أصبحت جزءًا من migration الإنشاء الأصلية، وحذفت migration الإضافية القديمة.
-- اختبارات schema/provenance حدثت لتطابق التصميم النهائي، دون تسجيل أرقام tests غير منشورة.
-- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي J5 — Conversation policies.
+J5 Completion:
+- أضيفت `ConversationPolicy`.
+- يسمح للمستخدم المسجل بـ`viewAny` و`create`.
+- تقتصر `view` و`update` و`delete` على مالك المحادثة فقط.
+- معيار الملكية: `conversation.user_id === user.id`.
+- يمنع مستخدم آخر من إدارة Conversation لا يملكها.
+- يستخدم Laravel Gate / Policy authorization.
+- لم تُضف Routes أو Controllers أو UI أو workflow جديد للمحادثات ضمن J5.
+- الملفات المضافة:
+  - `laravel-app/app/Policies/ConversationPolicy.php`
+  - `laravel-app/tests/Feature/Policies/ConversationPolicyTest.php`
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي J6 — Create / list conversations.
 
 Open Blockers: none
 ```
@@ -929,12 +946,14 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 | J2 conversation_document pivot | DONE |
 | J3 Messages + snapshots / metrics | DONE |
 | J4 message_sources + processing run / profile provenance | DONE |
-| J5 Conversation policies | TODO |
+| J5 Conversation policies | DONE |
 | J6 Create / list conversations | TODO |
 | J7 Multi-document selection | TODO |
 | J8 Ready / indexed / runtime-capable document filtering | TODO |
 
 > **J4 finalized in PR #103:** يعتمد `message_sources` على `processing_run_id` للوصول إلى الـProcessingRun ثم Document/Profile/Qdrant provenance دون تكرار حقول مشتقة. أصبح FK الخاص بالـProcessingRun يستخدم `cascadeOnDelete()` بحيث يحذف حذف الـRun مصادرها فقط وتبقى Message نفسها، وتم Consolidate أعمدة `kind` وstage timestamps داخل migration إنشاء ProcessingRun الأصلية مع حذف migration الإضافية القديمة وتحديث اختبارات schema/provenance.
+
+> **J5 completed in PR #104:** أضيفت `ConversationPolicy` باستخدام Laravel Gate / Policy authorization؛ يسمح للمستخدم المسجل بـ`viewAny` و`create`، بينما تقصر `view` و`update` و`delete` على مالك المحادثة وفق `conversation.user_id === user.id`. لم تضف J5 Routes أو Controllers أو UI أو workflow جديد للمحادثات.
 
 كل Document جاهزة تشير إلى `active_processing_run_id`.
 
@@ -1914,7 +1933,7 @@ Laravel Pint:
 PASS
 ```
 
-## آخر مهمة مكتملة — J4 message_sources + processing run / profile provenance
+## المهمة السابقة المكتملة — J4 message_sources + processing run / profile provenance
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #103، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `cd74de40c10d56fed93c8bc80489747bd056bd16`.
 
@@ -1944,19 +1963,57 @@ PASS
 لم تُنشر أرقام tests في PR #103 أو مناقشته، لذلك لم تُسجل أعداد غير موثقة.
 ```
 
+## آخر مهمة مكتملة — J5 Conversation policies
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #104، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `61332b33af8828fefa7c6cc2673561bf9e996393`.
+
+تم تنفيذ:
+
+- إضافة `ConversationPolicy`.
+- السماح للمستخدم المسجل بـ`viewAny` و`create`.
+- قصر `view` و`update` و`delete` على مالك المحادثة فقط.
+- معيار الملكية: `conversation.user_id === user.id`.
+- منع مستخدم آخر من إدارة Conversation لا يملكها.
+- استخدام Laravel Gate / Policy authorization.
+- لم تتم إضافة Routes أو Controllers أو UI أو workflow جديد للمحادثات ضمن J5.
+- الملفات المضافة في J5:
+  - `laravel-app/app/Policies/ConversationPolicy.php`
+  - `laravel-app/tests/Feature/Policies/ConversationPolicyTest.php`
+
+### Verification J5
+
+```text
+PR #104 merged on GitHub: PASS
+Feature branch:
+- task/J5-conversation-policies
+Feature commit:
+- 3656cc74600b2bfae2452b06ebaa62a8f4355415
+Merge commit:
+- 61332b33af8828fefa7c6cc2673561bf9e996393
+
+Focused tests:
+3 passed (8 assertions)
+
+Laravel Pint:
+PASS
+
+Full Laravel suite:
+183 passed (869 assertions)
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-J5 — Conversation policies
+J6 — Create / list conversations
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت J4 ودمجت في main عبر PR #103، وأصبح message_sources provenance يعتمد processing_run_id كمرجع وحيد للوصول إلى ProcessingRun ثم Document/Profile/Qdrant metadata دون حقول مشتقة مكررة.
-أصبح حذف ProcessingRun يحذف MessageSources المرتبطة بها عبر CASCADE مع بقاء Message، وتم دمج kind وstage timestamps داخل migration إنشاء ProcessingRun الأصلية وحذف migration الإضافية القديمة.
-يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفيًا هي J5 — Conversation policies.
-تبقى J6 وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
+اكتملت J5 ودمجت في main عبر PR #104، وأصبحت Conversation authorization مثبتة عبر `ConversationPolicy`: يسمح للمستخدم المسجل بـviewAny/create، وتقصر view/update/delete على مالك المحادثة وفق conversation.user_id === user.id باستخدام Laravel Gate / Policy authorization.
+لم تضف J5 Routes أو Controllers أو UI أو workflow جديد للمحادثات.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفيًا هي J6 — Create / list conversations.
+تبقى J7 وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
 ---
