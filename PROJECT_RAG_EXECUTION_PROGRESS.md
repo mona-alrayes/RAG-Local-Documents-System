@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — J3 مكتملة ومدموجة في PR #102؛ أضيفت طبقة Messages مع snapshots/metrics، وتم تأسيس schema/provenance الخاصة بـ`message_sources` مبكرًا ضمن نفس PR؛ J4 هي المهمة الحالية مع إلزام مراجعة الموجود وتجنب أي migration/schema مكرر
+> **الحالة العامة:** قيد التنفيذ — J4 مكتملة ومدموجة في PR #103؛ اكتمل أساس `message_sources` provenance بالاعتماد على `processing_run_id` للوصول إلى Document/Profile provenance دون تكرار حقول مشتقة، وأصبحت J5 — Conversation policies هي المهمة الحالية وفق الـMaster Plan
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 428989ac4289e451d698c683acfea344f8ef59e9
-Last Merged Feature PR on main: #102 — J3 Messages + snapshots / metrics
-Latest Task PR: #102 — J3 Messages + snapshots / metrics
-Verified J3 Feature Commit:
-- 8a40bb6c88ab0397ed10befdd4c35f359172565b — J3 message persistence and source provenance schema
-Verified J3 Merge Commit: 428989ac4289e451d698c683acfea344f8ef59e9
-Documentation Baseline: تم تسجيل اكتمال J3 وتسليم J4 message_sources + processing run / profile provenance كمهمة حالية، مع توثيق أن أساس message_sources/provenance/relevance-score persistence تأسس بالفعل في PR #102 ويجب مراجعته قبل أي تنفيذ جديد.
+Verified Main Commit: cd74de40c10d56fed93c8bc80489747bd056bd16
+Last Merged Feature PR on main: #103 — J4 message_sources + processing run / profile provenance
+Latest Task PR: #103 — J4 message_sources + processing run / profile provenance
+Verified J4 Feature Commit:
+- 3ec50ec782e24c727b8bac8f3ad3ef23600f8bdd — J4 finalize message source provenance schema
+Verified J4 Merge Commit: cd74de40c10d56fed93c8bc80489747bd056bd16
+Documentation Baseline: تم تسجيل اكتمال J4 وتسليم J5 Conversation policies كمهمة حالية، مع تثبيت أن `MessageSource.processing_run_id -> ProcessingRun` هو مسار provenance المعتمد للوصول إلى Document/Profile/Qdrant provenance دون تكرار `document_id` أو `processing_profile` أو `qdrant_collection` داخل `message_sources`.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-J3 — Messages + snapshots / metrics
+J4 — message_sources + processing run / profile provenance
 
 Current Phase:
 J — Conversations Database
@@ -129,29 +129,28 @@ Architectural Result:
 - أضافت J3 جدول `messages` و`Message` model وربط `Conversation -> Messages`، مع `MessageRole` (`user`, `assistant`) و`MessageStatus` (`pending`, `completed`, `failed`).
 - تخزن J3 `content` و`execution_snapshot` و`metrics`، مع casts مناسبة للـenums وحقول JSON.
 - أسست J3 مبكرًا جدول `message_sources` و`MessageSource` model وربط `Message -> MessageSources` و`MessageSource -> ProcessingRun`، مع حفظ `processing_run_id`, `qdrant_point_id`, `chunk_index`, `source_snapshot`, و`relevance_score`.
-- لا يكرر `message_sources` حقول `document_id` أو `processing_profile` أو `qdrant_collection` لأنها تستنتج عبر `ProcessingRun` الموثوقة.
-- Cascade معتمد من Conversation إلى Messages ومن Message إلى MessageSources، بينما حذف ProcessingRun المشار إليها من MessageSource ممنوع عبر `restrictOnDelete()`.
-- يبقى J4 مستقلاً في الـMaster Plan ولم يعتبر DONE؛ عند بدء J4 يجب أولًا تدقيق schema/provenance foundation الموجودة من PR #102 وتجنب إنشاء migration/schema مكرر.
+- أكملت J4 provenance الخاصة بـ`message_sources` بالاعتماد على `MessageSource.processing_run_id -> ProcessingRun` كمصدر موثوق للوصول إلى `document_id` وProcessing Profile و`qdrant_collection` دون تخزينها مرة ثانية داخل `message_sources`.
+- غيرت J4 FK الخاصة بـ`message_sources.processing_run_id` إلى `CASCADE ON DELETE`؛ حذف ProcessingRun يحذف MessageSources التابعة لها فقط بينما تبقى Message نفسها.
+- دمجت J4 أعمدة `kind`, `started_at`, `indexing_started_at`, و`failed_at` داخل migration الإنشاء الأصلية لـ`document_processing_runs`، وحذفت migration الإضافية `2026_09_03_060000_add_progress_fields_to_document_processing_runs_table.php` لأن قاعدة التطوير تبنى من الصفر.
+- حدثت J4 اختبارات schema/provenance لتتوافق مع الـbaseline النهائي، بما في ذلك default/casts وحذف backfill test القديم المرتبط بالـmigration المحذوفة.
 
 Latest Verification:
-PR #102 merged on GitHub: PASS
-PR head commit: 8a40bb6c88ab0397ed10befdd4c35f359172565b
-PR merge commit: 428989ac4289e451d698c683acfea344f8ef59e9
-main verified at J3 merge commit 428989ac4289e451d698c683acfea344f8ef59e9 before this progress update: PASS
-Focused J3 tests: 6 passed (24 assertions)
-Full Laravel suite: 180 passed (864 assertions)
-Migration rollback + re-run: PASS
-Laravel Pint: PASS
+PR #103 merged on GitHub: PASS
+PR head commit: 3ec50ec782e24c727b8bac8f3ad3ef23600f8bdd
+PR merge commit: cd74de40c10d56fed93c8bc80489747bd056bd16
+main verified at J4 merge commit cd74de40c10d56fed93c8bc80489747bd056bd16 before this progress update: PASS
+PR #103 schema/provenance test files were updated to match the finalized baseline; no test-count numbers were published in the PR or its GitHub discussion, so none are recorded here.
 
 Current Task:
-J4 — message_sources + processing run / profile provenance
+J5 — Conversation policies
 
-J4 Existing Foundation:
-- schema الأساسي لـ`message_sources` موجود من PR #102.
-- `processing_run_id` provenance موجود ويرتبط بـ`document_processing_runs` مع `restrictOnDelete()`.
-- `relevance_score` persistence foundation موجود.
-- `document_id`, `processing_profile`, و`qdrant_collection` لا تكرر في `message_sources` وتستنتج عبر `ProcessingRun`.
-- أي تنفيذ لـJ4 يبدأ بـReference/Schema Audit للموجود ويتجنب migration/schema مكرر، ولا تعتبر J4 DONE قبل استكمال نطاقها المستقل والتحقق منه.
+J4 Completion:
+- اكتمل schema/provenance baseline الخاص بـ`message_sources` دون أعمدة provenance مكررة.
+- `processing_run_id` هو المرجع المعتمد للوصول إلى ProcessingRun ثم Document/Profile/Qdrant provenance.
+- FK الخاصة بالـProcessingRun أصبحت `CASCADE ON DELETE`: تحذف المصادر التابعة للـRun مع بقاء الرسالة.
+- أعمدة ProcessingRun الخاصة بالنوع وتوقيتات المراحل أصبحت جزءًا من migration الإنشاء الأصلية، وحذفت migration الإضافية القديمة.
+- اختبارات schema/provenance حدثت لتطابق التصميم النهائي، دون تسجيل أرقام tests غير منشورة.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي J5 — Conversation policies.
 
 Open Blockers: none
 ```
@@ -929,13 +928,13 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 | J1 Conversations migration / model | DONE |
 | J2 conversation_document pivot | DONE |
 | J3 Messages + snapshots / metrics | DONE |
-| J4 message_sources + processing run / profile provenance | TODO |
+| J4 message_sources + processing run / profile provenance | DONE |
 | J5 Conversation policies | TODO |
 | J6 Create / list conversations | TODO |
 | J7 Multi-document selection | TODO |
 | J8 Ready / indexed / runtime-capable document filtering | TODO |
 
-> **J4 pre-existing foundation from PR #102:** schema الأساسي لـ`message_sources` و`MessageSource` model و`processing_run_id` provenance و`relevance_score` persistence موجودة بالفعل. يجب أن يبدأ J4 بتدقيق الموجود وتحديد الجزء المتبقي من نطاق المهمة، مع تجنب أي migration/schema مكرر وعدم اعتبار J4 مكتملة تلقائيًا.
+> **J4 finalized in PR #103:** يعتمد `message_sources` على `processing_run_id` للوصول إلى الـProcessingRun ثم Document/Profile/Qdrant provenance دون تكرار حقول مشتقة. أصبح FK الخاص بالـProcessingRun يستخدم `cascadeOnDelete()` بحيث يحذف حذف الـRun مصادرها فقط وتبقى Message نفسها، وتم Consolidate أعمدة `kind` وstage timestamps داخل migration إنشاء ProcessingRun الأصلية مع حذف migration الإضافية القديمة وتحديث اختبارات schema/provenance.
 
 كل Document جاهزة تشير إلى `active_processing_run_id`.
 
@@ -1111,13 +1110,16 @@ Domain/orchestration يجب أن يفرض:
 
 ## 8.2 document_processing_runs
 
-الـbaseline الحالي:
+الـbaseline الحالي بعد J4:
 
 ```text
 id
 document_id
 profile
 status
+kind default initial
+started_at nullable
+indexing_started_at nullable
 profile_snapshot
 total_pages nullable
 total_chunks default 0
@@ -1129,15 +1131,16 @@ error_code nullable
 failure_reason nullable
 qdrant_collection nullable
 indexed_at nullable
+failed_at nullable
 created_at
 updated_at
 ```
 
 لا توجد حقول خاصة بالمقارنة أو الـtemporary artifacts.
 
-## 8.2.1 H9 target extension
+## 8.2.1 H9 progress fields — consolidated in J4
 
-تضاف عبر Forward Migration:
+كانت H9 قد أضافت الحقول التالية عبر migration إضافية أثناء التطوير:
 
 ```text
 kind: initial | reprocessing
@@ -1146,8 +1149,7 @@ indexing_started_at nullable
 failed_at nullable
 ```
 
-`created_at` يمثل `queued_at`، و`indexed_at` يبقى توقيت النجاح. لا تستخدم
-الواجهة `updated_at` لتخمين المرحلة أو نوع المحاولة.
+في J4، وبما أن قاعدة التطوير ستُبنى من الصفر، دُمجت هذه الحقول داخل migration الإنشاء الأصلية لـ`document_processing_runs` وحذفت migration الإضافية `2026_09_03_060000_add_progress_fields_to_document_processing_runs_table.php`. يبقى `created_at` ممثلًا لـ`queued_at` و`indexed_at` توقيت النجاح، ولا تستخدم الواجهة `updated_at` لتخمين المرحلة أو نوع المحاولة.
 
 ## 8.3 DocumentStatus
 
@@ -1204,9 +1206,9 @@ MessageStatus: pending | completed | failed
 Conversation deletion -> cascade Messages
 ```
 
-## 8.7 message_sources — foundation established in J3 for J4
+## 8.7 message_sources — J4 finalized provenance baseline
 
-الـschema الأساسي الموجود منذ PR #102:
+الـschema النهائي المثبت بعد PR #103:
 
 ```text
 id
@@ -1226,10 +1228,10 @@ updated_at
 - `MessageSource -> belongsTo(Message)`.
 - `MessageSource -> belongsTo(ProcessingRun)`.
 - حذف Message يعمل cascade على MessageSources.
-- حذف ProcessingRun المشار إليها ممنوع عبر `restrictOnDelete()`.
-- لا تخزن `document_id`, `processing_profile`, أو `qdrant_collection` داخل `message_sources`؛ تستنتج من `ProcessingRun`.
+- حذف ProcessingRun يعمل cascade على MessageSources المرتبطة بتلك الـRun، بينما تبقى Message نفسها.
+- لا تخزن `document_id`, `processing_profile`, أو `qdrant_collection` داخل `message_sources`؛ تستنتج عبر `ProcessingRun` الموثوقة.
 - يوجد unique constraint على `message_id + qdrant_point_id`.
-- هذا **foundation مبكر لـJ4** وليس إعلانًا بأن J4 مكتملة؛ أي عمل لاحق لـJ4 يراجع الموجود أولًا ويتجنب إنشاء schema مكرر.
+- `processing_run_id` هو provenance anchor المعتمد للوصول إلى Document/Profile/Qdrant provenance دون duplication داخل `message_sources`.
 
 ---
 
@@ -1862,7 +1864,7 @@ PASS
 
 لم تُسجل أرقام الاختبارات في PR #101 أو commit المنشور، لذلك لم تُضف أعداد غير موثقة.
 
-## آخر مهمة مكتملة — J3 Messages + snapshots / metrics
+## المهمة السابقة المكتملة — J3 Messages + snapshots / metrics
 
 **الحالة:** `DONE` ومتحقق منها في PR #102، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `428989ac4289e451d698c683acfea344f8ef59e9`.
 
@@ -1912,20 +1914,49 @@ Laravel Pint:
 PASS
 ```
 
+## آخر مهمة مكتملة — J4 message_sources + processing run / profile provenance
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #103، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `cd74de40c10d56fed93c8bc80489747bd056bd16`.
+
+تم تنفيذ:
+
+- استكمال أساس provenance لـ`message_sources` بالاعتماد على `MessageSource.processing_run_id -> ProcessingRun`.
+- عدم إضافة `document_id` أو `processing_profile` أو `qdrant_collection` إلى `message_sources`؛ تستنتج هذه البيانات عبر الـProcessingRun الموثوقة.
+- تغيير FK الخاصة بـ`message_sources.processing_run_id` من `restrictOnDelete()` إلى `cascadeOnDelete()`.
+- عند حذف ProcessingRun تحذف MessageSources المرتبطة بها، بينما تبقى Message نفسها.
+- دمج `kind`, `started_at`, `indexing_started_at`, و`failed_at` داخل migration الإنشاء الأصلية لـ`document_processing_runs`.
+- حذف migration الإضافية القديمة `2026_09_03_060000_add_progress_fields_to_document_processing_runs_table.php` لأن baseline التطوير يبنى من الصفر.
+- تحديث `MessagePersistenceTest` لإثبات cascade من ProcessingRun إلى MessageSources مع بقاء Message.
+- تحديث `ProcessingRunSchemaTest` ليتحقق من default/casts ضمن الـbaseline النهائي وإزالة backfill test القديم المرتبط بالـmigration المحذوفة.
+
+### Verification J4
+
+```text
+PR #103 merged on GitHub: PASS
+Feature commit:
+- 3ec50ec782e24c727b8bac8f3ad3ef23600f8bdd
+Merge commit:
+- cd74de40c10d56fed93c8bc80489747bd056bd16
+
+GitHub PR diff / schema-provenance test audit:
+PASS
+
+لم تُنشر أرقام tests في PR #103 أو مناقشته، لذلك لم تُسجل أعداد غير موثقة.
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-J4 — message_sources + processing run / profile provenance
+J5 — Conversation policies
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت J3 في main عبر PR #102، وأصبحت طبقة Messages الأساسية موجودة مع MessageRole/MessageStatus وcontent/execution_snapshot/metrics.
-أسس PR #102 مبكرًا schema الأساسي لـmessage_sources وMessageSource model وربط provenance عبر processing_run_id، مع qdrant_point_id وchunk_index وsource_snapshot وrelevance_score، كما ثبت cascade من Message إلى MessageSources وrestrict delete على ProcessingRun المشار إليها.
-لا تكرر message_sources document_id أو processing_profile أو qdrant_collection لأنها تستنتج عبر ProcessingRun.
-تبقى J4 مهمة مستقلة حرفيًا وفق PROJECT_RAG_MASTER_PLAN.md ولا تعتبر DONE تلقائيًا. يجب أن يبدأ تنفيذها بتدقيق الموجود في PR #102 وتحديد الجزء المتبقي من نطاق J4، وتجنب إنشاء migration/schema مكرر أو إعادة تنفيذ provenance/relevance-score foundation الموجودة.
-تبقى J5 وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
+اكتملت J4 ودمجت في main عبر PR #103، وأصبح message_sources provenance يعتمد processing_run_id كمرجع وحيد للوصول إلى ProcessingRun ثم Document/Profile/Qdrant metadata دون حقول مشتقة مكررة.
+أصبح حذف ProcessingRun يحذف MessageSources المرتبطة بها عبر CASCADE مع بقاء Message، وتم دمج kind وstage timestamps داخل migration إنشاء ProcessingRun الأصلية وحذف migration الإضافية القديمة.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفيًا هي J5 — Conversation policies.
+تبقى J6 وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
 ---
