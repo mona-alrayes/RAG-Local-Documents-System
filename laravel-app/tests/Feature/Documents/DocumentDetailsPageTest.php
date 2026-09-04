@@ -218,7 +218,7 @@ class DocumentDetailsPageTest extends TestCase
             ->assertDontSee('data-document-poll-url', false);
     }
 
-    public function test_processing_document_details_include_safe_polling_failure_message(): void
+    public function test_processing_document_details_use_livewire_polling_without_legacy_reload_contract(): void
     {
         Http::fake([
             '*' => Http::response([
@@ -240,39 +240,9 @@ class DocumentDetailsPageTest extends TestCase
             ->actingAs($user)
             ->get(route('documents.show', $document))
             ->assertOk()
-            ->assertSee('data-document-poll-error', false)
-            ->assertSee(
-                __('documents.polling.update_failed'),
-            );
-    }
-
-    public function test_processing_document_details_expose_server_controlled_polling_endpoint(): void
-    {
-        Http::fake([
-            '*' => Http::response([
-                'available_profiles' => [
-                    ProcessingProfile::Cloud->value,
-                ],
-            ]),
-        ]);
-
-        $user = User::factory()->create();
-
-        $document = $this->createReadyDocument($user);
-
-        $document->forceFill([
-            'status' => DocumentStatus::Queued,
-        ])->save();
-
-        $this
-            ->actingAs($user)
-            ->get(route('documents.show', $document))
-            ->assertOk()
-            ->assertSee('data-document-poll-url', false)
-            ->assertSee(
-                route('documents.poll', $document),
-                false,
-            );
+            ->assertSeeHtml('wire:poll.5s="poll"')
+            ->assertDontSee('data-document-poll-url', false)
+            ->assertDontSee('data-document-poll-error', false);
     }
 
     private function createReadyDocument(User $user): Document

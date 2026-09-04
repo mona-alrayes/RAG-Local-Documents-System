@@ -2,8 +2,6 @@
 
 namespace App\Providers;
 
-use App\View\Composers\AppShellComposer;
-use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,9 +19,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        View::composer(
-            'components.layouts.app',
-            AppShellComposer::class,
-        );
+        //
     }
 }

@@ -56,6 +56,7 @@
             </div>
         @endif
 
+        @persist('documents-upload-controls')
         {{-- Upload document --}}
         <section
             class="rounded-2xl border border-white/10 bg-navy-900/70 p-4 sm:p-5"
@@ -197,6 +198,9 @@
             </form>
         </section>
 
+        @endpersist
+
+        @persist('documents-filter-controls')
         {{-- Filters --}}
         <section
             class="rounded-2xl border border-white/10 bg-navy-900/70 p-4 sm:p-5"
@@ -296,6 +300,8 @@
                 </div>
             </form>
         </section>
+
+        @endpersist
 
         {{-- Documents --}}
         @if ($documents->isNotEmpty())

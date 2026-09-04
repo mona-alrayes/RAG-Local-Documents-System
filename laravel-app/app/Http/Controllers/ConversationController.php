@@ -26,8 +26,9 @@ final class ConversationController extends Controller
         ]);
     }
 
-    public function store(StoreConversationRequest $request): RedirectResponse
-    {
+    public function store(
+        StoreConversationRequest $request,
+    ): RedirectResponse {
         $request->user()
             ->conversations()
             ->create([
@@ -39,24 +40,13 @@ final class ConversationController extends Controller
             ->with('success', 'تم إنشاء المحادثة بنجاح.');
     }
 
-    public function show(Request $request, Conversation $conversation): View
-    {
+    public function show(
+        Conversation $conversation,
+    ): View {
         Gate::authorize('view', $conversation);
-
-        $documents = $request->user()
-            ->documents()
-            ->latest()
-            ->get([
-                'documents.id',
-                'documents.title',
-                'documents.original_name',
-            ]);
-
-        $conversation->load('documents:id');
 
         return view('conversations.show', [
             'conversation' => $conversation,
-            'documents' => $documents,
         ]);
     }
 
