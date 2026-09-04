@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — I6 مكتملة ومدموجة في PR #99؛ اكتملت تحسينات Accessibility/Responsive وحالات النجاح والتحذير والخطأ مع polling متحكم به Server-side عبر Laravel دون نقل Business State إلى JavaScript؛ J1 هي المهمة الحالية
+> **الحالة العامة:** قيد التنفيذ — J1 مكتملة ومدموجة في PR #100؛ أضيف أساس Conversations في Laravel/MySQL مع جدول `conversations` وملكية المستخدم وحقل `title` nullable والعلاقات الأساسية فقط؛ J2 هي المهمة الحالية
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: a8aa3df94bbc4ee31336133cfef09f0ed263f640
-Last Merged Feature PR on main: #99 — I6 Accessibility / responsive / error states
-Latest Task PR: #99 — I6 Accessibility / responsive / error states
-Verified I6 Feature Commit:
-- 3464ea1a91c1d62ecfd8bb1ce38fccaeafbcc723 — I6 accessibility / responsive / error states
-Verified I6 Merge Commit: a8aa3df94bbc4ee31336133cfef09f0ed263f640
-Documentation Baseline: تم تسجيل اكتمال I6 وتسليم J1 Conversations migration / model كمهمة حالية.
+Verified Main Commit: e84467a971e42b88ce88349e8d3a39c1f70a861f
+Last Merged Feature PR on main: #100 — J1 Conversations migration / model
+Latest Task PR: #100 — J1 Conversations migration / model
+Verified J1 Feature Commit:
+- bdcd0c6c6cbbd39344e068d9d556b611cb58a450 — J1 conversations foundation
+Verified J1 Merge Commit: e84467a971e42b88ce88349e8d3a39c1f70a861f
+Documentation Baseline: تم تسجيل اكتمال J1 وتسليم J2 conversation_document pivot كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-I6 — Accessibility / responsive / error states
+J1 — Conversations migration / model
 
 Current Phase:
 J — Conversations Database
@@ -118,19 +118,24 @@ Architectural Result:
 - حافظت I6 على الفصل بين `Document.status` وجاهزية الوثيقة وبين `ProcessingRun.status` وتقدم المحاولة، ولم تنشئ Business State Machine داخل JavaScript.
 - أضافت I6 polling endpoint في Laravel لطبقة العرض؛ يحدد السيرفر `poll_required`، وتستخدم JavaScript هذا القرار فقط لتحديث الواجهة وتتوقف عند الحالات النهائية دون إعادة تفسير الحالة محليًا.
 - حافظت I6 على private preview/download behavior وصلاحيات الوصول الحالية دون تحويل الملفات إلى Public URLs.
+- أضافت J1 جدول `conversations` في Laravel/MySQL، وكل Conversation مملوكة لمستخدم عبر `user_id` مع FK يستخدم `restrictOnDelete()` بما يتوافق مع النمط الحالي.
+- أضافت J1 حقل `title` nullable لدعم توليد اسم افتراضي للمحادثة لاحقًا من محتواها وإتاحة إعادة التسمية لاحقًا، دون تنفيذ منطق التوليد أو UI/API لإعادة التسمية في هذه المهمة.
+- أضافت J1 `Conversation` Eloquent model وعلاقتي `Conversation -> belongsTo(User)` و`User -> hasMany(Conversation)`.
+- لم تضف J1 document selection أو Messages أو Message sources أو Policies أو Conversation UI/controllers أو RAG/Retrieval/FastAPI/Qdrant/streaming/conversation memory.
 
 Latest Verification:
-PR #99 merged on GitHub: PASS
-PR head commit: 3464ea1a91c1d62ecfd8bb1ce38fccaeafbcc723
-PR merge commit: a8aa3df94bbc4ee31336133cfef09f0ed263f640
-main verified at I6 merge commit a8aa3df94bbc4ee31336133cfef09f0ed263f640 before this progress update: PASS
+PR #100 merged on GitHub: PASS
+PR head commit: bdcd0c6c6cbbd39344e068d9d556b611cb58a450
+PR merge commit: e84467a971e42b88ce88349e8d3a39c1f70a861f
+main verified at J1 merge commit e84467a971e42b88ce88349e8d3a39c1f70a861f before this progress update: PASS
+Migration: PASS
+Migration rollback + re-run: PASS
 Pint: PASS
-Vite production build: PASS
-Focused Documents + Workspace regression: 108 tests / 602 assertions PASS
-Full Laravel suite: 168 tests / 823 assertions PASS
+Focused J1 tests: 2 passed (6 assertions)
+Full Laravel suite: 170 passed (829 assertions)
 
 Current Task:
-J1 — Conversations migration / model
+J2 — conversation_document pivot
 
 Open Blockers: none
 ```
@@ -905,7 +910,7 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 
 | المهمة | الحالة |
 |---|---|
-| J1 Conversations migration / model | TODO |
+| J1 Conversations migration / model | DONE |
 | J2 conversation_document pivot | TODO |
 | J3 Messages + snapshots / metrics | TODO |
 | J4 message_sources + processing run / profile provenance | TODO |
@@ -1659,7 +1664,7 @@ Frontend build:
 PASS
 ```
 
-## آخر مهمة مكتملة — I6 Accessibility / Responsive / Error States
+## المهمة السابقة المكتملة — I6 Accessibility / Responsive / Error States
 
 **الحالة:** `DONE` ومتحقق منها في PR #99، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `a8aa3df94bbc4ee31336133cfef09f0ed263f640`.
 
@@ -1698,18 +1703,67 @@ Full Laravel suite:
 168 tests / 823 assertions PASS
 ```
 
+## آخر مهمة مكتملة — J1 Conversations migration / model
+
+**الحالة:** `DONE` ومتحقق منها في PR #100، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `e84467a971e42b88ce88349e8d3a39c1f70a861f`.
+
+تم تنفيذ:
+
+- إضافة جدول `conversations` في Laravel/MySQL.
+- كل Conversation مملوكة لمستخدم عبر `user_id` مع FK يستخدم `restrictOnDelete()` بما يتوافق مع نمط المشروع الحالي.
+- إضافة `title` nullable. الحقل يسمح لاحقًا بتوليد اسم افتراضي للمحادثة من محتواها على نمط تجربة ChatGPT، كما يسمح بإضافة إعادة تسمية من المستخدم لاحقًا؛ لم يُنفذ أي من هذين السلوكين في J1.
+- إضافة `Conversation` Eloquent model.
+- إضافة `Conversation -> belongsTo(User)` و`User -> hasMany(Conversation)`.
+
+حدود J1:
+
+- لا `conversation_document` pivot.
+- لا Messages أو Message sources.
+- لا Conversation policies.
+- لا Conversation create/list UI أو controllers.
+- لا document selection.
+- لا RAG / retrieval.
+- لا FastAPI أو Qdrant.
+- لا streaming.
+- لا conversation memory.
+
+### Verification J1
+
+```text
+PR #100 merged on GitHub: PASS
+Feature commit:
+- bdcd0c6c6cbbd39344e068d9d556b611cb58a450
+Merge commit:
+- e84467a971e42b88ce88349e8d3a39c1f70a861f
+
+Migration:
+PASS
+
+Migration rollback + re-run:
+PASS
+
+Laravel Pint:
+PASS
+
+Focused J1 tests:
+2 passed (6 assertions)
+
+Full Laravel suite:
+170 passed (829 assertions)
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-J1 — Conversations migration / model
+J2 — conversation_document pivot
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت I6 في main عبر PR #99 واكتملت مرحلة Blade Documents Experience مع تحسين Accessibility/Responsive وحالات النجاح والتحذير والخطأ، وبقيت رسائل الفشل آمنة دون raw failure_reason أو تفاصيل داخلية.
-يعتمد polling في الواجهة على Laravel/MySQL وقرار poll_required المتحكم به Server-side، ولا توجد Business State Machine في JavaScript، مع الحفاظ على الفصل بين Document status وProcessingRun status وعلى private preview/download behavior.
-تبدأ J1 — Conversations migration / model حرفيًا وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md ضمن مرحلة Conversations Database.
+دُمجت J1 في main عبر PR #100، وأصبح أساس Conversations موجودًا في Laravel/MySQL بجدول conversations وملكية user_id وحقل title nullable وConversation model وعلاقات User/Conversation فقط.
+حقل title يهيئ الـschema لتوليد اسم افتراضي وإعادة التسمية لاحقًا، لكنه لا يعني أن منطق التوليد أو UI/API لإعادة التسمية قد تم تنفيذه.
+تبدأ J2 — conversation_document pivot حرفيًا وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، بينما تبقى J3 وما بعدها دون تغيير.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
