@@ -20,6 +20,10 @@ return new class extends Migration
 
             $table->string('profile', 32);
             $table->string('status', 32)->default('pending');
+            $table->string('kind', 32)->default('initial');
+
+            $table->timestamp('started_at')->nullable();
+            $table->timestamp('indexing_started_at')->nullable();
 
             $table->json('profile_snapshot');
 
@@ -35,7 +39,9 @@ return new class extends Migration
             $table->text('failure_reason')->nullable();
 
             $table->string('qdrant_collection')->nullable();
+
             $table->timestamp('indexed_at')->nullable();
+            $table->timestamp('failed_at')->nullable();
 
             $table->timestamps();
 

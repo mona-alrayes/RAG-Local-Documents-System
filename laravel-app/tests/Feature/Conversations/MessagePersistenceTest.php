@@ -223,6 +223,51 @@ class MessagePersistenceTest extends TestCase
         ]);
     }
 
+    public function test_deleting_processing_run_cascades_sources_but_keeps_message(): void
+    {
+        $user = User::factory()->create();
+
+        $conversation = $user->conversations()->create([
+            'title' => 'محادثة',
+        ]);
+
+        $document = $this->createDocument($user);
+
+        $processingRun = $document->processingRuns()->create([
+            'profile' => 'cloud',
+            'status' => 'indexed',
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+        ]);
+
+        $message = $conversation->messages()->create([
+            'role' => MessageRole::Assistant,
+            'status' => MessageStatus::Completed,
+            'content' => 'الإجابة.',
+        ]);
+
+        $source = $message->sources()->create([
+            'processing_run_id' => $processingRun->id,
+            'qdrant_point_id' => 'bf9f6557-d595-599b-8704-6a115fd102c5',
+            'chunk_index' => 0,
+            'source_snapshot' => [
+                'source' => $document->original_name,
+                'excerpt' => 'المصدر.',
+            ],
+            'relevance_score' => 0.91,
+        ]);
+
+        $processingRun->delete();
+
+        $this->assertDatabaseHas('messages', [
+            'id' => $message->id,
+        ]);
+
+        $this->assertDatabaseMissing('message_sources', [
+            'id' => $source->id,
+        ]);
+    }
+
     private function createDocument(User $user): Document
     {
         return $user->documents()->create([
