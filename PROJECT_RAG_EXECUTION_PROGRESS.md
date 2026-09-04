@@ -2,8 +2,8 @@
 
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
-> **آخر تحديث:** 2026-09-03
-> **الحالة العامة:** قيد التنفيذ — I3 مكتملة ومدموجة في PR #96؛ أصبحت صفحة Documents إدارة وثائق فعلية ببطاقات وفلاتر وبحث؛ I4 هي المهمة الحالية
+> **آخر تحديث:** 2026-09-04
+> **الحالة العامة:** قيد التنفيذ — I4 مكتملة ومدموجة في PR #97؛ أصبح رفع وثيقة واحدة واختيار Cloud/Hybrid Local مرتبطين بالـCapabilities الفعلية مع fail-closed وبدون fallback؛ I5 هي المهمة الحالية
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 356a897b20dfee543e20791664baa2dec7b45038
-Last Merged Feature PR on main: #96 — I3 Documents List / Cards / Filters
-Latest Task PR: #96 — I3 Documents List / Cards / Filters
-Verified I3 Feature Commit:
-- e5e6c0b119578eb1753f2072a50afb2ab8448fcd — I3 documents list / cards / filters
-Verified I3 Merge Commit: 356a897b20dfee543e20791664baa2dec7b45038
-Documentation Baseline: تم تسجيل اكتمال I3 وتسليم I4 One-file upload + capability-aware Cloud/Hybrid Local choice كمهمة حالية.
+Verified Main Commit: 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107
+Last Merged Feature PR on main: #97 — I4 One-file upload + capability-aware Cloud/Hybrid Local choice
+Latest Task PR: #97 — I4 One-file upload + capability-aware Cloud/Hybrid Local choice
+Verified I4 Feature Commit:
+- 014a1a91bd9d84746c29d2c35fd04b5488dbb812 — I4 one-file upload + capability-aware profile choice
+Verified I4 Merge Commit: 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107
+Documentation Baseline: تم تسجيل اكتمال I4 وتسليم I5 Document details / processing timeline كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-I3 — Documents List / Cards / Filters
+I4 — One-file upload + capability-aware Cloud/Hybrid Local choice
 
 Current Phase:
 I — Blade Documents Experience
@@ -98,24 +98,29 @@ Architectural Result:
 - لا تعرض I3 raw `failure_reason`؛ تستخدم safe failure presentation، وتفصل بين no documents empty state وfiltered no-results empty state.
 - بقيت Queries user-scoped مع eager loading للـactive/latest processing runs لمنع N+1.
 - أضيف `DocumentReadService::hasAnyForUser()` لدعم empty-state distinction، وأصلح بناء user-scoped query باستخدام relation `getQuery()` ليتوافق مع typed Builder المستخدم في filter/search methods.
+- أضافت I4 نموذج رفع وثيقة واحدة فقط بصيغ PDF / DOCX / TXT داخل صفحة `/documents` الحالية.
+- تعرض I4 خياري `cloud` و`hybrid_local` وفق Capabilities الفعلية، وتمنع اختيار الـProfile غير المتاحة دون أي automatic fallback.
+- تبقى Server-side capability verification داخل orchestration مصدر الحقيقة النهائي حتى لو كانت الواجهة قد عرضت Profile متاحة سابقًا.
+- تفشل واجهة I4 مغلقًا عند تعطل خدمة Capabilities أو فساد response، وتُعطّل الرفع عندما لا توجد أي Profile متاحة.
+- إذا أصبحت الـProfile غير متاحة بين عرض الصفحة وتنفيذ الرفع، يعاد المستخدم بأمان إلى صفحة الوثائق برسالة localized دون إنشاء ProcessingRun أو Queue job بديلة.
+- حافظت I4 على redirect/flash contract المثبت في H13 ولم تنشئ مسار Upload موازياً.
+- أصبحت ملفات ترجمة Documents في المسار القياسي `lang/ar` و`lang/en` مع رسائل I4 الجديدة.
+- أضيفت اختبارات I4 لحالات one-file upload، capability-aware UI، unavailable profile، fail-closed، وغياب fallback.
 
 Latest Verification:
-PR #96 merged on GitHub: PASS
-PR head commit: e5e6c0b119578eb1753f2072a50afb2ab8448fcd
-PR merge commit: 356a897b20dfee543e20791664baa2dec7b45038
-main verified at I3 merge commit 356a897b20dfee543e20791664baa2dec7b45038 before this progress update: PASS
-DocumentPagesTest: 8 passed (21 assertions)
-I1/I2 regression — AppShellTest + WorkspaceDashboardTest: 4 passed (36 assertions)
-Laravel full regression: 149 passed (728 assertions)
-Laravel Pint on I3 files: PASS
-Frontend: npm run build — PASS
-Manual browser verification: PASS
-Visual verification: /documents cards, search, status filter, file type filter, and empty states — PASS
-Status filter verified to display actual values such as pending, processing, ready, failed instead of translation keys such as documents.availability.pending — PASS
-FastAPI: لم تُشغّل الاختبارات لأن I3 لم تغيّر FastAPI.
+PR #97 merged on GitHub: PASS
+PR head commit: 014a1a91bd9d84746c29d2c35fd04b5488dbb812
+PR merge commit: 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107
+main verified at I4 merge commit 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107 before this progress update: PASS
+DocumentPagesTest: 11 passed (51 assertions)
+DocumentUploadValidationTest: 8 passed (62 assertions)
+ProcessingCapabilityServiceTest: 3 passed (6 assertions)
+Laravel full regression: 153 passed (765 assertions)
+Laravel Pint on I4 files: PASS
+FastAPI: لم يتم تعديل FastAPI في I4.
 
 Current Task:
-I4 — One-file upload + capability-aware Cloud/Hybrid Local choice
+I5 — Document details / processing timeline
 
 Open Blockers: none
 ```
@@ -572,7 +577,7 @@ FastAPI:
 | I1 Responsive app shell / sidebar | DONE |
 | I2 Workspace dashboard | DONE |
 | I3 Documents list / cards / filters | DONE |
-| I4 One-file upload + capability-aware Cloud/Hybrid Local choice | TODO |
+| I4 One-file upload + capability-aware Cloud/Hybrid Local choice | DONE |
 | I5 Document details / processing timeline | TODO |
 | I6 Accessibility / responsive / error states | TODO |
 
@@ -735,7 +740,52 @@ FastAPI:
 لم تُشغّل الاختبارات لأن I3 لم تغيّر FastAPI.
 ```
 
-الواجهة تعرض فقط Processing Profiles المتاحة فعلياً من Capabilities.
+### I4 — One-file upload + capability-aware Cloud/Hybrid Local choice
+
+**الحالة:** `DONE` ومتحقق منها في PR #97 والمدمجة في `main` بتاريخ 2026-09-04.
+
+تم تنفيذ:
+
+- إضافة نموذج رفع وثيقة واحدة فقط داخل صفحة `/documents` بصيغ PDF / DOCX / TXT.
+- استهلاك `ProcessingCapabilityService` لقراءة `available_profiles` الفعلية وعرض خياري `cloud` و`hybrid_local` مع تعطيل الـProfile غير المتاحة.
+- عدم تنفيذ أي automatic fallback من Profile يختارها المستخدم إلى Profile أخرى.
+- إبقاء Server-side capability verification في `DocumentProcessingDispatcher` مصدر الحقيقة قبل إنشاء Initial ProcessingRun أو dispatch أي Queue job.
+- fail-closed عند تعطل capability lookup أو فساد response؛ عند عدم توفر أي Profile تُعطل أدوات الرفع في الواجهة.
+- معالجة آمنة لحالة race عندما تصبح الـProfile غير متاحة بين عرض الصفحة وتنفيذ POST؛ يعاد المستخدم إلى صفحة الوثائق برسالة localized دون إنشاء ProcessingRun أو Queue job بديلة.
+- الحفاظ على redirect/flash contract المثبت في H13، بما في ذلك success/duplicate/user-safe error behavior.
+- اعتماد ملفات ترجمة Documents في `lang/ar` و`lang/en` وإضافة رسائل `profile_unavailable` و`service_unavailable` الخاصة بالرفع.
+- إضافة اختبارات I4 للـcapability-aware UI، تعطيل Profile غير المتاحة، fail-closed، عدم وجود fallback، one-file input، وحالة تغير الـCapability وقت التنفيذ.
+
+Verification المثبت لـI4:
+
+```text
+PR #97 merged on GitHub: PASS
+Merged at: 2026-09-04T06:12:53Z
+Feature commit:
+- 014a1a91bd9d84746c29d2c35fd04b5488dbb812
+Merge commit:
+- 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107
+
+DocumentPagesTest:
+11 passed (51 assertions)
+
+DocumentUploadValidationTest:
+8 passed (62 assertions)
+
+ProcessingCapabilityServiceTest:
+3 passed (6 assertions)
+
+Laravel full regression:
+153 passed (765 assertions)
+
+Laravel Pint on I4 files:
+PASS
+
+FastAPI:
+لم يتم تعديل FastAPI في I4.
+```
+
+الواجهة تتيح الاختيار فقط للـProcessing Profiles المتاحة فعلياً من Capabilities؛ وتظهر غير المتاحة بحالة disabled دون fallback.
 
 تبعيات المرحلة I الملزمة:
 
@@ -1347,7 +1397,7 @@ FastAPI:
 لم تُشغّل الاختبارات لأن I2 لم تغيّر FastAPI.
 ```
 
-## آخر مهمة مكتملة — I3 Documents List / Cards / Filters
+## المهمة السابقة المكتملة — I3 Documents List / Cards / Filters
 
 **الحالة:** `DONE` ومتحقق منها في PR #96، والمدمجة في `main` عند merge commit `356a897b20dfee543e20791664baa2dec7b45038`.
 
@@ -1410,18 +1460,63 @@ FastAPI:
 لم تُشغّل الاختبارات لأن I3 لم تغيّر FastAPI.
 ```
 
+## آخر مهمة مكتملة — I4 One-file upload + capability-aware Cloud/Hybrid Local choice
+
+**الحالة:** `DONE` ومتحقق منها في PR #97، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107`.
+
+تم تنفيذ:
+
+- رفع وثيقة واحدة فقط بصيغ PDF / DOCX / TXT ضمن صفحة Documents الحالية.
+- اختيار `cloud` أو `hybrid_local` حسب `available_profiles` الفعلية، مع تعطيل الـProfile غير المتاحة.
+- لا يوجد automatic fallback؛ اختيار المستخدم لا يتحول تلقائيًا إلى Profile أخرى.
+- Server-side capability verification تبقى مصدر الحقيقة النهائي قبل إنشاء ProcessingRun أو dispatch أي Queue job.
+- fail-closed عند تعطل capability lookup أو فساد response، مع تعطيل الرفع عندما لا توجد أي Profile متاحة.
+- إذا أصبحت الـProfile غير متاحة بين عرض الصفحة وتنفيذ الرفع، يفشل الطلب بأمان ويعود برسالة localized دون إنشاء Run أو Job بديلة.
+- الحفاظ على redirect/flash contract المثبت في H13.
+- اعتماد ملفات الترجمة في `lang/ar` و`lang/en` وإضافة رسائل الرفع الجديدة.
+- إضافة اختبارات I4 اللازمة للـcapability-aware UI، one-file upload، fail-closed، unavailable profile، وعدم وجود fallback.
+
+### Verification I4
+
+```text
+PR #97 merged on GitHub: PASS
+Merged at: 2026-09-04T06:12:53Z
+Feature commit:
+- 014a1a91bd9d84746c29d2c35fd04b5488dbb812
+Merge commit:
+- 0a0adad4ea9e3e71f64d7c6ae84321d6b95d1107
+
+DocumentPagesTest:
+11 passed (51 assertions)
+
+DocumentUploadValidationTest:
+8 passed (62 assertions)
+
+ProcessingCapabilityServiceTest:
+3 passed (6 assertions)
+
+Laravel full regression:
+153 passed (765 assertions)
+
+Laravel Pint on I4 files:
+PASS
+
+FastAPI:
+لم يتم تعديل FastAPI في I4.
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-I4 — One-file upload + capability-aware Cloud/Hybrid Local choice
+I5 — Document details / processing timeline
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت I3 في main عبر PR #96 وأصبحت صفحة Documents إدارة وثائق فعلية ببطاقات responsive وبحث وفلاتر status/file type وpagination تحافظ على query string، مع empty states منفصلة وآمنة.
-تبدأ I4 — One-file upload + capability-aware Cloud/Hybrid Local choice وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك H12 capability availability وH13 Upload command بدلاً من إعادة تعريف قواعد Availability أو orchestration داخل الواجهة.
-يبقى App Shell وWorkspace Dashboard وصفحة Documents الناتجة عن I1/I2/I3 قاعدة الواجهة؛ لا يعاد تصميمها ضمن I4 إلا بما يلزم لدمج one-file upload ضمن العقود الحالية.
+دُمجت I4 في main عبر PR #97 وأصبح رفع وثيقة واحدة بصيغ PDF/DOCX/TXT واختيار cloud أو hybrid_local مرتبطين بالـCapabilities الفعلية، مع تعطيل Profile غير المتاحة وfail-closed وعدم وجود automatic fallback.
+تبدأ I5 — Document details / processing timeline وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، وتستهلك H12 details/timeline وH13 Reprocess/Delete commands بدل إعادة تعريف Business State أو orchestration داخل الواجهة.
+يبقى App Shell وWorkspace Dashboard وصفحة Documents وUpload flow الناتجة عن I1–I4 قاعدة الواجهة.
 لا تغيّر المرحلة I عقود H12/H13 أو Business State داخل Blade/JavaScript دون توثيق gap معماري صريح.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
