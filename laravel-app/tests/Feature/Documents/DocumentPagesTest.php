@@ -382,4 +382,30 @@ class DocumentPagesTest extends TestCase
             $submitButton->hasAttribute('disabled'),
         );
     }
+
+    public function test_index_displays_safe_flash_feedback_messages(): void
+    {
+        $user = User::factory()->create();
+
+        Http::fake([
+            '*' => Http::response([
+                'available_profiles' => [
+                    ProcessingProfile::Cloud->value,
+                ],
+            ]),
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->withSession([
+                'success' => 'تم تنفيذ العملية بنجاح.',
+                'warning' => 'تعذر تنفيذ جزء من العملية.',
+                'error' => 'تعذر تنفيذ العملية.',
+            ])
+            ->get(route('documents.index'))
+            ->assertOk()
+            ->assertSee('تم تنفيذ العملية بنجاح.')
+            ->assertSee('تعذر تنفيذ جزء من العملية.')
+            ->assertSee('تعذر تنفيذ العملية.');
+    }
 }

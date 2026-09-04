@@ -1,12 +1,12 @@
 <x-layouts.app title="مساحة العمل">
-    <div class="space-y-10">
+    <div class="space-y-8 sm:space-y-10">
         {{-- Header --}}
-        <section>
+        <section class="min-w-0">
             <p class="text-sm font-semibold text-cyan-400">
                 مساحة العمل
             </p>
 
-            <h1 class="mt-2 text-3xl font-bold text-ice-100 sm:text-4xl">
+            <h1 class="mt-2 break-words text-3xl font-bold text-ice-100 sm:text-4xl">
                 أهلًا، {{ auth()->user()->name }}
             </h1>
 
@@ -73,7 +73,7 @@
         @if ($dashboard['totalDocuments'] === 0)
             {{-- Empty state --}}
             <section
-                class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-6 py-12 text-center"
+                class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-4 py-12 text-center sm:px-6"
             >
                 <div
                     class="mx-auto flex size-12 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300"
@@ -104,7 +104,7 @@
 
                 <a
                     href="{{ route('documents.index') }}"
-                    class="mt-6 inline-flex min-h-11 items-center justify-center rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-navy-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-navy-950"
+                    class="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-navy-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-navy-950 sm:w-auto"
                 >
                     الانتقال إلى الوثائق
                 </a>
@@ -112,8 +112,8 @@
         @else
             {{-- Recent documents --}}
             <section aria-labelledby="recent-documents-heading">
-                <div class="flex flex-wrap items-end justify-between gap-4">
-                    <div>
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div class="min-w-0">
                         <h2
                             id="recent-documents-heading"
                             class="text-xl font-semibold text-ice-100"
@@ -128,7 +128,7 @@
 
                     <a
                         href="{{ route('documents.index') }}"
-                        class="text-sm font-semibold text-cyan-300 transition hover:text-cyan-200"
+                        class="self-start text-sm font-semibold text-cyan-300 transition hover:text-cyan-200 sm:self-auto"
                     >
                         عرض كل الوثائق
                     </a>
@@ -151,18 +151,18 @@
                         @endphp
 
                         <article
-                            class="flex min-w-0 items-center justify-between gap-4 px-5 py-4"
+                            class="flex min-w-0 flex-col items-stretch gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5"
                         >
-                            <div class="flex min-w-0 items-center gap-3">
+                            <div class="flex min-w-0 items-start gap-3 sm:items-center">
                                 <span
-                                    class="size-2.5 shrink-0 rounded-full {{ $statusDotClasses }}"
+                                    class="mt-1 size-2.5 shrink-0 rounded-full {{ $statusDotClasses }} sm:mt-0"
                                     aria-hidden="true"
                                 ></span>
 
                                 <div class="min-w-0">
                                     <a
                                         href="{{ route('documents.show', $document->id) }}"
-                                        class="block truncate font-medium text-ice-100 transition hover:text-cyan-300"
+                                        class="block break-words font-medium text-ice-100 transition hover:text-cyan-300 sm:truncate"
                                     >
                                         {{ $document->title ?: $document->originalName }}
                                     </a>
@@ -183,7 +183,7 @@
 
                             <a
                                 href="{{ route('documents.show', $document->id) }}"
-                                class="shrink-0 rounded-lg px-3 py-2 text-sm text-mist-300 transition hover:bg-white/5 hover:text-ice-100"
+                                class="self-start rounded-lg px-3 py-2 text-sm text-mist-300 transition hover:bg-white/5 hover:text-ice-100 sm:shrink-0 sm:self-auto"
                             >
                                 عرض
                             </a>
@@ -196,7 +196,7 @@
                 {{-- Recent failures --}}
                 <section
                     aria-labelledby="recent-failures-heading"
-                    class="rounded-2xl border border-red-400/15 bg-red-400/5 p-5"
+                    class="rounded-2xl border border-red-400/15 bg-red-400/5 p-4 sm:p-5"
                 >
                     <h2
                         id="recent-failures-heading"
@@ -205,32 +205,34 @@
                         تحتاج إلى انتباه
                     </h2>
 
-                    <div class="mt-4 space-y-3">
+                    <div class="mt-4 space-y-4">
                         @foreach ($dashboard['recentFailures'] as $document)
-                            <div class="flex min-w-0 items-center justify-between gap-4">
-                                <div class="flex min-w-0 items-center gap-3">
+                            <div
+                                class="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                            >
+                                <div class="flex min-w-0 items-start gap-3 sm:items-center">
                                     <span
-                                        class="size-2.5 shrink-0 rounded-full bg-red-400"
+                                        class="mt-1 size-2.5 shrink-0 rounded-full bg-red-400 sm:mt-0"
                                         aria-hidden="true"
                                     ></span>
 
                                     <div class="min-w-0">
                                         <a
                                             href="{{ route('documents.show', $document->id) }}"
-                                            class="block truncate text-sm font-medium text-ice-100 hover:text-cyan-300"
+                                            class="block break-words text-sm font-medium text-ice-100 hover:text-cyan-300 sm:truncate"
                                         >
                                             {{ $document->title ?: $document->originalName }}
                                         </a>
 
-                                        <p class="mt-1 text-xs text-red-200">
-                                            {{ $document->safeFailure ?? __('documents.failure.processing_failed') }}
+                                        <p class="mt-1 break-words text-xs leading-5 text-red-200">
+                                            {{ __('documents.failure.processing_failed') }}
                                         </p>
                                     </div>
                                 </div>
 
                                 <a
                                     href="{{ route('documents.show', $document->id) }}"
-                                    class="shrink-0 text-sm font-medium text-red-200 hover:text-red-100"
+                                    class="self-start text-sm font-medium text-red-200 hover:text-red-100 sm:shrink-0 sm:self-auto"
                                 >
                                     التفاصيل
                                 </a>

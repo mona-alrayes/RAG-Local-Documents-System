@@ -9,7 +9,7 @@
     <div class="space-y-8">
         {{-- Header --}}
         <header class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-            <div>
+            <div class="min-w-0">
                 <p class="text-sm font-semibold text-cyan-400">
                     إدارة الوثائق
                 </p>
@@ -27,6 +27,34 @@
                 {{ $documents->total() }} وثيقة
             </div>
         </header>
+
+        {{-- Flash messages --}}
+        @if (session('success'))
+            <div
+                role="status"
+                class="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"
+            >
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if (session('warning'))
+            <div
+                role="status"
+                class="rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"
+            >
+                {{ session('warning') }}
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div
+                role="alert"
+                class="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
+            >
+                {{ session('error') }}
+            </div>
+        @endif
 
         {{-- Upload document --}}
         <section
@@ -68,17 +96,29 @@
                         type="file"
                         accept=".pdf,.docx,.txt"
                         required
+                        @error('document')
+                            aria-invalid="true"
+                            aria-describedby="document-error"
+                        @enderror
                         class="block w-full rounded-xl border border-white/10 bg-navy-950 px-4 py-3 text-sm text-mist-200 file:me-4 file:rounded-lg file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-navy-950 hover:file:bg-cyan-300"
                     >
 
                     @error('document')
-                        <p class="mt-2 text-sm text-red-300">
+                        <p
+                            id="document-error"
+                            role="alert"
+                            class="mt-2 text-sm text-red-300"
+                        >
                             {{ $message }}
                         </p>
                     @enderror
                 </div>
 
-                <fieldset>
+                <fieldset
+                    @error('processing_profile')
+                        aria-describedby="processing-profile-error"
+                    @enderror
+                >
                     <legend class="mb-3 text-sm font-medium text-ice-100">
                         طريقة المعالجة
                     </legend>
@@ -94,7 +134,7 @@
                             @endphp
 
                             <label
-                                class="flex items-start gap-3 rounded-xl border p-4 transition
+                                class="flex min-w-0 items-start gap-3 rounded-xl border p-4 transition
                                     {{ $isAvailable
                                         ? 'cursor-pointer border-white/10 bg-navy-950 hover:border-cyan-400/40'
                                         : 'cursor-not-allowed border-white/5 bg-navy-950/50 opacity-50' }}"
@@ -109,11 +149,11 @@
                                         old('processing_profile') === $profile->value
                                         && $isAvailable
                                     )
-                                    class="mt-1"
+                                    class="mt-1 shrink-0"
                                 >
 
-                                <span>
-                                    <span class="block font-medium text-ice-100">
+                                <span class="min-w-0">
+                                    <span class="block break-words font-medium text-ice-100">
                                         {{ __('documents.processing_run.profile.' . $profile->value) }}
                                     </span>
 
@@ -128,7 +168,11 @@
                     </div>
 
                     @error('processing_profile')
-                        <p class="mt-2 text-sm text-red-300">
+                        <p
+                            id="processing-profile-error"
+                            role="alert"
+                            class="mt-2 text-sm text-red-300"
+                        >
                             {{ $message }}
                         </p>
                     @enderror
@@ -136,6 +180,7 @@
 
                 @if (empty($availableProcessingProfiles))
                     <p
+                        role="status"
                         class="rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"
                     >
                         لا توجد طريقة معالجة متاحة حاليًا. يرجى المحاولة لاحقًا.
@@ -145,7 +190,7 @@
                 <button
                     type="submit"
                     @disabled(empty($availableProcessingProfiles))
-                    class="inline-flex min-h-10 items-center justify-center rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-navy-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-navy-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                     رفع الوثيقة
                 </button>
@@ -162,7 +207,7 @@
                 action="{{ route('documents.index') }}"
                 class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px_auto]"
             >
-                <div>
+                <div class="min-w-0">
                     <label
                         for="search"
                         class="mb-2 block text-sm font-medium text-ice-100"
@@ -180,7 +225,7 @@
                     >
                 </div>
 
-                <div>
+                <div class="min-w-0">
                     <label
                         for="status"
                         class="mb-2 block text-sm font-medium text-ice-100"
@@ -206,7 +251,7 @@
                     </select>
                 </div>
 
-                <div>
+                <div class="min-w-0">
                     <label
                         for="file_type"
                         class="mb-2 block text-sm font-medium text-ice-100"
@@ -232,7 +277,7 @@
                     </select>
                 </div>
 
-                <div class="flex items-end gap-2">
+                <div class="flex flex-col gap-2 sm:flex-row lg:items-end">
                     <button
                         type="submit"
                         class="inline-flex min-h-10 items-center justify-center rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-navy-950 transition hover:bg-cyan-300"
@@ -272,7 +317,7 @@
                     @endphp
 
                     <article
-                        class="group rounded-2xl border border-white/10 bg-navy-900/70 p-5 transition hover:border-white/20 hover:bg-navy-900"
+                        class="group rounded-2xl border border-white/10 bg-navy-900/70 p-4 transition hover:border-white/20 hover:bg-navy-900 sm:p-5"
                     >
                         <div class="flex min-w-0 items-start gap-4">
                             <div
@@ -284,17 +329,17 @@
 
                             <div class="min-w-0 flex-1">
                                 <div class="flex min-w-0 items-start justify-between gap-3">
-                                    <div class="min-w-0">
+                                    <div class="min-w-0 flex-1">
                                         <a
                                             href="{{ route('documents.show', $document->id) }}"
-                                            class="block truncate font-semibold text-ice-100 transition hover:text-cyan-300"
+                                            class="block break-words font-semibold text-ice-100 transition hover:text-cyan-300"
                                         >
                                             {{ $displayTitle }}
                                         </a>
 
                                         @if ($document->title)
                                             <p
-                                                class="mt-1 truncate text-sm text-mist-400"
+                                                class="mt-1 break-all text-sm text-mist-400"
                                                 title="{{ $document->originalName }}"
                                             >
                                                 {{ $document->originalName }}
@@ -302,10 +347,12 @@
                                         @endif
                                     </div>
 
-                                    <x-documents.actions-menu
-                                        :document="$document"
-                                        :available-processing-profiles="$availableProcessingProfiles"
-                                    />
+                                    <div class="shrink-0">
+                                        <x-documents.actions-menu
+                                            :document="$document"
+                                            :available-processing-profiles="$availableProcessingProfiles"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs text-mist-300">
@@ -331,20 +378,22 @@
 
                                 @if ($document->reprocessingInProgress)
                                     <div
-                                        class="mt-4 inline-flex items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-300"
+                                        class="mt-4 inline-flex max-w-full items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-300"
                                     >
                                         <span
-                                            class="size-2 rounded-full bg-amber-400"
+                                            class="size-2 shrink-0 rounded-full bg-amber-400"
                                             aria-hidden="true"
                                         ></span>
 
-                                        إعادة المعالجة جارية
+                                        <span class="break-words">
+                                            إعادة المعالجة جارية
+                                        </span>
                                     </div>
                                 @endif
 
                                 @if ($document->safeFailure !== null)
                                     <p
-                                        class="mt-4 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
+                                        class="mt-4 break-words rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
                                     >
                                         {{ __('documents.failure.processing_failed') }}
                                     </p>
@@ -356,13 +405,13 @@
             </section>
 
             @if ($documents->hasPages())
-                <div class="pt-2">
+                <div class="min-w-0 overflow-x-auto pt-2">
                     {{ $documents->links() }}
                 </div>
             @endif
         @elseif (! $hasAnyDocuments)
             <section
-                class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-6 py-14 text-center"
+                class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-4 py-12 text-center sm:px-6 sm:py-14"
             >
                 <div
                     class="mx-auto flex size-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-cyan-300"
@@ -381,7 +430,7 @@
             </section>
         @else
             <section
-                class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-6 py-14 text-center"
+                class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-4 py-12 text-center sm:px-6 sm:py-14"
             >
                 <h2 class="text-lg font-semibold text-ice-100">
                     لا توجد نتائج مطابقة
@@ -393,7 +442,7 @@
 
                 <a
                     href="{{ route('documents.index') }}"
-                    class="mt-5 inline-flex items-center justify-center rounded-xl border border-cyan-400/30 px-4 py-2.5 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
+                    class="mt-5 inline-flex min-h-10 items-center justify-center rounded-xl border border-cyan-400/30 px-4 py-2.5 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/10"
                 >
                     مسح جميع الفلاتر
                 </a>
