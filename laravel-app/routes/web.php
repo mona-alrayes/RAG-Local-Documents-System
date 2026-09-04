@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\DocumentPollingController;
 use App\Http\Controllers\WorkspaceController;
@@ -13,6 +14,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::view('/settings/account', 'settings.account')
         ->name('settings.account');
+
+    Route::get('/conversations', [ConversationController::class, 'index'])
+        ->name('conversations.index');
+
+    Route::post('/conversations', [ConversationController::class, 'store'])
+        ->name('conversations.store');
 
     Route::get('/documents', [DocumentController::class, 'index'])
         ->name('documents.index');
