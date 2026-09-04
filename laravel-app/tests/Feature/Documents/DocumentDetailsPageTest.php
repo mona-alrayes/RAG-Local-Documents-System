@@ -193,6 +193,88 @@ class DocumentDetailsPageTest extends TestCase
             ->assertDontSee('بدء إعادة المعالجة');
     }
 
+    public function test_terminal_document_details_do_not_enable_polling(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'available_profiles' => [
+                    ProcessingProfile::Cloud->value,
+                ],
+            ]),
+        ]);
+
+        $user = User::factory()->create();
+
+        $document = $this->createReadyDocument($user);
+
+        $document->forceFill([
+            'status' => DocumentStatus::Failed,
+        ])->save();
+
+        $this
+            ->actingAs($user)
+            ->get(route('documents.show', $document))
+            ->assertOk()
+            ->assertDontSee('data-document-poll-url', false);
+    }
+
+    public function test_processing_document_details_include_safe_polling_failure_message(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'available_profiles' => [
+                    ProcessingProfile::Cloud->value,
+                ],
+            ]),
+        ]);
+
+        $user = User::factory()->create();
+
+        $document = $this->createReadyDocument($user);
+
+        $document->forceFill([
+            'status' => DocumentStatus::Queued,
+        ])->save();
+
+        $this
+            ->actingAs($user)
+            ->get(route('documents.show', $document))
+            ->assertOk()
+            ->assertSee('data-document-poll-error', false)
+            ->assertSee(
+                __('documents.polling.update_failed'),
+            );
+    }
+
+    public function test_processing_document_details_expose_server_controlled_polling_endpoint(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'available_profiles' => [
+                    ProcessingProfile::Cloud->value,
+                ],
+            ]),
+        ]);
+
+        $user = User::factory()->create();
+
+        $document = $this->createReadyDocument($user);
+
+        $document->forceFill([
+            'status' => DocumentStatus::Queued,
+        ])->save();
+
+        $this
+            ->actingAs($user)
+            ->get(route('documents.show', $document))
+            ->assertOk()
+            ->assertSee('data-document-poll-url', false)
+            ->assertSee(
+                route('documents.poll', $document),
+                false,
+            );
+    }
+
     private function createReadyDocument(User $user): Document
     {
         return $user->documents()->create([

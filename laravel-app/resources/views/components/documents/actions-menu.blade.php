@@ -62,6 +62,9 @@
                     rel="noopener noreferrer"
                 >
                     عرض الملف
+                    <span class="sr-only">
+                        في تبويب جديد
+                    </span>
                 </flux:menu.item>
             @endif
 
@@ -126,17 +129,21 @@
     @if ($canReprocess)
         <flux:modal
             :name="$reprocessModal"
-            class="md:w-96"
+            class="w-[calc(100vw-2rem)] max-w-md md:w-96"
         >
-            <div class="space-y-6">
-                <div>
+            <div class="min-w-0 space-y-6">
+                <div class="min-w-0">
                     <flux:heading size="lg">
                         إعادة معالجة الوثيقة؟
                     </flux:heading>
 
-                    <flux:text class="mt-2">
+                    <flux:text class="mt-2 break-words">
                         سيتم بدء معالجة جديدة للوثيقة
-                        "{{ $document->title ?: $document->originalName }}"
+
+                        <span class="break-all font-medium">
+                            "{{ $document->title ?: $document->originalName }}"
+                        </span>
+
                         باستخدام نفس طريقة المعالجة الحالية:
 
                         <span class="font-semibold text-ice-100">
@@ -148,7 +155,7 @@
                 <form
                     method="POST"
                     action="{{ route('documents.reprocess', $document->id) }}"
-                    class="flex flex-wrap justify-end gap-3"
+                    class="grid gap-3 sm:flex sm:flex-wrap sm:justify-end"
                 >
                     @csrf
 
@@ -162,6 +169,7 @@
                         <flux:button
                             type="button"
                             variant="ghost"
+                            class="w-full sm:w-auto"
                         >
                             إلغاء
                         </flux:button>
@@ -171,6 +179,7 @@
                         type="submit"
                         variant="primary"
                         icon="arrow-path"
+                        class="w-full sm:w-auto"
                     >
                         بدء إعادة المعالجة
                     </flux:button>
@@ -183,17 +192,21 @@
     @if ($document->canDelete)
         <flux:modal
             :name="$deleteModal"
-            class="md:w-96"
+            class="w-[calc(100vw-2rem)] max-w-md md:w-96"
         >
-            <div class="space-y-6">
-                <div>
+            <div class="min-w-0 space-y-6">
+                <div class="min-w-0">
                     <flux:heading size="lg">
                         حذف الوثيقة؟
                     </flux:heading>
 
-                    <flux:text class="mt-2">
+                    <flux:text class="mt-2 break-words">
                         سيتم حذف
-                        "{{ $document->title ?: $document->originalName }}"
+
+                        <span class="break-all font-medium">
+                            "{{ $document->title ?: $document->originalName }}"
+                        </span>
+
                         وبياناتها المرتبطة.
                     </flux:text>
 
@@ -205,7 +218,7 @@
                 <form
                     method="POST"
                     action="{{ route('documents.destroy', $document->id) }}"
-                    class="flex flex-wrap justify-end gap-3"
+                    class="grid gap-3 sm:flex sm:flex-wrap sm:justify-end"
                 >
                     @csrf
                     @method('DELETE')
@@ -214,6 +227,7 @@
                         <flux:button
                             type="button"
                             variant="ghost"
+                            class="w-full sm:w-auto"
                         >
                             إلغاء
                         </flux:button>
@@ -223,6 +237,7 @@
                         type="submit"
                         variant="danger"
                         icon="trash"
+                        class="w-full sm:w-auto"
                     >
                         حذف الوثيقة
                     </flux:button>

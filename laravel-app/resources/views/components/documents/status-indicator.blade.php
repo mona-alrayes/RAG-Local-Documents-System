@@ -18,14 +18,14 @@
     };
 @endphp
 
-<span {{ $attributes->class(['inline-flex min-w-0 items-center gap-2']) }}>
+<span {{ $attributes->class(['inline-flex min-w-0 items-start gap-2']) }}>
     <span
-        class="size-2.5 shrink-0 rounded-full {{ $dotClasses }}"
+        class="mt-1 size-2.5 shrink-0 rounded-full {{ $dotClasses }}"
         aria-hidden="true"
     ></span>
 
     @if ($showLabel)
-        <span class="truncate text-xs text-mist-300">
+        <span class="min-w-0 break-words text-xs leading-5 text-mist-300">
             {{ __('documents.availability.' . $status) }}
         </span>
     @endif

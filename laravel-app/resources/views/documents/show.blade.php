@@ -24,29 +24,45 @@
             && $activeRun->id !== $latestAttempt->id;
     @endphp
 
-    <div class="space-y-8">
+    <div
+        class="min-w-0 space-y-8"
+        @if ($document->pollRequired)
+            data-document-poll-url="{{ route('documents.poll', $document->id) }}"
+        @endif
+    >
+        @if ($document->pollRequired)
+            <p
+                data-document-poll-error
+                role="alert"
+                hidden
+                class="break-words rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-200"
+            >
+                {{ __('documents.polling.update_failed') }}
+            </p>
+        @endif
+
         {{-- Header --}}
-        <header class="space-y-5">
+        <header class="min-w-0 space-y-5">
             <a
                 href="{{ route('documents.index') }}"
-                class="inline-flex items-center gap-2 text-sm font-semibold text-cyan-400 transition hover:text-cyan-300"
+                class="inline-flex min-h-10 items-center gap-2 rounded-lg text-sm font-semibold text-cyan-400 transition hover:text-cyan-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400"
             >
                 <span aria-hidden="true">←</span>
                 العودة إلى الوثائق
             </a>
 
-            <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                <div class="min-w-0">
+            <div class="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0 flex-1">
                     <p class="text-sm font-semibold text-cyan-400">
                         تفاصيل الوثيقة
                     </p>
 
-                    <h1 class="mt-2 break-words text-3xl font-bold text-ice-100">
+                    <h1 class="mt-2 break-words text-2xl font-bold text-ice-100 sm:text-3xl">
                         {{ $displayTitle }}
                     </h1>
 
                     @if ($document->title)
-                        <p class="mt-2 break-all text-sm text-mist-400">
+                        <p class="mt-2 break-all text-sm leading-6 text-mist-400">
                             {{ $document->originalName }}
                         </p>
                     @endif
@@ -58,17 +74,20 @@
                     </div>
                 </div>
 
-                <x-documents.actions-menu
-                    :document="$document"
-                    :available-processing-profiles="$availableProcessingProfiles"
-                />
+                <div class="shrink-0 self-start">
+                    <x-documents.actions-menu
+                        :document="$document"
+                        :available-processing-profiles="$availableProcessingProfiles"
+                    />
+                </div>
             </div>
         </header>
 
         {{-- Flash messages --}}
         @if (session('success'))
             <div
-                class="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"
+                role="status"
+                class="break-words rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm leading-6 text-emerald-200"
             >
                 {{ session('success') }}
             </div>
@@ -76,7 +95,8 @@
 
         @if (session('warning'))
             <div
-                class="rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"
+                role="status"
+                class="break-words rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-200"
             >
                 {{ session('warning') }}
             </div>
@@ -84,7 +104,8 @@
 
         @if (session('error'))
             <div
-                class="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
+                role="alert"
+                class="break-words rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm leading-6 text-red-200"
             >
                 {{ session('error') }}
             </div>
@@ -93,7 +114,7 @@
         {{-- Reprocessing state --}}
         @if ($document->reprocessingInProgress && $activeAndLatestAreDifferent)
             <div
-                class="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-5"
+                class="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 sm:p-5"
             >
                 <p class="font-semibold text-amber-200">
                     إعادة معالجة جديدة جارية
@@ -112,7 +133,7 @@
             && $document->availability->value === 'ready'
         )
             <div
-                class="rounded-2xl border border-red-400/20 bg-red-400/10 p-5"
+                class="rounded-2xl border border-red-400/20 bg-red-400/10 p-4 sm:p-5"
             >
                 <p class="font-semibold text-red-200">
                     فشلت آخر محاولة لإعادة المعالجة
@@ -125,7 +146,7 @@
             </div>
         @elseif ($document->safeFailure !== null)
             <div
-                class="rounded-2xl border border-red-400/20 bg-red-400/10 p-5 text-sm text-red-200"
+                class="break-words rounded-2xl border border-red-400/20 bg-red-400/10 p-4 text-sm leading-6 text-red-200 sm:p-5"
             >
                 {{ __('documents.failure.processing_failed') }}
             </div>
@@ -133,7 +154,7 @@
 
         {{-- Document summary --}}
         <section
-            class="rounded-2xl border border-white/10 bg-navy-900/70 p-5 sm:p-6"
+            class="min-w-0 rounded-2xl border border-white/10 bg-navy-900/70 p-4 sm:p-6"
             aria-labelledby="document-summary-title"
         >
             <h2
@@ -144,17 +165,17 @@
             </h2>
 
             <dl class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
+                <div class="min-w-0">
                     <dt class="text-sm text-mist-400">
                         اسم الملف
                     </dt>
 
-                    <dd class="mt-2 break-all text-sm font-medium text-ice-100">
+                    <dd class="mt-2 break-all text-sm font-medium leading-6 text-ice-100">
                         {{ $document->originalName }}
                     </dd>
                 </div>
 
-                <div>
+                <div class="min-w-0">
                     <dt class="text-sm text-mist-400">
                         نوع الملف
                     </dt>
@@ -164,7 +185,7 @@
                     </dd>
                 </div>
 
-                <div>
+                <div class="min-w-0">
                     <dt class="text-sm text-mist-400">
                         الحجم
                     </dt>
@@ -174,7 +195,7 @@
                     </dd>
                 </div>
 
-                <div>
+                <div class="min-w-0">
                     <dt class="text-sm text-mist-400">
                         الحالة الحالية
                     </dt>
@@ -186,12 +207,12 @@
                     </dd>
                 </div>
 
-                <div>
+                <div class="min-w-0">
                     <dt class="text-sm text-mist-400">
                         طريقة المعالجة الفعالة
                     </dt>
 
-                    <dd class="mt-2 text-sm font-medium text-ice-100">
+                    <dd class="mt-2 break-words text-sm font-medium text-ice-100">
                         @if ($activeRun !== null)
                             {{ __('documents.processing_run.profile.' . $activeRun->profile->value) }}
                         @else
@@ -200,7 +221,7 @@
                     </dd>
                 </div>
 
-                <div>
+                <div class="min-w-0">
                     <dt class="text-sm text-mist-400">
                         تاريخ الإضافة
                     </dt>
@@ -216,20 +237,20 @@
 
         {{-- Active and latest processing state --}}
         <section
-            class="grid gap-4 lg:grid-cols-2"
+            class="grid min-w-0 gap-4 lg:grid-cols-2"
             aria-label="حالة المعالجة الحالية"
         >
             <article
-                class="rounded-2xl border border-white/10 bg-navy-900/70 p-5"
+                class="min-w-0 rounded-2xl border border-white/10 bg-navy-900/70 p-4 sm:p-5"
             >
-                <div class="flex items-center justify-between gap-3">
+                <div class="flex min-w-0 flex-wrap items-center justify-between gap-3">
                     <h2 class="font-semibold text-ice-100">
                         النسخة الفعالة
                     </h2>
 
                     @if ($activeRun !== null)
                         <span
-                            class="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300"
+                            class="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300"
                         >
                             فعالة
                         </span>
@@ -238,32 +259,32 @@
 
                 @if ($activeRun !== null)
                     <dl class="mt-5 space-y-4 text-sm">
-                        <div class="flex items-center justify-between gap-4">
+                        <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <dt class="text-mist-400">
                                 طريقة المعالجة
                             </dt>
 
-                            <dd class="font-medium text-ice-100">
+                            <dd class="break-words font-medium text-ice-100 sm:text-end">
                                 {{ __('documents.processing_run.profile.' . $activeRun->profile->value) }}
                             </dd>
                         </div>
 
-                        <div class="flex items-center justify-between gap-4">
+                        <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <dt class="text-mist-400">
                                 الحالة
                             </dt>
 
-                            <dd class="font-medium text-ice-100">
+                            <dd class="break-words font-medium text-ice-100 sm:text-end">
                                 {{ __('documents.processing_run.status.' . $activeRun->status->value) }}
                             </dd>
                         </div>
 
-                        <div class="flex items-center justify-between gap-4">
+                        <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <dt class="text-mist-400">
                                 نوع العملية
                             </dt>
 
-                            <dd class="font-medium text-ice-100">
+                            <dd class="break-words font-medium text-ice-100 sm:text-end">
                                 {{ __('documents.processing_run.kind.' . $activeRun->kind->value) }}
                             </dd>
                         </div>
@@ -276,7 +297,7 @@
             </article>
 
             <article
-                class="rounded-2xl border border-white/10 bg-navy-900/70 p-5"
+                class="min-w-0 rounded-2xl border border-white/10 bg-navy-900/70 p-4 sm:p-5"
             >
                 <h2 class="font-semibold text-ice-100">
                     آخر محاولة معالجة
@@ -284,32 +305,32 @@
 
                 @if ($latestAttempt !== null)
                     <dl class="mt-5 space-y-4 text-sm">
-                        <div class="flex items-center justify-between gap-4">
+                        <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <dt class="text-mist-400">
                                 طريقة المعالجة
                             </dt>
 
-                            <dd class="font-medium text-ice-100">
+                            <dd class="break-words font-medium text-ice-100 sm:text-end">
                                 {{ __('documents.processing_run.profile.' . $latestAttempt->profile->value) }}
                             </dd>
                         </div>
 
-                        <div class="flex items-center justify-between gap-4">
+                        <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <dt class="text-mist-400">
                                 الحالة
                             </dt>
 
-                            <dd class="font-medium text-ice-100">
+                            <dd class="break-words font-medium text-ice-100 sm:text-end">
                                 {{ __('documents.processing_run.status.' . $latestAttempt->status->value) }}
                             </dd>
                         </div>
 
-                        <div class="flex items-center justify-between gap-4">
+                        <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <dt class="text-mist-400">
                                 نوع العملية
                             </dt>
 
-                            <dd class="font-medium text-ice-100">
+                            <dd class="break-words font-medium text-ice-100 sm:text-end">
                                 {{ __('documents.processing_run.kind.' . $latestAttempt->kind->value) }}
                             </dd>
                         </div>
@@ -324,7 +345,7 @@
 
         {{-- Processing timeline --}}
         <section
-            class="rounded-2xl border border-white/10 bg-navy-900/70 p-5 sm:p-6"
+            class="min-w-0 rounded-2xl border border-white/10 bg-navy-900/70 p-4 sm:p-6"
             aria-labelledby="processing-timeline-title"
         >
             <div>
@@ -369,30 +390,30 @@
                         @endphp
 
                         <article
-                            class="rounded-xl border border-white/10 bg-navy-950/60 p-5"
+                            class="min-w-0 rounded-xl border border-white/10 bg-navy-950/60 p-4 sm:p-5"
                         >
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <h3 class="font-semibold text-ice-100">
+                            <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0">
+                                    <div class="flex min-w-0 flex-wrap items-center gap-2">
+                                        <h3 class="break-words font-semibold text-ice-100">
                                             {{ __('documents.processing_run.kind.' . $run->kind->value) }}
                                         </h3>
 
                                         @if ($run->isActive)
                                             <span
-                                                class="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-semibold text-emerald-300"
+                                                class="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-semibold text-emerald-300"
                                             >
                                                 النسخة الفعالة
                                             </span>
                                         @endif
                                     </div>
 
-                                    <p class="mt-2 text-sm text-mist-400">
+                                    <p class="mt-2 break-words text-sm text-mist-400">
                                         {{ __('documents.processing_run.profile.' . $run->profile->value) }}
                                     </p>
                                 </div>
 
-                                <span class="text-sm font-medium text-mist-200">
+                                <span class="break-words text-sm font-medium text-mist-200 sm:shrink-0">
                                     {{ __('documents.processing_run.status.' . $run->status->value) }}
                                 </span>
                             </div>
@@ -428,19 +449,19 @@
                             <ol class="mt-6 space-y-3 border-s border-white/10 ps-5">
                                 @foreach ($stages as $stage)
                                     @if ($stage['time'] !== null)
-                                        <li class="relative">
+                                        <li class="relative min-w-0">
                                             <span
                                                 class="absolute -start-[1.55rem] top-1.5 size-2 rounded-full bg-cyan-400"
                                                 aria-hidden="true"
                                             ></span>
 
-                                            <p class="text-sm font-medium text-ice-100">
+                                            <p class="break-words text-sm font-medium text-ice-100">
                                                 {{ $stage['label'] }}
                                             </p>
 
                                             <time
                                                 datetime="{{ $stage['time']->toIso8601String() }}"
-                                                class="mt-1 block text-xs text-mist-400"
+                                                class="mt-1 block break-words text-xs text-mist-400"
                                             >
                                                 {{ $stage['time']->format('Y-m-d H:i:s') }}
                                             </time>
@@ -450,21 +471,21 @@
                             </ol>
 
                             @if (! empty($run->stageTimingsMs))
-                                <div class="mt-6">
+                                <div class="mt-6 min-w-0">
                                     <h4 class="text-sm font-semibold text-ice-100">
                                         أزمنة المراحل
                                     </h4>
 
-                                    <dl class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    <dl class="mt-3 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                         @foreach ($run->stageTimingsMs as $stage => $milliseconds)
                                             <div
-                                                class="rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                                                class="min-w-0 rounded-lg border border-white/10 bg-white/5 px-3 py-2"
                                             >
-                                                <dt class="break-all text-xs text-mist-400">
+                                                <dt class="break-all text-xs leading-5 text-mist-400">
                                                     {{ $stage }}
                                                 </dt>
 
-                                                <dd class="mt-1 text-sm font-medium text-ice-100">
+                                                <dd class="mt-1 break-words text-sm font-medium text-ice-100">
                                                     {{ number_format($milliseconds) }} ms
                                                 </dd>
                                             </div>
@@ -475,15 +496,15 @@
 
                             @if (! empty($run->warnings))
                                 <div
-                                    class="mt-6 rounded-xl border border-amber-400/20 bg-amber-400/10 p-4"
+                                    class="mt-6 min-w-0 rounded-xl border border-amber-400/20 bg-amber-400/10 p-4"
                                 >
                                     <p class="text-sm font-semibold text-amber-200">
                                         تحذيرات أثناء المعالجة
                                     </p>
 
-                                    <ul class="mt-3 space-y-2 text-sm text-amber-100/80">
+                                    <ul class="mt-3 space-y-2 text-sm leading-6 text-amber-100/80">
                                         @foreach ($run->warnings as $warning)
-                                            <li>
+                                            <li class="break-all">
                                                 {{ $warning['code'] }}
 
                                                 @if ($warning['stage'] !== null)
@@ -498,7 +519,7 @@
 
                             @if ($run->failedAt !== null)
                                 <div
-                                    class="mt-6 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
+                                    class="mt-6 break-words rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm leading-6 text-red-200"
                                 >
                                     تعذر إكمال محاولة المعالجة هذه.
                                 </div>
@@ -508,7 +529,7 @@
                 </div>
             @else
                 <div
-                    class="mt-6 rounded-xl border border-dashed border-white/15 px-5 py-8 text-center text-sm text-mist-400"
+                    class="mt-6 rounded-xl border border-dashed border-white/15 px-4 py-8 text-center text-sm leading-6 text-mist-400 sm:px-5"
                 >
                     لا توجد محاولات معالجة مسجلة حتى الآن.
                 </div>

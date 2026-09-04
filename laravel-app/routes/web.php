@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\DocumentPollingController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,6 +19,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/documents/{document}', [DocumentController::class, 'show'])
         ->name('documents.show');
+
+    Route::get(
+        '/documents/{document}/poll',
+        DocumentPollingController::class,
+    )->name('documents.poll');
 
     Route::post('/documents', [DocumentController::class, 'store'])
         ->name('documents.store');

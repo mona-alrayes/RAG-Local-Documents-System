@@ -139,4 +139,37 @@ class WorkspaceDashboardTest extends TestCase
 
         return $document;
     }
+
+    public function test_workspace_does_not_expose_raw_processing_failure_reason(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $document = $this->createDocument(
+            user: $user,
+            name: 'failed-processing-document.pdf',
+            status: DocumentStatus::Failed,
+            sha: 'e',
+        );
+
+        $rawFailure = 'Internal provider error: secret-token-12345';
+
+        $document->processingRuns()->create([
+            'profile' => ProcessingProfile::Cloud,
+            'status' => ProcessingRunStatus::Failed,
+            'kind' => ProcessingRunKind::Initial,
+            'profile_snapshot' => [],
+            'stage_timings_ms' => [],
+            'failure_reason' => $rawFailure,
+            'failed_at' => now(),
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->get(route('workspace'))
+            ->assertOk()
+            ->assertSee(__('documents.failure.processing_failed'))
+            ->assertDontSee($rawFailure);
+    }
 }
