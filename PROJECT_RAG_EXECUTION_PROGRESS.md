@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-05
-> **الحالة العامة:** قيد التنفيذ — K1 مكتملة ومدموجة في PR #108؛ أصبحت الوثائق runtime-capable تتحول إلى `TrustedDocumentTarget` موثوقة Server-side من الـactive indexed ProcessingRun دون الثقة بمعرّفات التشغيل القادمة من Browser، والمهمة الحالية هي K2 — Cloud query embedding / retrieval وفق الـMaster Plan
+> **الحالة العامة:** قيد التنفيذ — K2 مكتملة ومدموجة في PR #109؛ أضيف مسار Cloud query embedding / dense retrieval الآمن داخل FastAPI باستخدام Jina وQdrant ضمن trusted user/document/run/profile scope، والمهمة الحالية هي K3 — Hybrid Local query embedding / retrieval وفق الـMaster Plan
 
 ---
 
@@ -17,13 +17,16 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
-Last Merged Feature PR on main: #108 — K1 Trusted document_targets
-Latest Task PR: #108 — K1 Trusted document_targets
+Verified Main Commit: d512feb1100c7d1fa791340bcfb9eac92b3cbb84
+Last Merged Feature PR on main: #109 — K2 Cloud Query Embedding / Retrieval
+Latest Task PR: #109 — K2 Cloud Query Embedding / Retrieval
 Verified K1 Feature Commit:
 - 28759b3fd2df80283fd8d3fba831aaadee569433 — K1 Trusted document_targets
 Verified K1 Merge Commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
-Documentation Baseline: تم تسجيل اكتمال K1 وتسليم K2 — Cloud query embedding / retrieval كمهمة حالية. أصبح المسار الموثوق: Conversation → selected documents → J8 runtime-capable filtering → active indexed ProcessingRun → `TrustedDocumentTarget` → K2 retrieval work. أضافت K1 `TrustedDocumentTarget` كـimmutable typed DTO يحمل فقط `documentId`, `processingRunId`, و`processingProfile`، وأضافت `ConversationDocumentTargetService` التي تعيد استخدام `ConversationRuntimeDocumentService` من J8 ولا تعيد تنفيذ readiness logic. تعتمد targets على `activeProcessingRun` الموثوقة Server-side، وتدعم multi-document وmixed profiles (`cloud`, `hybrid_local`) مع Safe Reprocessing بحيث تبقى active indexed Run القديمة مستخدمة أثناء Processing أو Failed replacement run أحدث. corrupted foreign-document pivot أو cross-document active run لا ينتجان target، والوثائق selected غير الجاهزة تبقى selected ولا تنتج runtime target. Resolution لا يعدل `conversation_document` أو `Document` أو `ProcessingRun`. لم تنفذ K1 query embeddings أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو LLM generation أو context building أو citations أو streaming أو Chat execution؛ تبدأ أعمال Retrieval الفعلية من K2 وما بعدها حسب الـMaster Plan.
+Verified K2 Feature Commit:
+- 608b50955616c96f898c51f5080ceb98beb503d2 — K2 Cloud Query Embedding / Retrieval
+Verified K2 Merge Commit: d512feb1100c7d1fa791340bcfb9eac92b3cbb84
+Documentation Baseline: تم تسجيل اكتمال K2 وتسليم K3 — Hybrid Local query embedding / retrieval كمهمة حالية. أضافت K2 مسار Cloud retrieval داخل FastAPI: يحول `CloudJinaQueryEmbedder` السؤال إلى Jina embedding باستخدام `task = retrieval.query` وبُعد `1024`، ويرفض blank query قبل استدعاء provider ويحافظ على retry semantics الحالية ويفشل مغلقًا عند malformed أو wrong-dimension provider results. تستخدم `CloudRetrievalService` و`QdrantCloudDenseRetriever` `resolve_qdrant_collection()` Server-side وnamed vector `dense_vector`، وتفرض دائماً trusted scope على `user_id`, `document_id`, `processing_run_id`, و`processing_profile = cloud` مع defensive validation لكل Qdrant result. لا تعاد raw vectors، ولا يوجد unfiltered retrieval أو fallback إلى Hybrid Local. تعيد K2 typed retrieval results فقط ولا تنفذ LLM generation أو context building أو citations أو Chat execution. وفق الـMaster Plan تبدأ الخطوة التالية حرفياً من K3 — Hybrid Local query embedding / retrieval.
 
 Current Working Branch: main
 
@@ -31,7 +34,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-K1 — Trusted document_targets
+K2 — Cloud Query Embedding / Retrieval
 
 Current Phase:
 K — Retrieval and Reranking
@@ -163,27 +166,31 @@ Architectural Result:
 - تفشل K1 مغلقًا عند corrupted foreign-document pivot أو cross-document active run، وتبقي selected/unready documents مختارة دون إنتاج target.
 - K1 resolution read-only بالنسبة إلى `conversation_document`, `Document`, و`ProcessingRun`.
 - لم تنفذ K1 query embeddings أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو LLM generation أو context building أو citations أو streaming أو Chat execution.
+- أضافت K2 `CloudJinaQueryEmbedder` لعمل query embedding باستخدام Jina `retrieval.query` ببُعد `1024`، مع رفض blank query قبل provider call وإعادة استخدام retry semantics الحالية.
+- تفشل K2 مغلقًا إذا أعاد provider payload malformed أو أكثر/أقل من vector واحدة أو dimension غير `1024` أو قيماً غير قابلة للتحويل إلى float.
+- أضافت K2 `CloudRetrievalService` و`QdrantCloudDenseRetriever` مع Server-side `resolve_qdrant_collection()` واستخدام named vector `dense_vector`.
+- تقيد K2 كل Qdrant query بـ`user_id`, `document_id`, `processing_run_id`, و`processing_profile = cloud`، ثم تعيد التحقق دفاعياً من payload كل result قبل تحويله.
+- لا تعيد K2 raw vectors (`with_vectors=False`) وتعيد typed `CloudRetrievalResult` فقط.
+- لا يوجد unfiltered retrieval ولا fallback من Cloud إلى Hybrid Local، ولا LLM generation أو context building أو citations أو Chat execution ضمن K2.
 
 Latest Verification:
-PR #108 merged on GitHub: PASS
-PR head commit: 28759b3fd2df80283fd8d3fba831aaadee569433
-PR merge commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
-main verified at K1 merge commit 3fc41d4490c46012d314f4a58bf446e3e1946fad before this documentation update: PASS
+PR #109 merged on GitHub: PASS
+PR title: feat(K2): add cloud query retrieval
+PR head commit: 608b50955616c96f898c51f5080ceb98beb503d2
+PR merge commit: d512feb1100c7d1fa791340bcfb9eac92b3cbb84
+main verified at K2 merge commit d512feb1100c7d1fa791340bcfb9eac92b3cbb84 before this documentation update: PASS
 
-K1 focused tests:
-10 passed (22 assertions)
+K2 focused tests:
+16 passed
 
-K1 + J8 regression:
-18 passed (43 assertions)
+FastAPI full suite:
+173 passed
 
-Laravel full suite:
-217 passed (978 assertions)
-
-Pint:
-PASS
+Regression note:
+ظهر اختبار قديم غير متعلق بـK2 مرة واحدة كـflaky network/redirect failure؛ مر منفرداً 5/5 مرات، ثم مر FastAPI full suite كاملاً بـ173 passed. لا يسجل ذلك كـK2 defect.
 
 Current Task:
-K2 — Cloud query embedding / retrieval
+K3 — Hybrid Local query embedding / retrieval
 
 K1 Completion:
 - أضيف `TrustedDocumentTarget` كـimmutable typed DTO يحمل `documentId`, `processingRunId`, و`processingProfile`.
@@ -195,7 +202,19 @@ K1 Completion:
 - الوثيقة selected وغير الجاهزة تبقى selected ولا تنتج runtime target.
 - resolution لا يعدل `conversation_document` أو `Document` أو `ProcessingRun`.
 - لم تنفذ K1 query embeddings أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو LLM generation أو context building أو citations أو streaming أو Chat execution.
-- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K2 — Cloud query embedding / retrieval.
+
+K2 Completion:
+- يحول `CloudJinaQueryEmbedder` السؤال إلى Jina embedding باستخدام `task = retrieval.query` وdimension = `1024`.
+- يرفض blank query قبل أي provider call، ويحافظ على retry semantics الموجودة لـJina.
+- malformed أو wrong-dimension provider results تفشل Fail-Closed.
+- تستخدم `CloudRetrievalService` `resolve_qdrant_collection()` لتحديد Cloud collection Server-side.
+- يستخدم Qdrant named vector `dense_vector` ولا يعيد raw vectors.
+- retrieval مقيد دائماً بالـtrusted scope: `user_id`, `document_id`, `processing_run_id`, و`processing_profile = cloud`.
+- توجد defensive validation لكل Qdrant result للتأكد أنه ينتمي لنفس trusted scope قبل إنشاء typed result.
+- لا يوجد unfiltered retrieval ولا fallback إلى Hybrid Local.
+- تعيد K2 typed retrieval results فقط ولا تولد جواب LLM.
+- Out of Scope: K3 Hybrid Local query embedding / retrieval، generalized K4 filtering، BM25 / RRF، reranking، cross-profile fusion، LLM generation، context building، citations، Chat execution، streaming، UI / Livewire، Laravel Chat orchestration، migrations.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K3 — Hybrid Local query embedding / retrieval.
 
 Open Blockers: none
 ```
@@ -1001,7 +1020,7 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 | المهمة | الحالة |
 |---|---|
 | K1 Trusted document_targets | DONE |
-| K2 Cloud query embedding / retrieval | TODO |
+| K2 Cloud query embedding / retrieval | DONE |
 | K3 Hybrid Local query embedding / retrieval | TODO |
 | K4 user / document / run filters | TODO |
 | K5 Per-profile Dense + BM25 + RRF | TODO |
@@ -1012,6 +1031,8 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 | K10 Retrieval quality / security tests | TODO |
 
 > **K1 completed in PR #108:** أضيف `TrustedDocumentTarget` typed/readonly و`ConversationDocumentTargetService` لتحويل ناتج J8 runtime-capable إلى targets موثوقة من active indexed ProcessingRun Server-side. يدعم المسار multi-document وmixed profiles ويحافظ على Safe Reprocessing ويفشل مغلقًا عند corrupted foreign pivot أو cross-document active run، ولا يعدل selection أو Document/ProcessingRun. لم تنفذ K1 query embedding أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو generation/context/citations/streaming/Chat execution.
+
+> **K2 completed in PR #109:** أضيف Cloud query embedding باستخدام Jina `retrieval.query` ببُعد `1024` ومسار dense retrieval عبر Qdrant مع Server-side collection resolution وnamed vector `dense_vector`. يرفض blank query قبل provider call، ويحافظ على Jina retry semantics، ويفشل مغلقًا عند malformed/wrong-dimension embeddings. يفرض retrieval دائماً `user_id/document_id/processing_run_id/processing_profile=cloud` ويتحقق دفاعياً من كل result، ولا يعيد raw vectors أو يسمح unfiltered retrieval أو fallback إلى Hybrid Local. المخرجات typed retrieval results فقط؛ لا LLM generation أو context/citations/Chat execution ضمن K2.
 
 Cross-profile هنا يعني دمج نتائج وثائق مفهرسة مسبقاً بProfiles مختلفة داخل المحادثة، وليس Upload comparison workflow.
 
@@ -1399,6 +1420,32 @@ hybrid_local
 5. يفشل إذا persisted count لا يطابق عدد chunks.
 
 يستخدم production Process Document endpoint هذا الـindexer مباشرة ضمن H3، ولا يعيد `status="indexed"` إلا بعد نجاح الـindexing والتحقق من exact persisted count.
+
+## 9.4 K2 Cloud Query Embedding / Dense Retrieval
+
+الموجود بعد PR #109:
+
+```text
+CloudJinaQueryEmbedder
+CloudRetrievalService
+CloudRetrievalTarget
+CloudRetrievalResult
+QdrantCloudDenseRetriever
+```
+
+العقد:
+
+- Query embedding يستخدم Jina `task = retrieval.query` وdimension = `1024`.
+- blank query ترفض قبل provider call، مع إعادة استخدام retry semantics الحالية لـJina.
+- provider result يجب أن تكون vector واحدة صحيحة ببُعد `1024` وإلا يفشل المسار Fail-Closed.
+- Cloud collection تحدد Server-side عبر `resolve_qdrant_collection()`.
+- Dense search يستخدم named vector `dense_vector`.
+- كل Qdrant query مقيدة بـ`user_id`, `document_id`, `processing_run_id`, و`processing_profile = cloud`.
+- كل result تخضع defensive scope validation بعد Qdrant.
+- `with_vectors=False`؛ لا تعاد raw vectors.
+- المخرجات typed retrieval results فقط.
+- لا يوجد unfiltered retrieval أو fallback إلى Hybrid Local.
+- BM25/RRF/reranking/cross-profile fusion/generation/context/citations/Chat execution ليست ضمن K2.
 
 ---
 
@@ -2202,7 +2249,7 @@ Full Laravel suite:
 207 passed (956 assertions)
 ```
 
-## آخر مهمة مكتملة — K1 Trusted document_targets
+## المهمة السابقة المكتملة — K1 Trusted document_targets
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #108، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `3fc41d4490c46012d314f4a58bf446e3e1946fad`.
 
@@ -2255,19 +2302,84 @@ Laravel Pint:
 PASS
 ```
 
+## آخر مهمة مكتملة — K2 Cloud Query Embedding / Retrieval
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #109، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `d512feb1100c7d1fa791340bcfb9eac92b3cbb84`.
+
+تم تنفيذ:
+
+- إضافة `CloudJinaQueryEmbedder` لتحويل سؤال المستخدم إلى embedding باستخدام Jina `task = retrieval.query` وdimension = `1024`.
+- رفض blank query قبل استدعاء provider.
+- الحفاظ على retry semantics الحالية لـJina، مع تحويل provider failure النهائي إلى structured `ApplicationException`.
+- Fail-Closed عند malformed provider result أو عدد vectors غير صحيح أو dimension غير `1024` أو قيم vector غير صالحة.
+- إضافة `CloudRetrievalService` كطبقة application orchestration للمسار Cloud.
+- إضافة `CloudRetrievalTarget` و`CloudRetrievalResult` كـtyped dataclasses.
+- استخدام `resolve_qdrant_collection()` لتحديد Cloud collection Server-side من الـProcessing Profile الموثوقة.
+- إضافة `QdrantCloudDenseRetriever` واستخدام named vector `dense_vector`.
+- فرض Qdrant filter دائماً على:
+  - `user_id`
+  - `document_id`
+  - `processing_run_id`
+  - `processing_profile = cloud`
+- إجراء defensive validation بعد Qdrant للتأكد أن كل result ينتمي لنفس trusted scope قبل تحويله إلى typed result.
+- عدم إرجاع raw vectors عبر `with_vectors=False`.
+- عدم وجود unfiltered retrieval أو fallback إلى Hybrid Local.
+- إرجاع typed retrieval results فقط؛ لا يتم توليد جواب LLM ضمن K2.
+
+حدود K2 / Out of Scope:
+
+- K3 Hybrid Local query embedding / retrieval.
+- generalized K4 filtering.
+- BM25 / RRF.
+- reranking.
+- cross-profile fusion.
+- LLM generation.
+- context building.
+- citations.
+- Chat execution.
+- streaming.
+- UI / Livewire.
+- Laravel Chat orchestration.
+- migrations.
+
+### Verification K2
+
+```text
+PR #109 merged on GitHub: PASS
+PR title:
+- feat(K2): add cloud query retrieval
+Feature branch:
+- task/K2-cloud-query-retrieval
+Feature commit:
+- 608b50955616c96f898c51f5080ceb98beb503d2
+Merge commit:
+- d512feb1100c7d1fa791340bcfb9eac92b3cbb84
+
+K2 focused tests:
+16 passed
+
+FastAPI full suite:
+173 passed
+
+Flaky regression note:
+- ظهر اختبار قديم غير متعلق بـK2 مرة واحدة كـflaky network/redirect failure.
+- مر الاختبار نفسه منفرداً 5/5 مرات.
+- بعدها مر FastAPI full suite كاملاً: 173 passed.
+- لا يصنف ذلك كـK2 defect.
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-K2 — Cloud query embedding / retrieval
+K3 — Hybrid Local query embedding / retrieval
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت K1 ودمجت في main عبر PR #108. أصبح المسار من Conversation إلى Retrieval يبدأ من selected documents، ثم J8 runtime-capable filtering، ثم active indexed ProcessingRun الموثوقة، ثم TrustedDocumentTarget التي تحمل documentId وprocessingRunId وprocessingProfile فقط.
-ConversationDocumentTargetService يعيد استخدام ConversationRuntimeDocumentService ولا يثق بأي runtime identifiers من Browser، ويدعم multi-document وmixed profiles ويحافظ على Safe Reprocessing ويغلق الحالات الفاسدة دون تعديل selection أو Document/ProcessingRun.
-لم تنفذ K1 query embeddings أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو LLM generation أو context building أو citations أو streaming أو Chat execution.
-يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K2 — Cloud query embedding / retrieval.
+اكتملت K2 ودمجت في main عبر PR #109. أصبح Cloud query path يملك query embedding بـJina retrieval.query/1024 وdense Qdrant retrieval مقيداً بالـtrusted user/document/run/cloud scope، مع Server-side collection resolution وdefensive result validation وtyped results بدون raw vectors.
+لا يوجد unfiltered retrieval ولا fallback إلى Hybrid Local، ولم تضف K2 BM25/RRF أو reranking أو fusion أو generation/context/citations/Chat execution أو UI/Laravel Chat orchestration أو migrations.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K3 — Hybrid Local query embedding / retrieval.
 تبقى K وما بعدها دون تغيير من حيث الترقيم، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
