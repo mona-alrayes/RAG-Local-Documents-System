@@ -50,6 +50,14 @@
                     مساحة العمل
                 </flux:sidebar.item>
 
+                <flux:sidebar.item
+                    icon="chat-bubble-left-right"
+                    href="{{ route('conversations.index') }}"
+                    :current="request()->routeIs('conversations.*')"
+                >
+                    المحادثات
+                </flux:sidebar.item>
+
                 {{-- الوثائق --}}
                 <details
                     class="group"
