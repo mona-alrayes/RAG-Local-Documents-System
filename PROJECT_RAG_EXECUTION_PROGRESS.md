@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — J5 مكتملة ومدموجة في PR #104؛ أضيفت `ConversationPolicy` مع Laravel Gate / Policy authorization لحصر إدارة المحادثة بمالكها، وأصبحت J6 — Create / list conversations هي المهمة الحالية وفق الـMaster Plan
+> **الحالة العامة:** قيد التنفيذ — J6 مكتملة ومدموجة في PR #105؛ أصبح إنشاء وعرض المحادثات user-scoped ومحمياً عبر `ConversationPolicy`، وأصبحت J7 — Multi-document selection هي المهمة الحالية وفق الـMaster Plan
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 61332b33af8828fefa7c6cc2673561bf9e996393
-Last Merged Feature PR on main: #104 — J5 Conversation policies
-Latest Task PR: #104 — J5 Conversation policies
-Verified J5 Feature Commit:
-- 3656cc74600b2bfae2452b06ebaa62a8f4355415 — J5 add conversation authorization policy
-Verified J5 Merge Commit: 61332b33af8828fefa7c6cc2673561bf9e996393
-Documentation Baseline: تم تسجيل اكتمال J5 وتسليم J6 — Create / list conversations كمهمة حالية؛ أصبحت `ConversationPolicy` تسمح للمستخدم المسجل بـ`viewAny` و`create`، وتقصر `view` و`update` و`delete` على مالك المحادثة وفق `conversation.user_id === user.id` باستخدام Laravel Gate / Policy authorization، دون إضافة Routes أو Controllers أو UI أو workflow جديد للمحادثات ضمن J5.
+Verified Main Commit: eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235
+Last Merged Feature PR on main: #105 — J6 Create / list conversations
+Latest Task PR: #105 — J6 Create / list conversations
+Verified J6 Feature Commit:
+- 7b8790d0bbc090fd4c5eb09262a4ed02fa1ef5bb — J6 add conversation create and list workflow
+Verified J6 Merge Commit: eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235
+Documentation Baseline: تم تسجيل اكتمال J6 وتسليم J7 — Multi-document selection كمهمة حالية؛ أصبح المستخدم المسجل يستطيع إنشاء Conversation مملوكة له Server-side وعرض Conversations الخاصة به فقط، مع استخدام `ConversationPolicy` عبر `viewAny` و`create`، وحصر Query القائمة بالمستخدم الحالي وعدم الوثوق بـ`user_id` القادم من client، وبقاء `title` nullable، وإضافة Conversations إلى App Shell / Sidebar دون تنفيذ Documents selection أو Messages أو Retrieval أو Chat workflow ضمن J6.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-J5 — Conversation policies
+J6 — Create / list conversations
 
 Current Phase:
 J — Conversations Database
@@ -137,37 +137,42 @@ Architectural Result:
 - تسمح J5 للمستخدم المسجل بـ`viewAny` و`create`.
 - تقصر J5 صلاحيات `view` و`update` و`delete` على مالك المحادثة وفق `conversation.user_id === user.id`، وتمنع مستخدمًا آخر من إدارة Conversation لا يملكها.
 - لم تضف J5 Routes أو Controllers أو UI أو workflow جديد للمحادثات.
+- أضافت J6 workflow لإنشاء Conversation جديدة وصفحة لعرض Conversations الخاصة بالمستخدم الحالي فقط.
+- تستخدم J6 `ConversationPolicy` من J5 عبر `viewAny` للقائمة و`create` للإنشاء.
+- Query القائمة user-scoped عبر علاقة المستخدم authenticated لمنع cross-user Conversation leakage.
+- إنشاء Conversation يتم عبر علاقة المستخدم Server-side ولا يثق بـ`user_id` من client، لذلك لا يمكن تزوير ownership.
+- بقي `title` nullable/اختياري وفق schema الحالية، وأضيفت Conversations إلى App Shell / Sidebar.
+- لم تنفذ J6 اختيار Documents أو Messages أو Retrieval أو Chat workflow.
 
 Latest Verification:
-PR #104 merged on GitHub: PASS
-PR head commit: 3656cc74600b2bfae2452b06ebaa62a8f4355415
-PR merge commit: 61332b33af8828fefa7c6cc2673561bf9e996393
-main verified at J5 merge commit 61332b33af8828fefa7c6cc2673561bf9e996393 before this progress update: PASS
+PR #105 merged on GitHub: PASS
+PR head commit: 7b8790d0bbc090fd4c5eb09262a4ed02fa1ef5bb
+PR merge commit: eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235
+main verified at J6 merge commit eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235 before this progress update: PASS
 
-Focused J5 tests:
-3 passed (8 assertions)
+Focused J6 tests:
+5 passed (19 assertions)
 
 Laravel Pint:
-PASS
+PASS — 164 files
 
 Full Laravel suite:
-183 passed (869 assertions)
+188 passed (888 assertions)
 
 Current Task:
-J6 — Create / list conversations
+J7 — Multi-document selection
 
-J5 Completion:
-- أضيفت `ConversationPolicy`.
-- يسمح للمستخدم المسجل بـ`viewAny` و`create`.
-- تقتصر `view` و`update` و`delete` على مالك المحادثة فقط.
-- معيار الملكية: `conversation.user_id === user.id`.
-- يمنع مستخدم آخر من إدارة Conversation لا يملكها.
-- يستخدم Laravel Gate / Policy authorization.
-- لم تُضف Routes أو Controllers أو UI أو workflow جديد للمحادثات ضمن J5.
-- الملفات المضافة:
-  - `laravel-app/app/Policies/ConversationPolicy.php`
-  - `laravel-app/tests/Feature/Policies/ConversationPolicyTest.php`
-- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي J6 — Create / list conversations.
+J6 Completion:
+- أضيف workflow لإنشاء Conversation جديدة.
+- أضيفت صفحة لعرض Conversations الخاصة بالمستخدم الحالي فقط.
+- استخدمت `ConversationPolicy` الموجودة من J5 عبر `viewAny` و`create`.
+- حُصرت Query القائمة بالمستخدم authenticated لمنع تسريب Conversations بين المستخدمين.
+- يتم إنشاء Conversation عبر علاقة المستخدم Server-side.
+- لا يتم الوثوق بـ`user_id` القادم من client ولا يمكن تزوير ownership من خلاله.
+- بقي `title` اختيارياً / nullable وفق schema الحالية.
+- أضيفت Conversations إلى App Shell / Sidebar.
+- لم ينفذ اختيار Documents أو Messages أو Retrieval أو Chat workflow ضمن J6.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي J7 — Multi-document selection.
 
 Open Blockers: none
 ```
@@ -947,13 +952,15 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 | J3 Messages + snapshots / metrics | DONE |
 | J4 message_sources + processing run / profile provenance | DONE |
 | J5 Conversation policies | DONE |
-| J6 Create / list conversations | TODO |
+| J6 Create / list conversations | DONE |
 | J7 Multi-document selection | TODO |
 | J8 Ready / indexed / runtime-capable document filtering | TODO |
 
 > **J4 finalized in PR #103:** يعتمد `message_sources` على `processing_run_id` للوصول إلى الـProcessingRun ثم Document/Profile/Qdrant provenance دون تكرار حقول مشتقة. أصبح FK الخاص بالـProcessingRun يستخدم `cascadeOnDelete()` بحيث يحذف حذف الـRun مصادرها فقط وتبقى Message نفسها، وتم Consolidate أعمدة `kind` وstage timestamps داخل migration إنشاء ProcessingRun الأصلية مع حذف migration الإضافية القديمة وتحديث اختبارات schema/provenance.
 
 > **J5 completed in PR #104:** أضيفت `ConversationPolicy` باستخدام Laravel Gate / Policy authorization؛ يسمح للمستخدم المسجل بـ`viewAny` و`create`، بينما تقصر `view` و`update` و`delete` على مالك المحادثة وفق `conversation.user_id === user.id`. لم تضف J5 Routes أو Controllers أو UI أو workflow جديد للمحادثات.
+
+> **J6 completed in PR #105:** أضيف workflow لإنشاء Conversation وصفحة لعرض Conversations الخاصة بالمستخدم الحالي فقط؛ تستخدم القائمة `viewAny` والإنشاء `create` من `ConversationPolicy`، وتبقى القراءة والإنشاء user-scoped Server-side دون الثقة بـ`user_id` من client. بقي `title` nullable وأضيفت Conversations إلى App Shell / Sidebar، دون تنفيذ document selection أو Messages أو Retrieval أو Chat workflow.
 
 كل Document جاهزة تشير إلى `active_processing_run_id`.
 
@@ -1963,7 +1970,7 @@ PASS
 لم تُنشر أرقام tests في PR #103 أو مناقشته، لذلك لم تُسجل أعداد غير موثقة.
 ```
 
-## آخر مهمة مكتملة — J5 Conversation policies
+## المهمة السابقة المكتملة — J5 Conversation policies
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #104، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `61332b33af8828fefa7c6cc2673561bf9e996393`.
 
@@ -2001,19 +2008,56 @@ Full Laravel suite:
 183 passed (869 assertions)
 ```
 
+## آخر مهمة مكتملة — J6 Create / list conversations
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #105، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235`.
+
+تم تنفيذ:
+
+- إضافة workflow لإنشاء Conversation جديدة.
+- إضافة صفحة لعرض Conversations الخاصة بالمستخدم الحالي فقط.
+- استخدام `ConversationPolicy` الموجودة من J5 عبر `viewAny` لعرض القائمة و`create` لإنشاء Conversation.
+- حصر Query القائمة بالمستخدم authenticated عبر `user()->conversations()` لمنع تسريب Conversations بين المستخدمين.
+- إنشاء Conversation عبر علاقة المستخدم Server-side.
+- عدم الوثوق بـ`user_id` القادم من client؛ حتى عند إرساله لا يمكن تزوير ownership.
+- بقاء `title` اختيارية / nullable وفق schema الحالية، مع حد أقصى 255 حرفًا.
+- إضافة Conversations إلى App Shell / Sidebar.
+- عدم تنفيذ اختيار Documents أو Messages أو Retrieval أو Chat workflow ضمن J6.
+
+### Verification J6
+
+```text
+PR #105 merged on GitHub: PASS
+Feature branch:
+- task/J6-create-list-conversations
+Feature commit:
+- 7b8790d0bbc090fd4c5eb09262a4ed02fa1ef5bb
+Merge commit:
+- eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235
+
+Focused J6 tests:
+5 passed (19 assertions)
+
+Full Laravel suite:
+188 passed (888 assertions)
+
+Laravel Pint:
+PASS — 164 files
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-J6 — Create / list conversations
+J7 — Multi-document selection
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت J5 ودمجت في main عبر PR #104، وأصبحت Conversation authorization مثبتة عبر `ConversationPolicy`: يسمح للمستخدم المسجل بـviewAny/create، وتقصر view/update/delete على مالك المحادثة وفق conversation.user_id === user.id باستخدام Laravel Gate / Policy authorization.
-لم تضف J5 Routes أو Controllers أو UI أو workflow جديد للمحادثات.
-يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفيًا هي J6 — Create / list conversations.
-تبقى J7 وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
+اكتملت J6 ودمجت في main عبر PR #105. أصبح المستخدم المسجل يستطيع إنشاء Conversation مملوكة له Server-side وعرض Conversations الخاصة به فقط، مع استخدام ConversationPolicy عبر viewAny/create، ومنع تزوير ownership عبر user_id القادم من client، وبقاء title nullable.
+لم تنفذ J6 اختيار Documents أو Messages أو Retrieval أو Chat workflow.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفيًا هي J7 — Multi-document selection.
+تبقى J8 وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
 ---
