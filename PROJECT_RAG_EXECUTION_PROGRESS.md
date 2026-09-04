@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — J1 مكتملة ومدموجة في PR #100؛ أضيف أساس Conversations في Laravel/MySQL مع جدول `conversations` وملكية المستخدم وحقل `title` nullable والعلاقات الأساسية فقط؛ J2 هي المهمة الحالية
+> **الحالة العامة:** قيد التنفيذ — J2 مكتملة ومدموجة في PR #101؛ أضيف جدول `conversation_document` كعلاقة Many-to-Many بين Conversations وDocuments مع منع التكرار وForeign Keys المناسبة؛ J3 هي المهمة الحالية
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: e84467a971e42b88ce88349e8d3a39c1f70a861f
-Last Merged Feature PR on main: #100 — J1 Conversations migration / model
-Latest Task PR: #100 — J1 Conversations migration / model
-Verified J1 Feature Commit:
-- bdcd0c6c6cbbd39344e068d9d556b611cb58a450 — J1 conversations foundation
-Verified J1 Merge Commit: e84467a971e42b88ce88349e8d3a39c1f70a861f
-Documentation Baseline: تم تسجيل اكتمال J1 وتسليم J2 conversation_document pivot كمهمة حالية.
+Verified Main Commit: 7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a
+Last Merged Feature PR on main: #101 — J2 conversation_document pivot
+Latest Task PR: #101 — J2 conversation_document pivot
+Verified J2 Feature Commit:
+- 42e373d48a0ff8cec5a0da41e42fb5e159551eff — J2 conversation_document pivot
+Verified J2 Merge Commit: 7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a
+Documentation Baseline: تم تسجيل اكتمال J2 وتسليم J3 Messages + snapshots / metrics كمهمة حالية.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-J1 — Conversations migration / model
+J2 — conversation_document pivot
 
 Current Phase:
 J — Conversations Database
@@ -122,20 +122,21 @@ Architectural Result:
 - أضافت J1 حقل `title` nullable لدعم توليد اسم افتراضي للمحادثة لاحقًا من محتواها وإتاحة إعادة التسمية لاحقًا، دون تنفيذ منطق التوليد أو UI/API لإعادة التسمية في هذه المهمة.
 - أضافت J1 `Conversation` Eloquent model وعلاقتي `Conversation -> belongsTo(User)` و`User -> hasMany(Conversation)`.
 - لم تضف J1 document selection أو Messages أو Message sources أو Policies أو Conversation UI/controllers أو RAG/Retrieval/FastAPI/Qdrant/streaming/conversation memory.
+- أضافت J2 جدول pivot باسم `conversation_document` وعلاقة Many-to-Many بين `Conversation` و`Document` مع علاقات Eloquent من الجهتين.
+- تمنع J2 تكرار نفس `conversation_id/document_id` عبر unique constraint، وتستخدم Foreign Keys إلى `conversations` و`documents` مع `cascadeOnDelete()` لأن سجلات العلاقة ليست Business Entity مستقلة.
+- لا يوجد Pivot Model مستقل لأن الجدول يمثل علاقة فقط ولا يحمل business state، وتبقى Laravel/MySQL مصدر الحقيقة لهذه العلاقة.
+- لم تضف J2 document selection flow أو authorization أو UI أو RAG، كما لم تحاول حل cross-user document selection عبر schema معقد أو trigger؛ يفرض ذلك لاحقًا في application layer عند تنفيذ selection flow.
 
 Latest Verification:
-PR #100 merged on GitHub: PASS
-PR head commit: bdcd0c6c6cbbd39344e068d9d556b611cb58a450
-PR merge commit: e84467a971e42b88ce88349e8d3a39c1f70a861f
-main verified at J1 merge commit e84467a971e42b88ce88349e8d3a39c1f70a861f before this progress update: PASS
-Migration: PASS
-Migration rollback + re-run: PASS
-Pint: PASS
-Focused J1 tests: 2 passed (6 assertions)
-Full Laravel suite: 170 passed (829 assertions)
+PR #101 merged on GitHub: PASS
+PR head commit: 42e373d48a0ff8cec5a0da41e42fb5e159551eff
+PR merge commit: 7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a
+main verified at J2 merge commit 7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a before this progress update: PASS
+Focused J2 tests: PASS
+Full Laravel suite: PASS
 
 Current Task:
-J2 — conversation_document pivot
+J3 — Messages + snapshots / metrics
 
 Open Blockers: none
 ```
@@ -911,7 +912,7 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 | المهمة | الحالة |
 |---|---|
 | J1 Conversations migration / model | DONE |
-| J2 conversation_document pivot | TODO |
+| J2 conversation_document pivot | DONE |
 | J3 Messages + snapshots / metrics | TODO |
 | J4 message_sources + processing run / profile provenance | TODO |
 | J5 Conversation policies | TODO |
@@ -1703,7 +1704,7 @@ Full Laravel suite:
 168 tests / 823 assertions PASS
 ```
 
-## آخر مهمة مكتملة — J1 Conversations migration / model
+## المهمة السابقة المكتملة — J1 Conversations migration / model
 
 **الحالة:** `DONE` ومتحقق منها في PR #100، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `e84467a971e42b88ce88349e8d3a39c1f70a861f`.
 
@@ -1752,18 +1753,59 @@ Full Laravel suite:
 170 passed (829 assertions)
 ```
 
+## آخر مهمة مكتملة — J2 conversation_document pivot
+
+**الحالة:** `DONE` ومتحقق منها في PR #101، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a`.
+
+تم تنفيذ:
+
+- إضافة جدول pivot باسم `conversation_document` في Laravel/MySQL.
+- أصبحت العلاقة Many-to-Many بين `Conversation` و`Document`.
+- إضافة علاقة Eloquent `Conversation -> documents()` وعلاقة `Document -> conversations()`.
+- منع duplicate pair لنفس `conversation_id` و`document_id` على مستوى قاعدة البيانات عبر unique constraint.
+- استخدام Foreign Keys المناسبة إلى `conversations` و`documents` مع `cascadeOnDelete()`، بما يتوافق مع كون سجلات الـpivot علاقة تابعة وليست Business Entity مستقلة.
+- عدم إضافة Pivot Model مستقل لأن الجدول يمثل العلاقة فقط ولا يحتوي business state.
+- Laravel/MySQL هما Source of Truth لهذه العلاقة.
+
+حدود J2:
+
+- لا document selection flow.
+- لا authorization خاص باختيار الوثائق.
+- لا UI.
+- لا RAG / Retrieval / FastAPI / Qdrant.
+- لم يُحل cross-user document selection عبر schema معقد أو database trigger؛ يجب منعه لاحقًا في application layer عند تنفيذ document selection flow.
+
+### Verification J2
+
+```text
+PR #101 merged on GitHub: PASS
+Feature commit:
+- 42e373d48a0ff8cec5a0da41e42fb5e159551eff
+Merge commit:
+- 7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a
+
+Focused J2 tests:
+PASS
+
+Full Laravel suite:
+PASS
+```
+
+لم تُسجل أرقام الاختبارات في PR #101 أو commit المنشور، لذلك لم تُضف أعداد غير موثقة.
+
 ## المهمة الحالية/التالية
 
 ```text
-J2 — conversation_document pivot
+J3 — Messages + snapshots / metrics
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت J1 في main عبر PR #100، وأصبح أساس Conversations موجودًا في Laravel/MySQL بجدول conversations وملكية user_id وحقل title nullable وConversation model وعلاقات User/Conversation فقط.
-حقل title يهيئ الـschema لتوليد اسم افتراضي وإعادة التسمية لاحقًا، لكنه لا يعني أن منطق التوليد أو UI/API لإعادة التسمية قد تم تنفيذه.
-تبدأ J2 — conversation_document pivot حرفيًا وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، بينما تبقى J3 وما بعدها دون تغيير.
+دُمجت J2 في main عبر PR #101، وأصبحت العلاقة بين Conversations وDocuments ممثلة بجدول conversation_document وعلاقات Eloquent Many-to-Many من الجهتين، مع unique constraint لمنع duplicate pair وForeign Keys تستخدم cascadeOnDelete().
+يبقى Laravel/MySQL مصدر الحقيقة لهذه العلاقة، ولا يوجد Pivot Model مستقل لأن الجدول لا يحمل business state.
+لم تنفذ J2 document selection flow أو authorization أو UI أو RAG، ويظل منع cross-user document selection مسؤولية application layer عند تنفيذ selection flow لاحقًا.
+تبدأ J3 — Messages + snapshots / metrics حرفيًا وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، بينما تبقى J4 وما بعدها دون تغيير.
 لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
