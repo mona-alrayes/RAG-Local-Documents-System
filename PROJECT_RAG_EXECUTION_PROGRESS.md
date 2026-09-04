@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — J2 مكتملة ومدموجة في PR #101؛ أضيف جدول `conversation_document` كعلاقة Many-to-Many بين Conversations وDocuments مع منع التكرار وForeign Keys المناسبة؛ J3 هي المهمة الحالية
+> **الحالة العامة:** قيد التنفيذ — J3 مكتملة ومدموجة في PR #102؛ أضيفت طبقة Messages مع snapshots/metrics، وتم تأسيس schema/provenance الخاصة بـ`message_sources` مبكرًا ضمن نفس PR؛ J4 هي المهمة الحالية مع إلزام مراجعة الموجود وتجنب أي migration/schema مكرر
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a
-Last Merged Feature PR on main: #101 — J2 conversation_document pivot
-Latest Task PR: #101 — J2 conversation_document pivot
-Verified J2 Feature Commit:
-- 42e373d48a0ff8cec5a0da41e42fb5e159551eff — J2 conversation_document pivot
-Verified J2 Merge Commit: 7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a
-Documentation Baseline: تم تسجيل اكتمال J2 وتسليم J3 Messages + snapshots / metrics كمهمة حالية.
+Verified Main Commit: 428989ac4289e451d698c683acfea344f8ef59e9
+Last Merged Feature PR on main: #102 — J3 Messages + snapshots / metrics
+Latest Task PR: #102 — J3 Messages + snapshots / metrics
+Verified J3 Feature Commit:
+- 8a40bb6c88ab0397ed10befdd4c35f359172565b — J3 message persistence and source provenance schema
+Verified J3 Merge Commit: 428989ac4289e451d698c683acfea344f8ef59e9
+Documentation Baseline: تم تسجيل اكتمال J3 وتسليم J4 message_sources + processing run / profile provenance كمهمة حالية، مع توثيق أن أساس message_sources/provenance/relevance-score persistence تأسس بالفعل في PR #102 ويجب مراجعته قبل أي تنفيذ جديد.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-J2 — conversation_document pivot
+J3 — Messages + snapshots / metrics
 
 Current Phase:
 J — Conversations Database
@@ -126,17 +126,32 @@ Architectural Result:
 - تمنع J2 تكرار نفس `conversation_id/document_id` عبر unique constraint، وتستخدم Foreign Keys إلى `conversations` و`documents` مع `cascadeOnDelete()` لأن سجلات العلاقة ليست Business Entity مستقلة.
 - لا يوجد Pivot Model مستقل لأن الجدول يمثل علاقة فقط ولا يحمل business state، وتبقى Laravel/MySQL مصدر الحقيقة لهذه العلاقة.
 - لم تضف J2 document selection flow أو authorization أو UI أو RAG، كما لم تحاول حل cross-user document selection عبر schema معقد أو trigger؛ يفرض ذلك لاحقًا في application layer عند تنفيذ selection flow.
+- أضافت J3 جدول `messages` و`Message` model وربط `Conversation -> Messages`، مع `MessageRole` (`user`, `assistant`) و`MessageStatus` (`pending`, `completed`, `failed`).
+- تخزن J3 `content` و`execution_snapshot` و`metrics`، مع casts مناسبة للـenums وحقول JSON.
+- أسست J3 مبكرًا جدول `message_sources` و`MessageSource` model وربط `Message -> MessageSources` و`MessageSource -> ProcessingRun`، مع حفظ `processing_run_id`, `qdrant_point_id`, `chunk_index`, `source_snapshot`, و`relevance_score`.
+- لا يكرر `message_sources` حقول `document_id` أو `processing_profile` أو `qdrant_collection` لأنها تستنتج عبر `ProcessingRun` الموثوقة.
+- Cascade معتمد من Conversation إلى Messages ومن Message إلى MessageSources، بينما حذف ProcessingRun المشار إليها من MessageSource ممنوع عبر `restrictOnDelete()`.
+- يبقى J4 مستقلاً في الـMaster Plan ولم يعتبر DONE؛ عند بدء J4 يجب أولًا تدقيق schema/provenance foundation الموجودة من PR #102 وتجنب إنشاء migration/schema مكرر.
 
 Latest Verification:
-PR #101 merged on GitHub: PASS
-PR head commit: 42e373d48a0ff8cec5a0da41e42fb5e159551eff
-PR merge commit: 7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a
-main verified at J2 merge commit 7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a before this progress update: PASS
-Focused J2 tests: PASS
-Full Laravel suite: PASS
+PR #102 merged on GitHub: PASS
+PR head commit: 8a40bb6c88ab0397ed10befdd4c35f359172565b
+PR merge commit: 428989ac4289e451d698c683acfea344f8ef59e9
+main verified at J3 merge commit 428989ac4289e451d698c683acfea344f8ef59e9 before this progress update: PASS
+Focused J3 tests: 6 passed (24 assertions)
+Full Laravel suite: 180 passed (864 assertions)
+Migration rollback + re-run: PASS
+Laravel Pint: PASS
 
 Current Task:
-J3 — Messages + snapshots / metrics
+J4 — message_sources + processing run / profile provenance
+
+J4 Existing Foundation:
+- schema الأساسي لـ`message_sources` موجود من PR #102.
+- `processing_run_id` provenance موجود ويرتبط بـ`document_processing_runs` مع `restrictOnDelete()`.
+- `relevance_score` persistence foundation موجود.
+- `document_id`, `processing_profile`, و`qdrant_collection` لا تكرر في `message_sources` وتستنتج عبر `ProcessingRun`.
+- أي تنفيذ لـJ4 يبدأ بـReference/Schema Audit للموجود ويتجنب migration/schema مكرر، ولا تعتبر J4 DONE قبل استكمال نطاقها المستقل والتحقق منه.
 
 Open Blockers: none
 ```
@@ -913,12 +928,14 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 |---|---|
 | J1 Conversations migration / model | DONE |
 | J2 conversation_document pivot | DONE |
-| J3 Messages + snapshots / metrics | TODO |
+| J3 Messages + snapshots / metrics | DONE |
 | J4 message_sources + processing run / profile provenance | TODO |
 | J5 Conversation policies | TODO |
 | J6 Create / list conversations | TODO |
 | J7 Multi-document selection | TODO |
 | J8 Ready / indexed / runtime-capable document filtering | TODO |
+
+> **J4 pre-existing foundation from PR #102:** schema الأساسي لـ`message_sources` و`MessageSource` model و`processing_run_id` provenance و`relevance_score` persistence موجودة بالفعل. يجب أن يبدأ J4 بتدقيق الموجود وتحديد الجزء المتبقي من نطاق المهمة، مع تجنب أي migration/schema مكرر وعدم اعتبار J4 مكتملة تلقائيًا.
 
 كل Document جاهزة تشير إلى `active_processing_run_id`.
 
@@ -1161,6 +1178,58 @@ failed
 cloud
 hybrid_local
 ```
+
+## 8.6 messages — J3
+
+الـschema المثبت في PR #102:
+
+```text
+id
+conversation_id
+role
+status default pending
+content nullable
+execution_snapshot nullable JSON
+metrics nullable JSON
+created_at
+updated_at
+```
+
+العلاقات والحالات:
+
+```text
+Conversation -> hasMany(Message)
+MessageRole: user | assistant
+MessageStatus: pending | completed | failed
+Conversation deletion -> cascade Messages
+```
+
+## 8.7 message_sources — foundation established in J3 for J4
+
+الـschema الأساسي الموجود منذ PR #102:
+
+```text
+id
+message_id
+processing_run_id
+qdrant_point_id
+chunk_index
+source_snapshot JSON
+relevance_score nullable
+created_at
+updated_at
+```
+
+العقود المثبتة:
+
+- `Message -> hasMany(MessageSource)`.
+- `MessageSource -> belongsTo(Message)`.
+- `MessageSource -> belongsTo(ProcessingRun)`.
+- حذف Message يعمل cascade على MessageSources.
+- حذف ProcessingRun المشار إليها ممنوع عبر `restrictOnDelete()`.
+- لا تخزن `document_id`, `processing_profile`, أو `qdrant_collection` داخل `message_sources`؛ تستنتج من `ProcessingRun`.
+- يوجد unique constraint على `message_id + qdrant_point_id`.
+- هذا **foundation مبكر لـJ4** وليس إعلانًا بأن J4 مكتملة؛ أي عمل لاحق لـJ4 يراجع الموجود أولًا ويتجنب إنشاء schema مكرر.
 
 ---
 
@@ -1753,7 +1822,7 @@ Full Laravel suite:
 170 passed (829 assertions)
 ```
 
-## آخر مهمة مكتملة — J2 conversation_document pivot
+## المهمة السابقة المكتملة — J2 conversation_document pivot
 
 **الحالة:** `DONE` ومتحقق منها في PR #101، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `7c5ca49a04908f6cdf4db5897b8dd369e32b1f4a`.
 
@@ -1793,20 +1862,70 @@ PASS
 
 لم تُسجل أرقام الاختبارات في PR #101 أو commit المنشور، لذلك لم تُضف أعداد غير موثقة.
 
+## آخر مهمة مكتملة — J3 Messages + snapshots / metrics
+
+**الحالة:** `DONE` ومتحقق منها في PR #102، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `428989ac4289e451d698c683acfea344f8ef59e9`.
+
+تم تنفيذ:
+
+- إنشاء جدول `messages`.
+- إضافة `Message` model وربط `Conversation -> Messages`.
+- إضافة `MessageRole` بقيمتي `user` و`assistant`.
+- إضافة `MessageStatus` بالحالات `pending`, `completed`, `failed`.
+- دعم تخزين `content`, `execution_snapshot`, و`metrics` مع casts مناسبة.
+- السماح للرسالة `pending` أن توجد بدون `content` حتى يكتمل مسار السؤال لاحقًا.
+- تأسيس `message_sources` مبكرًا ضمن J3 لتثبيت schema المحادثات والمصادر قبل J4، بدون إضافة Retrieval/RAG logic.
+- إضافة `MessageSource` model وربط `Message -> MessageSources` و`MessageSource -> ProcessingRun`.
+- تخزين source provenance عبر `processing_run_id`, `qdrant_point_id`, `chunk_index`, `source_snapshot`, و`relevance_score`.
+- عدم تكرار `document_id`, `processing_profile`, أو `qdrant_collection` في `message_sources` لأنها تستنتج عبر `ProcessingRun`.
+- اعتماد cascade من Conversation إلى Messages ومن Message إلى MessageSources.
+- اعتماد `restrictOnDelete()` على `processing_run_id` لمنع حذف ProcessingRun ما دامت مشارًا إليها من MessageSource.
+- إضافة unique constraint على `message_id + qdrant_point_id`.
+- إضافة اختبارات لعقود schema والعلاقات والـcasts والـprovenance والـcascade/restrict behavior.
+
+حدود J3:
+
+- لا تعتبر J4 مكتملة رغم تأسيس جزء كبير من قاعدة بياناتها مبكرًا.
+- لا Retrieval أو RAG أو Qdrant query logic.
+- لا Conversation policies أو create/list UI أو document-selection flow.
+- أي تنفيذ لاحق لـJ4 يجب أن يراجع migration/model الموجودين أولًا ويتجنب إنشاء `message_sources` schema مكرر.
+
+### Verification J3
+
+```text
+PR #102 merged on GitHub: PASS
+Feature commit:
+- 8a40bb6c88ab0397ed10befdd4c35f359172565b
+Merge commit:
+- 428989ac4289e451d698c683acfea344f8ef59e9
+
+Focused J3 tests:
+6 passed (24 assertions)
+
+Laravel full suite:
+180 passed (864 assertions)
+
+Migration rollback + re-run:
+PASS
+
+Laravel Pint:
+PASS
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-J3 — Messages + snapshots / metrics
+J4 — message_sources + processing run / profile provenance
 ```
 
 Baseline المهمة التالية:
 
 ```text
-دُمجت J2 في main عبر PR #101، وأصبحت العلاقة بين Conversations وDocuments ممثلة بجدول conversation_document وعلاقات Eloquent Many-to-Many من الجهتين، مع unique constraint لمنع duplicate pair وForeign Keys تستخدم cascadeOnDelete().
-يبقى Laravel/MySQL مصدر الحقيقة لهذه العلاقة، ولا يوجد Pivot Model مستقل لأن الجدول لا يحمل business state.
-لم تنفذ J2 document selection flow أو authorization أو UI أو RAG، ويظل منع cross-user document selection مسؤولية application layer عند تنفيذ selection flow لاحقًا.
-تبدأ J3 — Messages + snapshots / metrics حرفيًا وفق خريطة المهام في PROJECT_RAG_MASTER_PLAN.md، بينما تبقى J4 وما بعدها دون تغيير.
-لا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
+دُمجت J3 في main عبر PR #102، وأصبحت طبقة Messages الأساسية موجودة مع MessageRole/MessageStatus وcontent/execution_snapshot/metrics.
+أسس PR #102 مبكرًا schema الأساسي لـmessage_sources وMessageSource model وربط provenance عبر processing_run_id، مع qdrant_point_id وchunk_index وsource_snapshot وrelevance_score، كما ثبت cascade من Message إلى MessageSources وrestrict delete على ProcessingRun المشار إليها.
+لا تكرر message_sources document_id أو processing_profile أو qdrant_collection لأنها تستنتج عبر ProcessingRun.
+تبقى J4 مهمة مستقلة حرفيًا وفق PROJECT_RAG_MASTER_PLAN.md ولا تعتبر DONE تلقائيًا. يجب أن يبدأ تنفيذها بتدقيق الموجود في PR #102 وتحديد الجزء المتبقي من نطاق J4، وتجنب إنشاء migration/schema مكرر أو إعادة تنفيذ provenance/relevance-score foundation الموجودة.
+تبقى J5 وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
 ---
