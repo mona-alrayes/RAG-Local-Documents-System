@@ -17,7 +17,7 @@ return new class extends Migration
 
             $table->foreignId('processing_run_id')
                 ->constrained('document_processing_runs')
-                ->restrictOnDelete();
+                ->cascadeOnDelete();
 
             $table->string('qdrant_point_id', 64);
 
