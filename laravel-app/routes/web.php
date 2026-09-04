@@ -9,11 +9,9 @@ use Illuminate\Support\Facades\Route;
 Route::view('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/workspace', WorkspaceController::class)
-        ->name('workspace');
+    Route::get('/workspace', WorkspaceController::class)->name('workspace');
 
-    Route::view('/settings/account', 'settings.account')
-        ->name('settings.account');
+    Route::view('/settings/account', 'settings.account')->name('settings.account');
 
     Route::get('/conversations', [ConversationController::class, 'index'])
         ->name('conversations.index');
@@ -21,16 +19,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/conversations', [ConversationController::class, 'store'])
         ->name('conversations.store');
 
+    Route::get('/conversations/{conversation}', [ConversationController::class, 'show'])
+        ->name('conversations.show');
+
+    Route::put('/conversations/{conversation}/documents', [ConversationController::class, 'updateDocuments'])
+        ->name('conversations.documents.update');
+
     Route::get('/documents', [DocumentController::class, 'index'])
         ->name('documents.index');
 
     Route::get('/documents/{document}', [DocumentController::class, 'show'])
         ->name('documents.show');
 
-    Route::get(
-        '/documents/{document}/poll',
-        DocumentPollingController::class,
-    )->name('documents.poll');
+    Route::get('/documents/{document}/poll', DocumentPollingController::class)
+        ->name('documents.poll');
 
     Route::post('/documents', [DocumentController::class, 'store'])
         ->name('documents.store');
@@ -41,13 +43,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])
         ->name('documents.preview');
 
-    Route::post(
-        '/documents/{document}/reprocess',
-        [DocumentController::class, 'reprocess'],
-    )->name('documents.reprocess');
+    Route::post('/documents/{document}/reprocess', [DocumentController::class, 'reprocess'])
+        ->name('documents.reprocess');
 
-    Route::delete(
-        '/documents/{document}',
-        [DocumentController::class, 'destroy'],
-    )->name('documents.destroy');
+    Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])
+        ->name('documents.destroy');
 });

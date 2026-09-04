@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreConversationRequest;
+use App\Http\Requests\UpdateConversationDocumentsRequest;
 use App\Models\Conversation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,9 +12,6 @@ use Illuminate\View\View;
 
 final class ConversationController extends Controller
 {
-    /**
-     * Display the authenticated user's conversations.
-     */
     public function index(Request $request): View
     {
         Gate::authorize('viewAny', Conversation::class);
@@ -28,9 +26,6 @@ final class ConversationController extends Controller
         ]);
     }
 
-    /**
-     * Create a conversation owned by the authenticated user.
-     */
     public function store(StoreConversationRequest $request): RedirectResponse
     {
         $request->user()
@@ -42,5 +37,39 @@ final class ConversationController extends Controller
         return redirect()
             ->route('conversations.index')
             ->with('success', 'تم إنشاء المحادثة بنجاح.');
+    }
+
+    public function show(Request $request, Conversation $conversation): View
+    {
+        Gate::authorize('view', $conversation);
+
+        $documents = $request->user()
+            ->documents()
+            ->latest()
+            ->get([
+                'documents.id',
+                'documents.title',
+                'documents.original_name',
+            ]);
+
+        $conversation->load('documents:id');
+
+        return view('conversations.show', [
+            'conversation' => $conversation,
+            'documents' => $documents,
+        ]);
+    }
+
+    public function updateDocuments(
+        UpdateConversationDocumentsRequest $request,
+        Conversation $conversation,
+    ): RedirectResponse {
+        $conversation->documents()->sync(
+            $request->validated('document_ids', []),
+        );
+
+        return redirect()
+            ->route('conversations.show', $conversation)
+            ->with('success', 'تم تحديث وثائق المحادثة بنجاح.');
     }
 }
