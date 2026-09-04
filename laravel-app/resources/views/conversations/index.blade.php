@@ -109,14 +109,25 @@
                 <article
                     class="mb-3 rounded-2xl border border-white/10 bg-navy-900/70 p-5"
                 >
-                    <h3 class="font-semibold text-ice-100">
-                        {{ $conversation->title ?: 'محادثة بدون عنوان' }}
-                    </h3>
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <h3 class="font-semibold text-ice-100">
+                                {{ $conversation->title ?: 'محادثة بدون عنوان' }}
+                            </h3>
 
-                    <p class="mt-2 text-xs text-mist-300">
-                        أُنشئت في
-                        {{ $conversation->created_at->format('Y-m-d H:i') }}
-                    </p>
+                            <p class="mt-2 text-xs text-mist-300">
+                                أُنشئت في
+                                {{ $conversation->created_at->format('Y-m-d H:i') }}
+                            </p>
+                        </div>
+
+                        <a
+                            href="{{ route('conversations.show', $conversation) }}"
+                            class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-ice-100 transition hover:border-cyan-400/40 hover:text-cyan-300"
+                        >
+                            اختيار الوثائق
+                        </a>
+                    </div>
                 </article>
             @empty
                 <div
