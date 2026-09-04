@@ -28,6 +28,130 @@
             </div>
         </header>
 
+        {{-- Upload document --}}
+        <section
+            class="rounded-2xl border border-white/10 bg-navy-900/70 p-4 sm:p-5"
+            aria-labelledby="upload-document-title"
+        >
+            <div class="mb-5">
+                <h2
+                    id="upload-document-title"
+                    class="text-lg font-semibold text-ice-100"
+                >
+                    رفع وثيقة جديدة
+                </h2>
+
+                <p class="mt-2 text-sm leading-7 text-mist-300">
+                    اختر ملفًا واحدًا بصيغة PDF أو DOCX أو TXT، ثم اختر طريقة المعالجة المتاحة.
+                </p>
+            </div>
+
+            <form
+                method="POST"
+                action="{{ route('documents.store') }}"
+                enctype="multipart/form-data"
+                class="space-y-5"
+            >
+                @csrf
+
+                <div>
+                    <label
+                        for="document"
+                        class="mb-2 block text-sm font-medium text-ice-100"
+                    >
+                        الملف
+                    </label>
+
+                    <input
+                        id="document"
+                        name="document"
+                        type="file"
+                        accept=".pdf,.docx,.txt"
+                        required
+                        class="block w-full rounded-xl border border-white/10 bg-navy-950 px-4 py-3 text-sm text-mist-200 file:me-4 file:rounded-lg file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-navy-950 hover:file:bg-cyan-300"
+                    >
+
+                    @error('document')
+                        <p class="mt-2 text-sm text-red-300">
+                            {{ $message }}
+                        </p>
+                    @enderror
+                </div>
+
+                <fieldset>
+                    <legend class="mb-3 text-sm font-medium text-ice-100">
+                        طريقة المعالجة
+                    </legend>
+
+                    <div class="grid gap-3 md:grid-cols-2">
+                        @foreach (\App\Enums\ProcessingProfile::cases() as $profile)
+                            @php
+                                $isAvailable = in_array(
+                                    $profile,
+                                    $availableProcessingProfiles,
+                                    true,
+                                );
+                            @endphp
+
+                            <label
+                                class="flex items-start gap-3 rounded-xl border p-4 transition
+                                    {{ $isAvailable
+                                        ? 'cursor-pointer border-white/10 bg-navy-950 hover:border-cyan-400/40'
+                                        : 'cursor-not-allowed border-white/5 bg-navy-950/50 opacity-50' }}"
+                            >
+                                <input
+                                    type="radio"
+                                    name="processing_profile"
+                                    value="{{ $profile->value }}"
+                                    required
+                                    @disabled(! $isAvailable)
+                                    @checked(
+                                        old('processing_profile') === $profile->value
+                                        && $isAvailable
+                                    )
+                                    class="mt-1"
+                                >
+
+                                <span>
+                                    <span class="block font-medium text-ice-100">
+                                        {{ __('documents.processing_run.profile.' . $profile->value) }}
+                                    </span>
+
+                                    @unless ($isAvailable)
+                                        <span class="mt-1 block text-xs text-mist-400">
+                                            غير متاح حاليًا
+                                        </span>
+                                    @endunless
+                                </span>
+                            </label>
+                        @endforeach
+                    </div>
+
+                    @error('processing_profile')
+                        <p class="mt-2 text-sm text-red-300">
+                            {{ $message }}
+                        </p>
+                    @enderror
+                </fieldset>
+
+                @if (empty($availableProcessingProfiles))
+                    <p
+                        class="rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"
+                    >
+                        لا توجد طريقة معالجة متاحة حاليًا. يرجى المحاولة لاحقًا.
+                    </p>
+                @endif
+
+                <button
+                    type="submit"
+                    @disabled(empty($availableProcessingProfiles))
+                    class="inline-flex min-h-10 items-center justify-center rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-navy-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    رفع الوثيقة
+                </button>
+            </form>
+        </section>
+
         {{-- Filters --}}
         <section
             class="rounded-2xl border border-white/10 bg-navy-900/70 p-4 sm:p-5"

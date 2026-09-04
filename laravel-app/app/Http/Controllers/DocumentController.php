@@ -11,6 +11,7 @@ use App\Http\Requests\DocumentIndexRequest;
 use App\Http\Requests\ReprocessDocumentRequest;
 use App\Http\Requests\UploadDocumentRequest;
 use App\Models\Document;
+use App\Services\Ai\ProcessingCapabilityService;
 use App\Services\Documents\DocumentDeletionService;
 use App\Services\Documents\DocumentProcessingDispatcher;
 use App\Services\Documents\DocumentUploadService;
@@ -26,6 +27,7 @@ class DocumentController extends Controller
     public function index(
         DocumentIndexRequest $request,
         DocumentReadService $documentReadService,
+        ProcessingCapabilityService $processingCapabilityService,
     ): View {
         $documents = $documentReadService
             ->paginateForUser(
@@ -38,9 +40,17 @@ class DocumentController extends Controller
             $request->user(),
         );
 
+        try {
+            $availableProcessingProfiles = $processingCapabilityService
+                ->availableProfiles();
+        } catch (AiServiceException) {
+            $availableProcessingProfiles = [];
+        }
+
         return view('documents.index', compact(
             'documents',
             'hasAnyDocuments',
+            'availableProcessingProfiles',
         ));
     }
 
@@ -68,6 +78,16 @@ class DocumentController extends Controller
                     'warning',
                     __('documents.commands.upload.duplicate'),
                 );
+        } catch (AiServiceException $exception) {
+            $message = match ($exception->errorCode) {
+                'processing_profile_unavailable' => __('documents.commands.upload.profile_unavailable'),
+
+                default => __('documents.commands.upload.service_unavailable'),
+            };
+
+            return redirect()
+                ->route('documents.index')
+                ->with('error', $message);
         }
 
         return redirect()
