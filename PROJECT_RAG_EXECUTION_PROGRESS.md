@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-04
-> **الحالة العامة:** قيد التنفيذ — J6 مكتملة ومدموجة في PR #105؛ أصبح إنشاء وعرض المحادثات user-scoped ومحمياً عبر `ConversationPolicy`، وأصبحت J7 — Multi-document selection هي المهمة الحالية وفق الـMaster Plan
+> **الحالة العامة:** قيد التنفيذ — J7 مكتملة ومدموجة في PR #106؛ أصبح اختيار وربط وثيقة واحدة أو عدة وثائق بالمحادثة user-scoped ومحمياً، وأصبحت J8 — Ready / indexed / runtime-capable document filtering هي المهمة الحالية وفق الـMaster Plan
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235
-Last Merged Feature PR on main: #105 — J6 Create / list conversations
-Latest Task PR: #105 — J6 Create / list conversations
-Verified J6 Feature Commit:
-- 7b8790d0bbc090fd4c5eb09262a4ed02fa1ef5bb — J6 add conversation create and list workflow
-Verified J6 Merge Commit: eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235
-Documentation Baseline: تم تسجيل اكتمال J6 وتسليم J7 — Multi-document selection كمهمة حالية؛ أصبح المستخدم المسجل يستطيع إنشاء Conversation مملوكة له Server-side وعرض Conversations الخاصة به فقط، مع استخدام `ConversationPolicy` عبر `viewAny` و`create`، وحصر Query القائمة بالمستخدم الحالي وعدم الوثوق بـ`user_id` القادم من client، وبقاء `title` nullable، وإضافة Conversations إلى App Shell / Sidebar دون تنفيذ Documents selection أو Messages أو Retrieval أو Chat workflow ضمن J6.
+Verified Main Commit: c519fe270a6383e687e203a360bb7963f97a0df3
+Last Merged Feature PR on main: #106 — J7 Multi-document selection
+Latest Task PR: #106 — J7 Multi-document selection
+Verified J7 Feature Commit:
+- 6ac9a0406968d3b26db5a8a04ba141a17d286aec — J7 add multi-document conversation selection
+Verified J7 Merge Commit: c519fe270a6383e687e203a360bb7963f97a0df3
+Documentation Baseline: تم تسجيل اكتمال J7 وتسليم J8 — Ready / indexed / runtime-capable document filtering كمهمة حالية؛ أصبح المستخدم المسجل يستطيع إدارة وثائق Conversation يملكها عبر اختيار وثيقة واحدة أو عدة وثائق من وثائقه فقط، وتغيير الاختيار أو إزالته بالكامل باستخدام علاقة `Conversation::documents()` و`sync()`، مع حماية Conversation عبر `ConversationPolicy` والتحقق Server-side من ملكية كل `document_id`. لم تنفذ J7 أي Ready/Indexed/runtime-capable filtering أو Retrieval أو FastAPI أو Qdrant retrieval أو LLM/Chat execution؛ هذه الحدود تبدأ في J8 وما بعدها.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-J6 — Create / list conversations
+J7 — Multi-document selection
 
 Current Phase:
 J — Conversations Database
@@ -143,36 +143,40 @@ Architectural Result:
 - إنشاء Conversation يتم عبر علاقة المستخدم Server-side ولا يثق بـ`user_id` من client، لذلك لا يمكن تزوير ownership.
 - بقي `title` nullable/اختياري وفق schema الحالية، وأضيفت Conversations إلى App Shell / Sidebar.
 - لم تنفذ J6 اختيار Documents أو Messages أو Retrieval أو Chat workflow.
+- أضافت J7 workflow لاختيار وثيقة واحدة أو عدة وثائق وربطها بمحادثة يملكها المستخدم، مع تغيير الاختيار أو إزالته بالكامل لاحقًا.
+- تستخدم J7 علاقة `Conversation::documents()` و`sync()` لمزامنة الاختيار الحالي ومنع duplicate pivot rows، وتعرض فقط وثائق المستخدم الحالي.
+- تحمي J7 الـConversation عبر `ConversationPolicy` وتتحقق Server-side من أن كل `document_id` يعود للمستخدم الحالي، وتغطي owner / other user / guest وترفض cross-user document linking.
+- لا تنفذ J7 أي Ready / Indexed / runtime-capable filtering؛ هذا مؤجل صراحةً إلى J8، كما لا تنفذ Retrieval أو FastAPI أو Qdrant retrieval أو LLM/Chat execution.
 
 Latest Verification:
-PR #105 merged on GitHub: PASS
-PR head commit: 7b8790d0bbc090fd4c5eb09262a4ed02fa1ef5bb
-PR merge commit: eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235
-main verified at J6 merge commit eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235 before this progress update: PASS
+PR #106 merged on GitHub: PASS
+PR head commit: 6ac9a0406968d3b26db5a8a04ba141a17d286aec
+PR merge commit: c519fe270a6383e687e203a360bb7963f97a0df3
+main verified at J7 merge commit c519fe270a6383e687e203a360bb7963f97a0df3 before this progress update: PASS
 
-Focused J6 tests:
-5 passed (19 assertions)
+Focused J7 tests:
+18 passed (73 assertions)
 
 Laravel Pint:
-PASS — 164 files
+PASS
 
 Full Laravel suite:
-188 passed (888 assertions)
+194 passed (923 assertions)
 
 Current Task:
-J7 — Multi-document selection
+J8 — Ready / indexed / runtime-capable document filtering
 
-J6 Completion:
-- أضيف workflow لإنشاء Conversation جديدة.
-- أضيفت صفحة لعرض Conversations الخاصة بالمستخدم الحالي فقط.
-- استخدمت `ConversationPolicy` الموجودة من J5 عبر `viewAny` و`create`.
-- حُصرت Query القائمة بالمستخدم authenticated لمنع تسريب Conversations بين المستخدمين.
-- يتم إنشاء Conversation عبر علاقة المستخدم Server-side.
-- لا يتم الوثوق بـ`user_id` القادم من client ولا يمكن تزوير ownership من خلاله.
-- بقي `title` اختيارياً / nullable وفق schema الحالية.
-- أضيفت Conversations إلى App Shell / Sidebar.
-- لم ينفذ اختيار Documents أو Messages أو Retrieval أو Chat workflow ضمن J6.
-- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي J7 — Multi-document selection.
+J7 Completion:
+- أضيفت صفحة لإدارة وثائق المحادثة.
+- تعرض الصفحة وثائق المستخدم الحالي فقط.
+- يدعم الاختيار وثيقة واحدة أو عدة وثائق.
+- يمكن تغيير الاختيار لاحقًا أو إزالة وثيقة أو إلغاء تحديد جميع الوثائق.
+- تستخدم العلاقة الحالية `Conversation::documents()` مع `sync()` لمزامنة الاختيار ومنع duplicate pivot rows.
+- تتحقق ملكية Conversation عبر `ConversationPolicy`.
+- يتحقق Server-side من أن كل `document_id` يعود للمستخدم الحالي، وتُرفض محاولة ربط وثيقة مملوكة لمستخدم آخر.
+- تغطي الحماية owner / other user / guest.
+- لم ينفذ Ready / Indexed / runtime-capable filtering أو Retrieval أو FastAPI أو Qdrant retrieval أو LLM answer generation أو Messages / Chat execution ضمن J7.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي J8 — Ready / indexed / runtime-capable document filtering.
 
 Open Blockers: none
 ```
@@ -953,7 +957,7 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 | J4 message_sources + processing run / profile provenance | DONE |
 | J5 Conversation policies | DONE |
 | J6 Create / list conversations | DONE |
-| J7 Multi-document selection | TODO |
+| J7 Multi-document selection | DONE |
 | J8 Ready / indexed / runtime-capable document filtering | TODO |
 
 > **J4 finalized in PR #103:** يعتمد `message_sources` على `processing_run_id` للوصول إلى الـProcessingRun ثم Document/Profile/Qdrant provenance دون تكرار حقول مشتقة. أصبح FK الخاص بالـProcessingRun يستخدم `cascadeOnDelete()` بحيث يحذف حذف الـRun مصادرها فقط وتبقى Message نفسها، وتم Consolidate أعمدة `kind` وstage timestamps داخل migration إنشاء ProcessingRun الأصلية مع حذف migration الإضافية القديمة وتحديث اختبارات schema/provenance.
@@ -961,6 +965,8 @@ I6 ← H8/H9/H10 safe states, polling terminals, and user-safe errors
 > **J5 completed in PR #104:** أضيفت `ConversationPolicy` باستخدام Laravel Gate / Policy authorization؛ يسمح للمستخدم المسجل بـ`viewAny` و`create`، بينما تقصر `view` و`update` و`delete` على مالك المحادثة وفق `conversation.user_id === user.id`. لم تضف J5 Routes أو Controllers أو UI أو workflow جديد للمحادثات.
 
 > **J6 completed in PR #105:** أضيف workflow لإنشاء Conversation وصفحة لعرض Conversations الخاصة بالمستخدم الحالي فقط؛ تستخدم القائمة `viewAny` والإنشاء `create` من `ConversationPolicy`، وتبقى القراءة والإنشاء user-scoped Server-side دون الثقة بـ`user_id` من client. بقي `title` nullable وأضيفت Conversations إلى App Shell / Sidebar، دون تنفيذ document selection أو Messages أو Retrieval أو Chat workflow.
+
+> **J7 completed in PR #106:** أضيف workflow لإدارة اختيار وثيقة واحدة أو عدة وثائق للمحادثة، مع عرض وثائق المستخدم الحالي فقط، وتغيير الاختيار أو إزالته بالكامل عبر `Conversation::documents()->sync()`. تحمي `ConversationPolicy` المحادثة، ويتحقق Server-side من ملكية كل `document_id` ويرفض cross-user linking. لا تتضمن J7 Ready/Indexed/runtime-capable filtering؛ هذا مؤجل إلى J8.
 
 كل Document جاهزة تشير إلى `active_processing_run_id`.
 
@@ -2008,7 +2014,7 @@ Full Laravel suite:
 183 passed (869 assertions)
 ```
 
-## آخر مهمة مكتملة — J6 Create / list conversations
+## المهمة السابقة المكتملة — J6 Create / list conversations
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #105، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `eeb5d4d7f1fd6f5ca4fb58ccd42b34dc09855235`.
 
@@ -2045,19 +2051,66 @@ Laravel Pint:
 PASS — 164 files
 ```
 
+## آخر مهمة مكتملة — J7 Multi-document selection
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #106، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `c519fe270a6383e687e203a360bb7963f97a0df3`.
+
+تم تنفيذ:
+
+- إضافة صفحة لإدارة وثائق Conversation يملكها المستخدم.
+- عرض Documents الخاصة بالمستخدم الحالي فقط.
+- دعم اختيار وثيقة واحدة أو عدة وثائق وربطها بالمحادثة.
+- دعم تغيير الاختيار لاحقًا، وإزالة وثيقة، أو إلغاء تحديد جميع الوثائق.
+- استخدام علاقة `Conversation::documents()` الحالية و`sync()` لمزامنة الاختيار ومنع duplicate pivot rows.
+- حماية Conversation عبر `ConversationPolicy`.
+- التحقق Server-side من أن كل `document_id` المرسل يعود للمستخدم الحالي.
+- رفض محاولة ربط وثيقة مملوكة لمستخدم آخر.
+- حماية owner / other user / guest ضمن اختبارات الـworkflow.
+
+حدود J7:
+
+- لا Ready / Indexed / runtime-capable filtering.
+- لا Retrieval.
+- لا FastAPI.
+- لا Qdrant retrieval.
+- لا LLM answer generation.
+- لا Messages / Chat execution.
+- تبقى هذه الجاهزية التشغيلية مؤجلة صراحةً إلى J8 وما بعدها.
+
+### Verification J7
+
+```text
+PR #106 merged on GitHub: PASS
+Feature branch:
+- task/J7-multi-document-selection
+Feature commit:
+- 6ac9a0406968d3b26db5a8a04ba141a17d286aec
+Merge commit:
+- c519fe270a6383e687e203a360bb7963f97a0df3
+
+Focused J7 tests:
+18 passed (73 assertions)
+
+Full Laravel suite:
+194 passed (923 assertions)
+
+Laravel Pint:
+PASS
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-J7 — Multi-document selection
+J8 — Ready / indexed / runtime-capable document filtering
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت J6 ودمجت في main عبر PR #105. أصبح المستخدم المسجل يستطيع إنشاء Conversation مملوكة له Server-side وعرض Conversations الخاصة به فقط، مع استخدام ConversationPolicy عبر viewAny/create، ومنع تزوير ownership عبر user_id القادم من client، وبقاء title nullable.
-لم تنفذ J6 اختيار Documents أو Messages أو Retrieval أو Chat workflow.
-يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفيًا هي J7 — Multi-document selection.
-تبقى J8 وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
+اكتملت J7 ودمجت في main عبر PR #106. أصبح المستخدم المسجل يستطيع اختيار وربط وثيقة واحدة أو عدة وثائق يملكها بمحادثة يملكها، وتغيير الاختيار أو إزالته بالكامل، مع التحقق Server-side من ownership لكل document_id واستخدام sync() للعلاقة الحالية.
+لم تنفذ J7 أي filtering خاص بجاهزية الوثائق أو كونها Indexed/runtime-capable، كما لم تنفذ Retrieval أو FastAPI أو Qdrant retrieval أو LLM/Chat execution.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفيًا هي J8 — Ready / indexed / runtime-capable document filtering.
+تبقى K وما بعدها دون تغيير، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
 ---
