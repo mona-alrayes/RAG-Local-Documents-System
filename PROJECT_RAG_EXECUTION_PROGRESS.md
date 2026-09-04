@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-05
-> **الحالة العامة:** قيد التنفيذ — J8 مكتملة ومدموجة في PR #107؛ أصبح اختيار الوثائق منفصلاً عن صلاحيتها التشغيلية، وأصبحت واجهات الوثائق والمحادثة Reactive عبر Livewire وtargeted conditional polling دون Manual Browser Refresh، والمهمة الحالية هي K1 — Trusted document_targets وفق الـMaster Plan
+> **الحالة العامة:** قيد التنفيذ — K1 مكتملة ومدموجة في PR #108؛ أصبحت الوثائق runtime-capable تتحول إلى `TrustedDocumentTarget` موثوقة Server-side من الـactive indexed ProcessingRun دون الثقة بمعرّفات التشغيل القادمة من Browser، والمهمة الحالية هي K2 — Cloud query embedding / retrieval وفق الـMaster Plan
 
 ---
 
@@ -17,13 +17,13 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 5d4804fec694b26a102802965c28720f0664580e
-Last Merged Feature PR on main: #107 — J8 Ready / indexed / runtime-capable document filtering and reactive UI
-Latest Task PR: #107 — J8 Ready / indexed / runtime-capable document filtering and reactive UI
-Verified J8 Feature Commit:
-- fee362ea9dd031d53e0516ec800ed0ab0b01df29 — J8 runtime-capable document filtering and reactive UI
-Verified J8 Merge Commit: 5d4804fec694b26a102802965c28720f0664580e
-Documentation Baseline: تم تسجيل اكتمال J8 وتسليم K1 — Trusted document_targets كمهمة حالية؛ أصبح `conversation_document` يمثل اختيار/ربط المستخدم فقط، بينما يحدد `ConversationRuntimeDocumentService` مجموعة الوثائق runtime-capable بصورة مستقلة وuser-scoped، مع إعادة استخدام `DocumentAvailabilityResolver` كمصدر الحقيقة للجاهزية والفشل المغلق عند active run مفقودة/فاسدة/cross-document. الوثيقة المختارة غير الجاهزة تبقى مرتبطة بالمحادثة ولا تدخل runtime set، وعندما تصبح جاهزة لاحقاً تدخل تلقائياً دون detach/reattach. كما أصبحت واجهة اختيار وثائق المحادثة Livewire reactive، وتحديثات Workspace/Documents/Sidebar/Document Details تعتمد Laravel/MySQL وPresentation Layer مع targeted conditional Livewire polling وتتوقف عند stable/terminal states. أزيل اعتماد الواجهة على `window.location.reload()` كآلية polling، ويستخدم Livewire navigation عند الحاجة. لم تنفذ J8 Retrieval أو FastAPI query أو Qdrant retrieval أو LLM/Chat execution؛ تبدأ هذه الحدود من K وما بعدها.
+Verified Main Commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
+Last Merged Feature PR on main: #108 — K1 Trusted document_targets
+Latest Task PR: #108 — K1 Trusted document_targets
+Verified K1 Feature Commit:
+- 28759b3fd2df80283fd8d3fba831aaadee569433 — K1 Trusted document_targets
+Verified K1 Merge Commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
+Documentation Baseline: تم تسجيل اكتمال K1 وتسليم K2 — Cloud query embedding / retrieval كمهمة حالية. أصبح المسار الموثوق: Conversation → selected documents → J8 runtime-capable filtering → active indexed ProcessingRun → `TrustedDocumentTarget` → K2 retrieval work. أضافت K1 `TrustedDocumentTarget` كـimmutable typed DTO يحمل فقط `documentId`, `processingRunId`, و`processingProfile`، وأضافت `ConversationDocumentTargetService` التي تعيد استخدام `ConversationRuntimeDocumentService` من J8 ولا تعيد تنفيذ readiness logic. تعتمد targets على `activeProcessingRun` الموثوقة Server-side، وتدعم multi-document وmixed profiles (`cloud`, `hybrid_local`) مع Safe Reprocessing بحيث تبقى active indexed Run القديمة مستخدمة أثناء Processing أو Failed replacement run أحدث. corrupted foreign-document pivot أو cross-document active run لا ينتجان target، والوثائق selected غير الجاهزة تبقى selected ولا تنتج runtime target. Resolution لا يعدل `conversation_document` أو `Document` أو `ProcessingRun`. لم تنفذ K1 query embeddings أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو LLM generation أو context building أو citations أو streaming أو Chat execution؛ تبدأ أعمال Retrieval الفعلية من K2 وما بعدها حسب الـMaster Plan.
 
 Current Working Branch: main
 
@@ -31,7 +31,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-J8 — Ready / indexed / runtime-capable document filtering
+K1 — Trusted document_targets
 
 Current Phase:
 K — Retrieval and Reranking
@@ -156,43 +156,46 @@ Architectural Result:
 - يستمر polling فقط عندما يقرر السيرفر `poll_required`، ويتوقف عند stable/terminal state؛ لا polling دائم ولا Browser polling مباشر إلى FastAPI/Qdrant.
 - أزيل اعتماد الواجهة القديمة على `data-document-poll-url`, `data-document-poll-error`, و`window.location.reload()` كمسار التحديث، ويستخدم `Livewire.navigate()` عند تغير snapshot مع الحفاظ على scroll عند الحاجة.
 - لم تنفذ J8 Retrieval أو FastAPI query أو Qdrant retrieval أو LLM answer generation أو Messages/Chat execution.
+- أضافت K1 `TrustedDocumentTarget` كـ`final readonly` typed DTO يحمل `documentId`, `processingRunId`, و`processingProfile` فقط.
+- أضافت K1 `ConversationDocumentTargetService` التي تعيد استخدام `ConversationRuntimeDocumentService` من J8 وتحوّل الوثائق runtime-capable إلى targets موثوقة دون تكرار readiness logic.
+- تستمد K1 `processingRunId` و`processingProfile` من `activeProcessingRun` الموثوقة Server-side ولا تثق بـruntime identifiers قادمة من Browser.
+- تدعم K1 عدة وثائق وmixed profiles (`cloud`, `hybrid_local`) وتحافظ على Safe Reprocessing باستخدام active indexed Run القديمة أثناء replacement processing/failed.
+- تفشل K1 مغلقًا عند corrupted foreign-document pivot أو cross-document active run، وتبقي selected/unready documents مختارة دون إنتاج target.
+- K1 resolution read-only بالنسبة إلى `conversation_document`, `Document`, و`ProcessingRun`.
+- لم تنفذ K1 query embeddings أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو LLM generation أو context building أو citations أو streaming أو Chat execution.
 
 Latest Verification:
-PR #107 merged on GitHub: PASS
-PR head commit: fee362ea9dd031d53e0516ec800ed0ab0b01df29
-PR merge commit: 5d4804fec694b26a102802965c28720f0664580e
-main verified at J8 merge commit 5d4804fec694b26a102802965c28720f0664580e before this documentation update: PASS
+PR #108 merged on GitHub: PASS
+PR head commit: 28759b3fd2df80283fd8d3fba831aaadee569433
+PR merge commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
+main verified at K1 merge commit 3fc41d4490c46012d314f4a58bf446e3e1946fad before this documentation update: PASS
 
-Focused J8 + reactive tests:
-14 passed (35 assertions)
+K1 focused tests:
+10 passed (22 assertions)
 
-DocumentDetailsPage regression:
-5 passed (23 assertions)
+K1 + J8 regression:
+18 passed (43 assertions)
 
-Laravel Pint:
+Laravel full suite:
+217 passed (978 assertions)
+
+Pint:
 PASS
-
-Frontend production build:
-PASS
-
-Full Laravel suite:
-207 passed (956 assertions)
 
 Current Task:
-K1 — Trusted document_targets
+K2 — Cloud query embedding / retrieval
 
-J8 Completion:
-- أضيف `ConversationRuntimeDocumentService` وفصل selection عن runtime capability.
-- التحقق user-scoped ويفشل مغلقًا عند active run مفقودة/فاسدة/cross-document.
-- يعاد استخدام `DocumentAvailabilityResolver` كمصدر الحقيقة للجاهزية بدل إنشاء lifecycle جديد.
-- selected/unready document تبقى attached وتستبعد من runtime set فقط.
-- عندما تصبح الوثيقة جاهزة لاحقاً تصبح runtime-capable تلقائياً دون detach/reattach.
-- Safe Reprocessing يحافظ على Ready طالما active indexed Run A ما زالت صالحة، مهما كانت latest Run B جارية أو فاشلة.
-- Conversation document selector أصبح Livewire/reactive مع targeted polling للجاهزية المتغيرة في الخلفية.
-- Workspace/Documents/Sidebar/Document Details أصبحت تتحدث تلقائياً عبر Laravel/MySQL + existing presentation services + targeted conditional Livewire polling.
-- أزيلت آلية polling القديمة القائمة على fetch + `window.location.reload()`، ويستخدم Livewire navigation حيث يلزم.
-- لم تضف J8 Retrieval أو FastAPI query أو Qdrant retrieval أو LLM/Chat execution.
-- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K1 — Trusted document_targets.
+K1 Completion:
+- أضيف `TrustedDocumentTarget` كـimmutable typed DTO يحمل `documentId`, `processingRunId`, و`processingProfile`.
+- أضيف `ConversationDocumentTargetService` وأعيد استخدام `ConversationRuntimeDocumentService` من J8 بدل تكرار runtime readiness logic.
+- تستمد targets من `activeProcessingRun` الموثوقة Server-side ولا تثق بـ`processing_run_id` أو Processing Profile أو runtime identifiers قادمة من Browser.
+- يدعم resolution عدة وثائق وmixed profiles: `cloud` و`hybrid_local`.
+- Safe Reprocessing يستخدم active indexed Run القديمة أثناء replacement run الأحدث إذا كانت Processing أو Failed.
+- corrupted foreign-document pivot لا يسرّب target، وcross-document active run لا ينتج target.
+- الوثيقة selected وغير الجاهزة تبقى selected ولا تنتج runtime target.
+- resolution لا يعدل `conversation_document` أو `Document` أو `ProcessingRun`.
+- لم تنفذ K1 query embeddings أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو LLM generation أو context building أو citations أو streaming أو Chat execution.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K2 — Cloud query embedding / retrieval.
 
 Open Blockers: none
 ```
@@ -997,7 +1000,7 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 
 | المهمة | الحالة |
 |---|---|
-| K1 Trusted document_targets | TODO |
+| K1 Trusted document_targets | DONE |
 | K2 Cloud query embedding / retrieval | TODO |
 | K3 Hybrid Local query embedding / retrieval | TODO |
 | K4 user / document / run filters | TODO |
@@ -1007,6 +1010,8 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 | K8 Cross-profile rank fusion | TODO |
 | K9 Metadata / source preservation | TODO |
 | K10 Retrieval quality / security tests | TODO |
+
+> **K1 completed in PR #108:** أضيف `TrustedDocumentTarget` typed/readonly و`ConversationDocumentTargetService` لتحويل ناتج J8 runtime-capable إلى targets موثوقة من active indexed ProcessingRun Server-side. يدعم المسار multi-document وmixed profiles ويحافظ على Safe Reprocessing ويفشل مغلقًا عند corrupted foreign pivot أو cross-document active run، ولا يعدل selection أو Document/ProcessingRun. لم تنفذ K1 query embedding أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو generation/context/citations/streaming/Chat execution.
 
 Cross-profile هنا يعني دمج نتائج وثائق مفهرسة مسبقاً بProfiles مختلفة داخل المحادثة، وليس Upload comparison workflow.
 
@@ -2148,7 +2153,7 @@ Laravel Pint:
 PASS
 ```
 
-## آخر مهمة مكتملة — J8 Ready / indexed / runtime-capable document filtering
+## المهمة السابقة المكتملة — J8 Ready / indexed / runtime-capable document filtering
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #107، والمدمجة في `main` بتاريخ 2026-09-04 عند merge commit `5d4804fec694b26a102802965c28720f0664580e`.
 
@@ -2197,19 +2202,72 @@ Full Laravel suite:
 207 passed (956 assertions)
 ```
 
+## آخر مهمة مكتملة — K1 Trusted document_targets
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #108، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `3fc41d4490c46012d314f4a58bf446e3e1946fad`.
+
+تم تنفيذ:
+
+- إضافة `TrustedDocumentTarget` كـ`final readonly` typed DTO يحمل فقط `documentId`, `processingRunId`, و`processingProfile`.
+- إضافة `ConversationDocumentTargetService` وإعادة استخدام `ConversationRuntimeDocumentService` من J8 بدل تكرار منطق runtime readiness.
+- أخذ `processingRunId` و`processingProfile` من `activeProcessingRun` الموثوقة Server-side، وعدم الثقة بأي processing/runtime identifiers قادمة من Browser.
+- دعم multi-document وmixed profiles: `cloud` و`hybrid_local`.
+- الحفاظ على Safe Reprocessing: active indexed Run القديمة تبقى target المستخدمة إذا كانت replacement run الأحدث Processing أو Failed.
+- corrupted foreign-document pivot لا يسرّب target.
+- cross-document active run لا ينتج target.
+- الوثائق selected لكنها غير جاهزة تبقى selected ولا تنتج runtime target.
+- target resolution لا يعدل `conversation_document` أو `Document` أو `ProcessingRun`.
+
+حدود K1:
+
+- لا query embeddings.
+- لا Qdrant retrieval.
+- لا RRF.
+- لا reranking.
+- لا FastAPI query/retrieval endpoint.
+- لا LLM generation.
+- لا context building.
+- لا citations.
+- لا streaming.
+- لا Chat execution.
+
+### Verification K1
+
+```text
+PR #108 merged on GitHub: PASS
+Feature branch:
+- task/K1-trusted-document-targets
+Feature commit:
+- 28759b3fd2df80283fd8d3fba831aaadee569433
+Merge commit:
+- 3fc41d4490c46012d314f4a58bf446e3e1946fad
+
+K1 focused tests:
+10 passed (22 assertions)
+
+K1 + J8 regression:
+18 passed (43 assertions)
+
+Laravel full suite:
+217 passed (978 assertions)
+
+Laravel Pint:
+PASS
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-K1 — Trusted document_targets
+K2 — Cloud query embedding / retrieval
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت J8 ودمجت في main عبر PR #107. أصبح اختيار Documents في conversation_document مستقلاً عن صلاحيتها التشغيلية؛ selected/unready document تبقى attached، بينما يقرر ConversationRuntimeDocumentService وDocumentAvailabilityResolver أي selected documents تملك active indexed run صحيحة وتستطيع دخول runtime RAG بصورة fail-closed وuser-scoped.
-أصبحت واجهة Conversation document selector Livewire/reactive، كما أصبحت Workspace/Documents/Sidebar/Document Details تتحدث تلقائياً من Laravel/MySQL عبر Presentation Layer وtargeted conditional Livewire polling الذي يتوقف عند stable/terminal state، دون window.location.reload() polling أو Browser access مباشر إلى FastAPI/Qdrant.
-لم تنفذ J8 Retrieval أو FastAPI query أو Qdrant retrieval أو LLM/Chat execution.
-يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K1 — Trusted document_targets.
+اكتملت K1 ودمجت في main عبر PR #108. أصبح المسار من Conversation إلى Retrieval يبدأ من selected documents، ثم J8 runtime-capable filtering، ثم active indexed ProcessingRun الموثوقة، ثم TrustedDocumentTarget التي تحمل documentId وprocessingRunId وprocessingProfile فقط.
+ConversationDocumentTargetService يعيد استخدام ConversationRuntimeDocumentService ولا يثق بأي runtime identifiers من Browser، ويدعم multi-document وmixed profiles ويحافظ على Safe Reprocessing ويغلق الحالات الفاسدة دون تعديل selection أو Document/ProcessingRun.
+لم تنفذ K1 query embeddings أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو LLM generation أو context building أو citations أو streaming أو Chat execution.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K2 — Cloud query embedding / retrieval.
 تبقى K وما بعدها دون تغيير من حيث الترقيم، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
