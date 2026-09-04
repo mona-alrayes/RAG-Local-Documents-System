@@ -275,7 +275,6 @@
                         class="group rounded-2xl border border-white/10 bg-navy-900/70 p-5 transition hover:border-white/20 hover:bg-navy-900"
                     >
                         <div class="flex min-w-0 items-start gap-4">
-                            {{-- File icon --}}
                             <div
                                 class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-cyan-300 sm:flex"
                                 aria-hidden="true"
@@ -283,7 +282,6 @@
                                 {{ strtoupper($document->fileType->value) }}
                             </div>
 
-                            {{-- Main information --}}
                             <div class="min-w-0 flex-1">
                                 <div class="flex min-w-0 items-start justify-between gap-3">
                                     <div class="min-w-0">
@@ -304,7 +302,10 @@
                                         @endif
                                     </div>
 
-                                    <x-documents.actions-menu :document="$document" />
+                                    <x-documents.actions-menu
+                                        :document="$document"
+                                        :available-processing-profiles="$availableProcessingProfiles"
+                                    />
                                 </div>
 
                                 <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs text-mist-300">
@@ -360,7 +361,6 @@
                 </div>
             @endif
         @elseif (! $hasAnyDocuments)
-            {{-- Account has no documents --}}
             <section
                 class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-6 py-14 text-center"
             >
@@ -380,7 +380,6 @@
                 </p>
             </section>
         @else
-            {{-- Filters returned no results --}}
             <section
                 class="rounded-2xl border border-dashed border-white/15 bg-navy-900/50 px-6 py-14 text-center"
             >

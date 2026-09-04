@@ -1,5 +1,6 @@
 @props([
     'document',
+    'availableProcessingProfiles' => [],
 ])
 
 @php
@@ -7,6 +8,29 @@
     $deleteModal = 'delete-document-' . $document->id;
 
     $activeProfile = $document->activeRun?->profile;
+
+    $activeProfileIsAvailable =
+        $activeProfile !== null
+        && in_array(
+            $activeProfile,
+            $availableProcessingProfiles,
+            true,
+        );
+
+    $canReprocess =
+        $document->canReprocess
+        && $activeProfileIsAvailable;
+
+    $canPreview =
+        $document->canDownload
+        && in_array(
+            $document->fileType,
+            [
+                \App\Enums\FileType::Pdf,
+                \App\Enums\FileType::Txt,
+            ],
+            true,
+        );
 @endphp
 
 <div class="shrink-0">
@@ -21,7 +45,7 @@
         />
 
         <flux:menu>
-            {{-- عرض الوثيقة --}}
+            {{-- Document details --}}
             <flux:menu.item
                 icon="eye"
                 href="{{ route('documents.show', $document->id) }}"
@@ -29,7 +53,19 @@
                 عرض التفاصيل
             </flux:menu.item>
 
-            {{-- تحميل الوثيقة --}}
+            {{-- Browser preview --}}
+            @if ($canPreview)
+                <flux:menu.item
+                    icon="eye"
+                    href="{{ route('documents.preview', $document->id) }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    عرض الملف
+                </flux:menu.item>
+            @endif
+
+            {{-- Download --}}
             @if ($document->canDownload)
                 <flux:menu.item
                     icon="arrow-down-tray"
@@ -48,8 +84,8 @@
 
             <flux:menu.separator />
 
-            {{-- إعادة المعالجة --}}
-            @if ($document->canReprocess && $activeProfile !== null)
+            {{-- Reprocess --}}
+            @if ($canReprocess)
                 <flux:modal.trigger :name="$reprocessModal">
                     <flux:menu.item icon="arrow-path">
                         إعادة المعالجة
@@ -64,7 +100,7 @@
                 </flux:menu.item>
             @endif
 
-            {{-- حذف الوثيقة --}}
+            {{-- Delete --}}
             @if ($document->canDelete)
                 <flux:modal.trigger :name="$deleteModal">
                     <flux:menu.item
@@ -86,8 +122,8 @@
         </flux:menu>
     </flux:dropdown>
 
-    {{-- نافذة تأكيد إعادة المعالجة --}}
-    @if ($document->canReprocess && $activeProfile !== null)
+    {{-- Reprocess confirmation modal --}}
+    @if ($canReprocess)
         <flux:modal
             :name="$reprocessModal"
             class="md:w-96"
@@ -102,6 +138,7 @@
                         سيتم بدء معالجة جديدة للوثيقة
                         "{{ $document->title ?: $document->originalName }}"
                         باستخدام نفس طريقة المعالجة الحالية:
+
                         <span class="font-semibold text-ice-100">
                             {{ __('documents.processing_run.profile.' . $activeProfile->value) }}
                         </span>
@@ -142,7 +179,7 @@
         </flux:modal>
     @endif
 
-    {{-- نافذة تأكيد الحذف --}}
+    {{-- Delete confirmation modal --}}
     @if ($document->canDelete)
         <flux:modal
             :name="$deleteModal"
