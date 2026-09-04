@@ -24,23 +24,7 @@
             && $activeRun->id !== $latestAttempt->id;
     @endphp
 
-    <div
-        class="min-w-0 space-y-8"
-        @if ($document->pollRequired)
-            data-document-poll-url="{{ route('documents.poll', $document->id) }}"
-        @endif
-    >
-        @if ($document->pollRequired)
-            <p
-                data-document-poll-error
-                role="alert"
-                hidden
-                class="break-words rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-200"
-            >
-                {{ __('documents.polling.update_failed') }}
-            </p>
-        @endif
-
+    <div class="min-w-0 space-y-8">
         {{-- Header --}}
         <header class="min-w-0 space-y-5">
             <a
