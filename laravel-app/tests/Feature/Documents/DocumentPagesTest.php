@@ -3,8 +3,10 @@
 namespace Tests\Feature\Documents;
 
 use App\Enums\DocumentStatus;
+use App\Enums\ProcessingProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class DocumentPagesTest extends TestCase
@@ -181,6 +183,124 @@ class DocumentPagesTest extends TestCase
             ->assertSee('file_type=pdf&amp;page=2', false);
     }
 
+    public function test_index_displays_profiles_and_disables_unavailable_profile_without_fallback(): void
+    {
+        $user = User::factory()->create();
+
+        Http::fake([
+            '*' => Http::response([
+                'available_profiles' => [
+                    ProcessingProfile::Cloud->value,
+                ],
+            ]),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get('/documents');
+
+        $response
+            ->assertOk()
+            ->assertViewHas(
+                'availableProcessingProfiles',
+                fn (array $profiles): bool => $profiles === [
+                    ProcessingProfile::Cloud,
+                ],
+            )
+            ->assertSee('سحابي')
+            ->assertSee('محلي هجين')
+            ->assertSee('غير متاح حاليًا');
+
+        $dom = new \DOMDocument;
+
+        @$dom->loadHTML($response->getContent());
+
+        $xpath = new \DOMXPath($dom);
+
+        $fileInput = $xpath
+            ->query('//input[@name="document" and @type="file"]')
+            ->item(0);
+
+        $cloudInput = $xpath
+            ->query('//input[@name="processing_profile" and @value="cloud"]')
+            ->item(0);
+
+        $hybridLocalInput = $xpath
+            ->query('//input[@name="processing_profile" and @value="hybrid_local"]')
+            ->item(0);
+
+        $this->assertNotNull($fileInput);
+        $this->assertFalse($fileInput->hasAttribute('multiple'));
+        $this->assertSame(
+            '.pdf,.docx,.txt',
+            $fileInput->getAttribute('accept'),
+        );
+
+        $this->assertNotNull($cloudInput);
+        $this->assertFalse(
+            $cloudInput->hasAttribute('disabled'),
+        );
+
+        $this->assertNotNull($hybridLocalInput);
+        $this->assertTrue(
+            $hybridLocalInput->hasAttribute('disabled'),
+        );
+    }
+
+    public function test_index_disables_upload_when_no_processing_profile_is_available(): void
+    {
+        $user = User::factory()->create();
+
+        Http::fake([
+            '*' => Http::response([
+                'available_profiles' => [],
+            ]),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get('/documents');
+
+        $response
+            ->assertOk()
+            ->assertViewHas(
+                'availableProcessingProfiles',
+                fn (array $profiles): bool => $profiles === [],
+            )
+            ->assertSee(
+                'لا توجد طريقة معالجة متاحة حاليًا. يرجى المحاولة لاحقًا.',
+            );
+
+        $this->assertUploadControlsAreDisabled($response->getContent());
+    }
+
+    public function test_index_fails_closed_when_capability_response_is_invalid(): void
+    {
+        $user = User::factory()->create();
+
+        Http::fake([
+            '*' => Http::response([
+                'available_profiles' => 'invalid',
+            ]),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get('/documents');
+
+        $response
+            ->assertOk()
+            ->assertViewHas(
+                'availableProcessingProfiles',
+                fn (array $profiles): bool => $profiles === [],
+            )
+            ->assertSee(
+                'لا توجد طريقة معالجة متاحة حاليًا. يرجى المحاولة لاحقًا.',
+            );
+
+        $this->assertUploadControlsAreDisabled($response->getContent());
+    }
+
     public function test_owner_can_view_their_document_details(): void
     {
         $owner = User::factory()->create();
@@ -223,5 +343,43 @@ class DocumentPagesTest extends TestCase
             ->actingAs($otherUser)
             ->get("/documents/{$document->id}")
             ->assertForbidden();
+    }
+
+    private function assertUploadControlsAreDisabled(string $html): void
+    {
+        $dom = new \DOMDocument;
+
+        @$dom->loadHTML($html);
+
+        $xpath = new \DOMXPath($dom);
+
+        $cloudInput = $xpath
+            ->query('//input[@name="processing_profile" and @value="cloud"]')
+            ->item(0);
+
+        $hybridLocalInput = $xpath
+            ->query('//input[@name="processing_profile" and @value="hybrid_local"]')
+            ->item(0);
+
+        $submitButton = $xpath
+            ->query(
+                '//button[@type="submit" and contains(normalize-space(.), "رفع الوثيقة")]',
+            )
+            ->item(0);
+
+        $this->assertNotNull($cloudInput);
+        $this->assertTrue(
+            $cloudInput->hasAttribute('disabled'),
+        );
+
+        $this->assertNotNull($hybridLocalInput);
+        $this->assertTrue(
+            $hybridLocalInput->hasAttribute('disabled'),
+        );
+
+        $this->assertNotNull($submitButton);
+        $this->assertTrue(
+            $submitButton->hasAttribute('disabled'),
+        );
     }
 }

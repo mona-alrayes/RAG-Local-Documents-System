@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -122,69 +123,49 @@ class DocumentUploadValidationTest extends TestCase
         }
     }
 
-    private function createDocxUpload(string $name): UploadedFile
+    public function test_upload_fails_safely_when_selected_processing_profile_becomes_unavailable(): void
     {
-        return $this->createZipUpload($name, [
-            '[Content_Types].xml' => <<<'XML'
-                <?xml version="1.0" encoding="UTF-8"?>
-                <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-                    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-                    <Default Extension="xml" ContentType="application/xml"/>
-                    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-                </Types>
-                XML,
-            '_rels/.rels' => <<<'XML'
-                <?xml version="1.0" encoding="UTF-8"?>
-                <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-                    <Relationship
-                        Id="rId1"
-                        Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
-                        Target="word/document.xml"
-                    />
-                </Relationships>
-                XML,
-            'word/document.xml' => <<<'XML'
-                <?xml version="1.0" encoding="UTF-8"?>
-                <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                    <w:body>
-                        <w:p><w:r><w:t>Test document</w:t></w:r></w:p>
-                    </w:body>
-                </w:document>
-                XML,
+        Queue::fake();
+
+        Storage::fake('documents');
+        Storage::fake('document_quarantine');
+
+        config()->set(
+            'security.document_security_scan.enabled',
+            false,
+        );
+
+        Http::fake([
+            '*' => Http::response([
+                'available_profiles' => [],
+            ]),
         ]);
-    }
 
-    /**
-     * @param  array<string, string>  $entries
-     */
-    private function createZipUpload(string $name, array $entries): UploadedFile
-    {
-        $path = tempnam(sys_get_temp_dir(), 'docx-');
+        $user = User::factory()->create();
 
-        if ($path === false) {
-            throw new RuntimeException('Unable to create the DOCX test file.');
-        }
+        $response = $this
+            ->actingAs($user)
+            ->post('/documents', [
+                'document' => UploadedFile::fake()->createWithContent(
+                    'capability-race.txt',
+                    "Document content.\n",
+                ),
+                'processing_profile' => 'cloud',
+            ]);
 
-        $zip = new ZipArchive;
+        $response
+            ->assertRedirectToRoute('documents.index')
+            ->assertSessionHas(
+                'error',
+                __('documents.commands.upload.profile_unavailable'),
+            );
 
-        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new RuntimeException('Unable to open the DOCX test archive.');
-        }
+        $this->assertDatabaseCount(
+            'document_processing_runs',
+            0,
+        );
 
-        foreach ($entries as $entryName => $content) {
-            $zip->addFromString($entryName, $content);
-        }
-
-        $zip->close();
-
-        $content = file_get_contents($path);
-        unlink($path);
-
-        if ($content === false) {
-            throw new RuntimeException('Unable to read the DOCX test file.');
-        }
-
-        return UploadedFile::fake()->createWithContent($name, $content);
+        Queue::assertNothingPushed();
     }
 
     public function test_mismatched_or_malformed_document_content_is_rejected(): void
@@ -248,7 +229,10 @@ class DocumentUploadValidationTest extends TestCase
 
     public function test_document_exceeding_the_configured_size_limit_is_rejected(): void
     {
-        config()->set('documents.upload.max_size_kilobytes', 1);
+        config()->set(
+            'documents.upload.max_size_kilobytes',
+            1,
+        );
 
         $user = User::factory()->create();
 
@@ -268,5 +252,93 @@ class DocumentUploadValidationTest extends TestCase
             ->assertJsonValidationErrors('document');
 
         $this->assertDatabaseCount('documents', 0);
+    }
+
+    private function createDocxUpload(string $name): UploadedFile
+    {
+        return $this->createZipUpload($name, [
+            '[Content_Types].xml' => <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+                    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+                    <Default Extension="xml" ContentType="application/xml"/>
+                    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+                </Types>
+                XML,
+            '_rels/.rels' => <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                    <Relationship
+                        Id="rId1"
+                        Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+                        Target="word/document.xml"
+                    />
+                </Relationships>
+                XML,
+            'word/document.xml' => <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                    <w:body>
+                        <w:p><w:r><w:t>Test document</w:t></w:r></w:p>
+                    </w:body>
+                </w:document>
+                XML,
+        ]);
+    }
+
+    /**
+     * @param  array<string, string>  $entries
+     */
+    private function createZipUpload(
+        string $name,
+        array $entries,
+    ): UploadedFile {
+        $path = tempnam(
+            sys_get_temp_dir(),
+            'docx-',
+        );
+
+        if ($path === false) {
+            throw new RuntimeException(
+                'Unable to create the DOCX test file.',
+            );
+        }
+
+        $zip = new ZipArchive;
+
+        if (
+            $zip->open(
+                $path,
+                ZipArchive::CREATE | ZipArchive::OVERWRITE,
+            ) !== true
+        ) {
+            throw new RuntimeException(
+                'Unable to open the DOCX test archive.',
+            );
+        }
+
+        foreach ($entries as $entryName => $content) {
+            $zip->addFromString(
+                $entryName,
+                $content,
+            );
+        }
+
+        $zip->close();
+
+        $content = file_get_contents($path);
+
+        unlink($path);
+
+        if ($content === false) {
+            throw new RuntimeException(
+                'Unable to read the DOCX test file.',
+            );
+        }
+
+        return UploadedFile::fake()->createWithContent(
+            $name,
+            $content,
+        );
     }
 }
