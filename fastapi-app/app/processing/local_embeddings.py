@@ -40,11 +40,23 @@ class LocalBgeM3Embedder:
         self._dtype = runtime.selected_dtype
         self._coordinator = coordinator
 
-    def embed(self, chunks: list[NormalizedChunk]) -> list[list[float]]:
+    def embed(
+        self,
+        chunks: list[NormalizedChunk],
+    ) -> list[list[float]]:
         if not chunks:
             return []
 
-        texts = [chunk.text for chunk in chunks]
+        return self.embed_texts(
+            [chunk.text for chunk in chunks],
+        )
+
+    def embed_texts(
+        self,
+        texts: list[str],
+    ) -> list[list[float]]:
+        if not texts:
+            return []
 
         with self._coordinator.lease(
             model_id=self._model_id,
@@ -55,7 +67,10 @@ class LocalBgeM3Embedder:
                 texts,
             )
 
-        self._validate_vectors(vectors, chunks)
+        self._validate_vectors(
+            vectors=vectors,
+            expected_count=len(texts),
+        )
 
         return vectors
 
@@ -73,10 +88,12 @@ class LocalBgeM3Embedder:
             tokenizer = transformers.AutoTokenizer.from_pretrained(
                 self._model_id
             )
+
             model = transformers.AutoModel.from_pretrained(
                 self._model_id,
                 torch_dtype=torch_dtype,
             )
+
             model = model.to(self._device)
             model.eval()
 
@@ -103,6 +120,7 @@ class LocalBgeM3Embedder:
                 truncation=True,
                 return_tensors="pt",
             )
+
             inputs = {
                 key: value.to(self._device)
                 for key, value in inputs.items()
@@ -110,6 +128,7 @@ class LocalBgeM3Embedder:
 
             with resources.torch.inference_mode():
                 outputs = resources.model(**inputs)
+
                 dense_vectors = outputs.last_hidden_state[:, 0]
 
             return cast(
@@ -124,19 +143,24 @@ class LocalBgeM3Embedder:
 
     @staticmethod
     def _validate_vectors(
+        *,
         vectors: list[list[float]],
-        chunks: list[NormalizedChunk],
+        expected_count: int,
     ) -> None:
-        if len(vectors) != len(chunks):
+        if (
+            not isinstance(vectors, list)
+            or len(vectors) != expected_count
+        ):
             raise ApplicationException(
                 code="local_embedding_result_invalid",
                 message=(
-                    "Local embedding result count does not match chunk count."
+                    "Local embedding result count does not match input count."
                 ),
             )
 
         if any(
-            len(vector) != LOCAL_EMBEDDING_DIMENSION
+            not isinstance(vector, list)
+            or len(vector) != LOCAL_EMBEDDING_DIMENSION
             for vector in vectors
         ):
             raise ApplicationException(
@@ -148,7 +172,9 @@ class LocalBgeM3Embedder:
             )
 
     @staticmethod
-    def _resolve_torch_device(backend: RuntimeBackend) -> str:
+    def _resolve_torch_device(
+        backend: RuntimeBackend,
+    ) -> str:
         if backend in {
             RuntimeBackend.CUDA,
             RuntimeBackend.ROCM,
