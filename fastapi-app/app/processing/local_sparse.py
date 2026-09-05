@@ -18,12 +18,18 @@ class SparseEmbeddingResult(Protocol):
 
 
 class SparseEmbedder(Protocol):
-    def embed(self, texts: list[str]) -> Iterable[SparseEmbeddingResult]:
+    def embed(
+        self,
+        texts: list[str],
+    ) -> Iterable[SparseEmbeddingResult]:
         ...
 
 
 class LocalBm25Representer:
-    def __init__(self, embedder: SparseEmbedder | None = None) -> None:
+    def __init__(
+        self,
+        embedder: SparseEmbedder | None = None,
+    ) -> None:
         if embedder is not None:
             self._embedder = embedder
             return
@@ -41,13 +47,34 @@ class LocalBm25Representer:
                 message="Local BM25 model failed to load.",
             ) from exc
 
-    def represent(self, chunks: list[NormalizedChunk]) -> list[models.SparseVector]:
-        if not chunks:
+    def represent(
+        self,
+        chunks: list[NormalizedChunk],
+    ) -> list[models.SparseVector]:
+        return self._represent_texts(
+            [chunk.text for chunk in chunks]
+        )
+
+    def represent_query(
+        self,
+        question: str,
+    ) -> models.SparseVector:
+        vectors = self._represent_texts(
+            [question.strip()]
+        )
+
+        return vectors[0]
+
+    def _represent_texts(
+        self,
+        texts: list[str],
+    ) -> list[models.SparseVector]:
+        if not texts:
             return []
 
         try:
             embeddings = list(
-                self._embedder.embed([chunk.text for chunk in chunks])
+                self._embedder.embed(texts)
             )
         except Exception as exc:
             raise ApplicationException(
@@ -55,17 +82,26 @@ class LocalBm25Representer:
                 message="Local BM25 representation failed.",
             ) from exc
 
-        if len(embeddings) != len(chunks):
+        if len(embeddings) != len(texts):
             raise ApplicationException(
                 code="local_sparse_result_invalid",
-                message="Local BM25 result count does not match chunk count.",
+                message=(
+                    "Local BM25 result count does not "
+                    "match input count."
+                ),
             )
 
         vectors: list[models.SparseVector] = []
 
         for embedding in embeddings:
-            indices = [int(index) for index in embedding.indices]
-            values = [float(value) for value in embedding.values]
+            indices = [
+                int(index)
+                for index in embedding.indices
+            ]
+            values = [
+                float(value)
+                for value in embedding.values
+            ]
 
             if len(indices) != len(values):
                 raise ApplicationException(
