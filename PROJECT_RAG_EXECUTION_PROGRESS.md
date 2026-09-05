@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-05
-> **الحالة العامة:** قيد التنفيذ — K2 مكتملة ومدموجة في PR #109؛ أضيف مسار Cloud query embedding / dense retrieval الآمن داخل FastAPI باستخدام Jina وQdrant ضمن trusted user/document/run/profile scope، والمهمة الحالية هي K3 — Hybrid Local query embedding / retrieval وفق الـMaster Plan
+> **الحالة العامة:** قيد التنفيذ — K3 مكتملة ومدموجة في PR #110؛ أضيف مسار Hybrid Local query embedding / dense retrieval الآمن داخل FastAPI باستخدام BGE-M3 وQdrant ضمن trusted user/document/run/profile scope، والمهمة الحالية هي K4 — user / document / run filters وفق الـMaster Plan
 
 ---
 
@@ -17,16 +17,19 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: d512feb1100c7d1fa791340bcfb9eac92b3cbb84
-Last Merged Feature PR on main: #109 — K2 Cloud Query Embedding / Retrieval
-Latest Task PR: #109 — K2 Cloud Query Embedding / Retrieval
+Verified Main Commit: c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b
+Last Merged Feature PR on main: #110 — K3 Hybrid Local Query Embedding / Retrieval
+Latest Task PR: #110 — K3 Hybrid Local Query Embedding / Retrieval
 Verified K1 Feature Commit:
 - 28759b3fd2df80283fd8d3fba831aaadee569433 — K1 Trusted document_targets
 Verified K1 Merge Commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
 Verified K2 Feature Commit:
 - 608b50955616c96f898c51f5080ceb98beb503d2 — K2 Cloud Query Embedding / Retrieval
 Verified K2 Merge Commit: d512feb1100c7d1fa791340bcfb9eac92b3cbb84
-Documentation Baseline: تم تسجيل اكتمال K2 وتسليم K3 — Hybrid Local query embedding / retrieval كمهمة حالية. أضافت K2 مسار Cloud retrieval داخل FastAPI: يحول `CloudJinaQueryEmbedder` السؤال إلى Jina embedding باستخدام `task = retrieval.query` وبُعد `1024`، ويرفض blank query قبل استدعاء provider ويحافظ على retry semantics الحالية ويفشل مغلقًا عند malformed أو wrong-dimension provider results. تستخدم `CloudRetrievalService` و`QdrantCloudDenseRetriever` `resolve_qdrant_collection()` Server-side وnamed vector `dense_vector`، وتفرض دائماً trusted scope على `user_id`, `document_id`, `processing_run_id`, و`processing_profile = cloud` مع defensive validation لكل Qdrant result. لا تعاد raw vectors، ولا يوجد unfiltered retrieval أو fallback إلى Hybrid Local. تعيد K2 typed retrieval results فقط ولا تنفذ LLM generation أو context building أو citations أو Chat execution. وفق الـMaster Plan تبدأ الخطوة التالية حرفياً من K3 — Hybrid Local query embedding / retrieval.
+Verified K3 Feature Commit:
+- 21ea644202f03d0430682d4e37c4464d4205b8fa — K3 Hybrid Local Query Embedding / Retrieval
+Verified K3 Merge Commit: c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b
+Documentation Baseline: تم تسجيل اكتمال K3 وتسليم K4 — user / document / run filters كمهمة حالية. أضافت K3 مسار Hybrid Local retrieval داخل FastAPI: يحول query محلياً باستخدام نفس `BAAI/bge-m3` ونفس Local embedding semantics المستخدمة لفهرسة الوثائق وبُعد `1024`، مع إعادة استخدام `LocalModelCoordinator` دون lifecycle منفصل. تستخدم `HybridLocalRetrievalService` و`QdrantHybridLocalDenseRetriever` Hybrid Local collection المحلولة Server-side وnamed vector `dense_vector`، وتفرض trusted scope على `user_id`, `document_id`, `processing_run_id`, و`processing_profile = hybrid_local` مع defensive validation للنتائج. تستخدم `with_vectors=False` وتعيد typed retrieval results فقط، وتفشل Fail-Closed عند runtime/model/inference/scope failures، ولا يوجد Local → Cloud fallback. لم تدخل K3 في K4/K5 أو BM25/RRF/reranking/generation. وفق الـMaster Plan تبدأ الخطوة التالية حرفياً من K4 — user / document / run filters.
 
 Current Working Branch: main
 
@@ -34,7 +37,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-K2 — Cloud Query Embedding / Retrieval
+K3 — Hybrid Local Query Embedding / Retrieval
 
 Current Phase:
 K — Retrieval and Reranking
@@ -172,25 +175,28 @@ Architectural Result:
 - تقيد K2 كل Qdrant query بـ`user_id`, `document_id`, `processing_run_id`, و`processing_profile = cloud`، ثم تعيد التحقق دفاعياً من payload كل result قبل تحويله.
 - لا تعيد K2 raw vectors (`with_vectors=False`) وتعيد typed `CloudRetrievalResult` فقط.
 - لا يوجد unfiltered retrieval ولا fallback من Cloud إلى Hybrid Local، ولا LLM generation أو context building أو citations أو Chat execution ضمن K2.
+- أضافت K3 Hybrid Local query embedding باستخدام نفس `BAAI/bge-m3` ونفس Local embedding semantics المستخدمة في document indexing وبُعد `1024`.
+- تعيد K3 استخدام `LocalModelCoordinator` نفسه دون query-specific model lifecycle.
+- أضافت K3 `HybridLocalRetrievalService` و`QdrantHybridLocalDenseRetriever` مع Hybrid Local collection محلولة Server-side وnamed vector `dense_vector`.
+- تقيد K3 retrieval بـ`user_id`, `document_id`, `processing_run_id`, و`processing_profile = hybrid_local`، وتتحقق دفاعياً من scope النتائج.
+- تستخدم K3 `with_vectors=False` وتعيد typed retrieval results فقط، وتفشل مغلقاً عند runtime/model/inference/scope failures دون Local → Cloud fallback.
+- لم تدخل K3 في K4/K5 أو BM25/RRF أو reranking أو generation.
 
 Latest Verification:
-PR #109 merged on GitHub: PASS
-PR title: feat(K2): add cloud query retrieval
-PR head commit: 608b50955616c96f898c51f5080ceb98beb503d2
-PR merge commit: d512feb1100c7d1fa791340bcfb9eac92b3cbb84
-main verified at K2 merge commit d512feb1100c7d1fa791340bcfb9eac92b3cbb84 before this documentation update: PASS
+PR #110 merged on GitHub: PASS
+PR title: feat(K3): add hybrid local query retrieval
+PR head commit: 21ea644202f03d0430682d4e37c4464d4205b8fa
+PR merge commit: c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b
+main verified at K3 merge commit c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b before this documentation update: PASS
 
-K2 focused tests:
-16 passed
+K3 focused/regression tests:
+44 passed
 
 FastAPI full suite:
-173 passed
-
-Regression note:
-ظهر اختبار قديم غير متعلق بـK2 مرة واحدة كـflaky network/redirect failure؛ مر منفرداً 5/5 مرات، ثم مر FastAPI full suite كاملاً بـ173 passed. لا يسجل ذلك كـK2 defect.
+192 passed
 
 Current Task:
-K3 — Hybrid Local query embedding / retrieval
+K4 — user / document / run filters
 
 K1 Completion:
 - أضيف `TrustedDocumentTarget` كـimmutable typed DTO يحمل `documentId`, `processingRunId`, و`processingProfile`.
@@ -214,7 +220,17 @@ K2 Completion:
 - لا يوجد unfiltered retrieval ولا fallback إلى Hybrid Local.
 - تعيد K2 typed retrieval results فقط ولا تولد جواب LLM.
 - Out of Scope: K3 Hybrid Local query embedding / retrieval، generalized K4 filtering، BM25 / RRF، reranking، cross-profile fusion، LLM generation، context building، citations، Chat execution، streaming، UI / Livewire، Laravel Chat orchestration، migrations.
-- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K3 — Hybrid Local query embedding / retrieval.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` كانت K3 — Hybrid Local query embedding / retrieval.
+
+K3 Completion:
+- يستخدم Hybrid Local query embedding نفس `BAAI/bge-m3` المستخدم لفهرسة الوثائق وبُعد `1024`.
+- يعاد استخدام نفس Local embedding semantics ونفس `LocalModelCoordinator`.
+- تُحل Hybrid Local Qdrant collection Server-side ويستخدم dense retrieval `dense_vector`.
+- trusted scope: `user_id`, `document_id`, `processing_run_id`, و`processing_profile = hybrid_local`.
+- `with_vectors=False`؛ typed retrieval results فقط.
+- runtime/model/inference/scope failures تفشل Fail-Closed، ولا يوجد Local → Cloud fallback.
+- Out of Scope: K4 generalized filters، K5 Dense + BM25 + RRF، BM25/RRF، reranking، generation.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K4 — user / document / run filters.
 
 Open Blockers: none
 ```
@@ -1021,7 +1037,7 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 |---|---|
 | K1 Trusted document_targets | DONE |
 | K2 Cloud query embedding / retrieval | DONE |
-| K3 Hybrid Local query embedding / retrieval | TODO |
+| K3 Hybrid Local query embedding / retrieval | DONE |
 | K4 user / document / run filters | TODO |
 | K5 Per-profile Dense + BM25 + RRF | TODO |
 | K6 Cloud Jina reranker | TODO |
@@ -1033,6 +1049,8 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 > **K1 completed in PR #108:** أضيف `TrustedDocumentTarget` typed/readonly و`ConversationDocumentTargetService` لتحويل ناتج J8 runtime-capable إلى targets موثوقة من active indexed ProcessingRun Server-side. يدعم المسار multi-document وmixed profiles ويحافظ على Safe Reprocessing ويفشل مغلقًا عند corrupted foreign pivot أو cross-document active run، ولا يعدل selection أو Document/ProcessingRun. لم تنفذ K1 query embedding أو Qdrant retrieval أو RRF أو reranking أو FastAPI query/retrieval endpoint أو generation/context/citations/streaming/Chat execution.
 
 > **K2 completed in PR #109:** أضيف Cloud query embedding باستخدام Jina `retrieval.query` ببُعد `1024` ومسار dense retrieval عبر Qdrant مع Server-side collection resolution وnamed vector `dense_vector`. يرفض blank query قبل provider call، ويحافظ على Jina retry semantics، ويفشل مغلقًا عند malformed/wrong-dimension embeddings. يفرض retrieval دائماً `user_id/document_id/processing_run_id/processing_profile=cloud` ويتحقق دفاعياً من كل result، ولا يعيد raw vectors أو يسمح unfiltered retrieval أو fallback إلى Hybrid Local. المخرجات typed retrieval results فقط؛ لا LLM generation أو context/citations/Chat execution ضمن K2.
+
+> **K3 completed in PR #110:** أضيف Hybrid Local query embedding باستخدام نفس `BAAI/bge-m3` ونفس Local embedding semantics المستخدمة لفهرسة الوثائق وبُعد `1024`، مع إعادة استخدام `LocalModelCoordinator` نفسه. يستخدم dense retrieval عبر `dense_vector` داخل Hybrid Local Qdrant collection المحلولة Server-side، ويقيد كل retrieval بالـtrusted scope `user_id/document_id/processing_run_id/processing_profile=hybrid_local` مع defensive scope validation. تستخدم النتائج `with_vectors=False` وتعود typed فقط، ويفشل المسار مغلقاً عند runtime/model/inference/scope failures دون Local → Cloud fallback. لم تدخل K3 في K4/K5 أو BM25/RRF/reranking/generation.
 
 Cross-profile هنا يعني دمج نتائج وثائق مفهرسة مسبقاً بProfiles مختلفة داخل المحادثة، وليس Upload comparison workflow.
 
@@ -1447,6 +1465,31 @@ QdrantCloudDenseRetriever
 - لا يوجد unfiltered retrieval أو fallback إلى Hybrid Local.
 - BM25/RRF/reranking/cross-profile fusion/generation/context/citations/Chat execution ليست ضمن K2.
 
+## 9.5 K3 Hybrid Local Query Embedding / Dense Retrieval
+
+الموجود بعد PR #110:
+
+```text
+LocalBgeM3QueryEmbedder
+HybridLocalRetrievalService
+HybridLocalRetrievalTarget
+HybridLocalRetrievalResult
+QdrantHybridLocalDenseRetriever
+```
+
+العقد:
+
+- Query embedding يستخدم نفس `BAAI/bge-m3` ونفس Local embedding semantics المستخدمة لفهرسة الوثائق وبُعد `1024`.
+- يعاد استخدام `LocalModelCoordinator` نفسه دون lifecycle منفصل للـquery.
+- Hybrid Local collection تحدد Server-side عبر `resolve_qdrant_collection()`.
+- Dense search يستخدم named vector `dense_vector`.
+- كل Qdrant query مقيدة بـ`user_id`, `document_id`, `processing_run_id`, و`processing_profile = hybrid_local`.
+- كل result تخضع defensive scope validation بعد Qdrant.
+- `with_vectors=False`؛ لا تعاد raw vectors.
+- المخرجات typed retrieval results فقط.
+- runtime/model/inference/scope failures تفشل Fail-Closed، ولا يوجد Local → Cloud fallback.
+- K4/K5 وBM25/RRF/reranking/generation ليست ضمن K3.
+
 ---
 
 # 10. Baseline التنفيذي المعتمد
@@ -1683,6 +1726,8 @@ FastAPI:
 
 ```text
 PR #95 merged on GitHub: PASS
+Feature branch:
+- task/I2-workspace-dashboard
 Feature commit:
 - 67f96f5da27f528f2fe57bbdd79136d78e255058
 Merge commit:
@@ -2302,7 +2347,7 @@ Laravel Pint:
 PASS
 ```
 
-## آخر مهمة مكتملة — K2 Cloud Query Embedding / Retrieval
+## المهمة السابقة المكتملة — K2 Cloud Query Embedding / Retrieval
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #109، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `d512feb1100c7d1fa791340bcfb9eac92b3cbb84`.
 
@@ -2368,18 +2413,70 @@ Flaky regression note:
 - لا يصنف ذلك كـK2 defect.
 ```
 
+## آخر مهمة مكتملة — K3 Hybrid Local Query Embedding / Retrieval
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #110، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b`.
+
+تم تنفيذ:
+
+- إضافة `LocalBgeM3QueryEmbedder` لتحويل سؤال المستخدم إلى Hybrid Local query embedding باستخدام نفس `BAAI/bge-m3` المستخدم لفهرسة الوثائق.
+- query vector ببُعد `1024` وبنفس Local embedding semantics المستخدمة في document indexing.
+- إعادة استخدام `LocalModelCoordinator` نفسه؛ لا يوجد model lifecycle منفصل للـquery.
+- إضافة `HybridLocalRetrievalService` وtyped `HybridLocalRetrievalTarget` / `HybridLocalRetrievalResult`.
+- استخدام `resolve_qdrant_collection()` لتحديد Hybrid Local Qdrant collection Server-side.
+- إضافة `QdrantHybridLocalDenseRetriever` واستخدام named vector `dense_vector`.
+- فرض trusted scope دائماً على:
+  - `user_id`
+  - `document_id`
+  - `processing_run_id`
+  - `processing_profile = hybrid_local`
+- إجراء defensive scope validation بعد Qdrant للتأكد أن كل result ينتمي للنطاق الموثوق قبل تحويله إلى typed result.
+- عدم إرجاع raw vectors عبر `with_vectors=False`.
+- إرجاع typed retrieval results فقط.
+- Fail-Closed عند runtime/model/inference/scope failures.
+- عدم وجود Local → Cloud fallback.
+
+حدود K3 / Out of Scope:
+
+- K4 user / document / run filters.
+- K5 Per-profile Dense + BM25 + RRF.
+- BM25 / RRF.
+- reranking.
+- generation.
+
+### Verification K3
+
+```text
+PR #110 merged on GitHub: PASS
+PR title:
+- feat(K3): add hybrid local query retrieval
+Feature branch:
+- task/K3-hybrid-local-query-retrieval
+Feature commit:
+- 21ea644202f03d0430682d4e37c4464d4205b8fa
+Merge commit:
+- c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b
+
+K3 focused/regression tests:
+44 passed
+
+FastAPI full suite:
+192 passed
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-K3 — Hybrid Local query embedding / retrieval
+K4 — user / document / run filters
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت K2 ودمجت في main عبر PR #109. أصبح Cloud query path يملك query embedding بـJina retrieval.query/1024 وdense Qdrant retrieval مقيداً بالـtrusted user/document/run/cloud scope، مع Server-side collection resolution وdefensive result validation وtyped results بدون raw vectors.
-لا يوجد unfiltered retrieval ولا fallback إلى Hybrid Local، ولم تضف K2 BM25/RRF أو reranking أو fusion أو generation/context/citations/Chat execution أو UI/Laravel Chat orchestration أو migrations.
-يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K3 — Hybrid Local query embedding / retrieval.
+اكتملت K3 ودمجت في main عبر PR #110. أصبح Hybrid Local query path يستخدم نفس BAAI/bge-m3 ونفس Local embedding semantics المستخدمة في document indexing وبُعد 1024، مع إعادة استخدام LocalModelCoordinator نفسه دون lifecycle منفصل للـquery.
+يستخدم المسار Hybrid Local Qdrant collection المحلولة Server-side وdense_vector، ويقيد retrieval بالـtrusted user/document/run/hybrid_local scope مع defensive result validation وwith_vectors=False وtyped retrieval results فقط.
+يفشل المسار مغلقاً عند runtime/model/inference/scope failures ولا يوجد Local → Cloud fallback. لم تدخل K3 في K4/K5 أو BM25/RRF/reranking/generation.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K4 — user / document / run filters.
 تبقى K وما بعدها دون تغيير من حيث الترقيم، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
