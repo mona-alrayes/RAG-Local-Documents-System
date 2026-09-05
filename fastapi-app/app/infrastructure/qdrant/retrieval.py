@@ -13,6 +13,7 @@ from app.services.hybrid_local_retrieval import (
     HybridLocalRetrievalResult,
     HybridLocalRetrievalTarget,
 )
+from app.services.retrieval_scope import RetrievalScope
 
 
 RETRIEVAL_PAYLOAD_FIELDS = [
@@ -28,39 +29,30 @@ RETRIEVAL_PAYLOAD_FIELDS = [
 ]
 
 
+def _scope_values(
+    scope: RetrievalScope,
+) -> dict[str, int | str]:
+    return {
+        "user_id": scope.user_id,
+        "document_id": scope.document_id,
+        "processing_run_id": scope.processing_run_id,
+        "processing_profile": scope.processing_profile.value,
+    }
+
+
 def _build_scope_filter(
     *,
-    user_id: int,
-    document_id: int,
-    processing_run_id: int,
-    processing_profile: ProcessingProfile,
+    scope: RetrievalScope,
 ) -> models.Filter:
     return models.Filter(
         must=[
             models.FieldCondition(
-                key="user_id",
+                key=key,
                 match=models.MatchValue(
-                    value=user_id,
+                    value=value,
                 ),
-            ),
-            models.FieldCondition(
-                key="document_id",
-                match=models.MatchValue(
-                    value=document_id,
-                ),
-            ),
-            models.FieldCondition(
-                key="processing_run_id",
-                match=models.MatchValue(
-                    value=processing_run_id,
-                ),
-            ),
-            models.FieldCondition(
-                key="processing_profile",
-                match=models.MatchValue(
-                    value=processing_profile.value,
-                ),
-            ),
+            )
+            for key, value in _scope_values(scope).items()
         ]
     )
 
@@ -68,19 +60,11 @@ def _build_scope_filter(
 def _validate_scope(
     *,
     payload: dict[str, Any],
-    user_id: int,
-    document_id: int,
-    processing_run_id: int,
-    processing_profile: ProcessingProfile,
+    scope: RetrievalScope,
     error_code: str,
     error_message: str,
 ) -> None:
-    expected_scope = {
-        "user_id": user_id,
-        "document_id": document_id,
-        "processing_run_id": processing_run_id,
-        "processing_profile": processing_profile.value,
-    }
+    expected_scope = _scope_values(scope)
 
     if any(
         payload.get(key) != expected_value
@@ -151,11 +135,15 @@ class QdrantCloudDenseRetriever:
         query_vector: list[float],
         limit: int,
     ) -> list[CloudRetrievalResult]:
-        query_filter = _build_scope_filter(
+        scope = RetrievalScope(
             user_id=user_id,
             document_id=target.document_id,
             processing_run_id=target.processing_run_id,
-            processing_profile=ProcessingProfile.CLOUD,
+            processing_profile=target.processing_profile,
+        )
+
+        query_filter = _build_scope_filter(
+            scope=scope,
         )
 
         response = self._client.query_points(
@@ -171,8 +159,7 @@ class QdrantCloudDenseRetriever:
         return [
             self._map_result(
                 point=point,
-                user_id=user_id,
-                target=target,
+                scope=scope,
             )
             for point in response.points
         ]
@@ -181,8 +168,7 @@ class QdrantCloudDenseRetriever:
     def _map_result(
         *,
         point: Any,
-        user_id: int,
-        target: CloudRetrievalTarget,
+        scope: RetrievalScope,
     ) -> CloudRetrievalResult:
         payload = point.payload
 
@@ -194,10 +180,7 @@ class QdrantCloudDenseRetriever:
 
         _validate_scope(
             payload=payload,
-            user_id=user_id,
-            document_id=target.document_id,
-            processing_run_id=target.processing_run_id,
-            processing_profile=ProcessingProfile.CLOUD,
+            scope=scope,
             error_code="cloud_retrieval_result_scope_invalid",
             error_message=(
                 "Cloud retrieval result does not belong "
@@ -234,11 +217,15 @@ class QdrantHybridLocalDenseRetriever:
         query_vector: list[float],
         limit: int,
     ) -> list[HybridLocalRetrievalResult]:
-        query_filter = _build_scope_filter(
+        scope = RetrievalScope(
             user_id=user_id,
             document_id=target.document_id,
             processing_run_id=target.processing_run_id,
-            processing_profile=ProcessingProfile.HYBRID_LOCAL,
+            processing_profile=target.processing_profile,
+        )
+
+        query_filter = _build_scope_filter(
+            scope=scope,
         )
 
         response = self._client.query_points(
@@ -254,8 +241,7 @@ class QdrantHybridLocalDenseRetriever:
         return [
             self._map_result(
                 point=point,
-                user_id=user_id,
-                target=target,
+                scope=scope,
             )
             for point in response.points
         ]
@@ -264,8 +250,7 @@ class QdrantHybridLocalDenseRetriever:
     def _map_result(
         *,
         point: Any,
-        user_id: int,
-        target: HybridLocalRetrievalTarget,
+        scope: RetrievalScope,
     ) -> HybridLocalRetrievalResult:
         payload = point.payload
 
@@ -279,10 +264,7 @@ class QdrantHybridLocalDenseRetriever:
 
         _validate_scope(
             payload=payload,
-            user_id=user_id,
-            document_id=target.document_id,
-            processing_run_id=target.processing_run_id,
-            processing_profile=ProcessingProfile.HYBRID_LOCAL,
+            scope=scope,
             error_code=(
                 "hybrid_local_retrieval_result_scope_invalid"
             ),
