@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-05
-> **الحالة العامة:** قيد التنفيذ — K3 مكتملة ومدموجة في PR #110؛ أضيف مسار Hybrid Local query embedding / dense retrieval الآمن داخل FastAPI باستخدام BGE-M3 وQdrant ضمن trusted user/document/run/profile scope، والمهمة الحالية هي K4 — user / document / run filters وفق الـMaster Plan
+> **الحالة العامة:** قيد التنفيذ — K4 مكتملة ومدموجة في PR #111؛ وُحّد trusted retrieval scope لمساري Cloud وHybrid Local عبر `RetrievalScope` مشتركة تُستخدم لبناء exact Qdrant filter والتحقق الدفاعي من النتائج ضمن user/document/run/profile scope، والمهمة الحالية هي K5 — Per-profile Dense + BM25 + RRF وفق الـMaster Plan
 
 ---
 
@@ -17,9 +17,9 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b
-Last Merged Feature PR on main: #110 — K3 Hybrid Local Query Embedding / Retrieval
-Latest Task PR: #110 — K3 Hybrid Local Query Embedding / Retrieval
+Verified Main Commit: 3c7be519fac934de2ce1f9264be202623c69f757
+Last Merged Feature PR on main: #111 — K4 Trusted User / Document / Run Retrieval Filters
+Latest Task PR: #111 — K4 Trusted User / Document / Run Retrieval Filters
 Verified K1 Feature Commit:
 - 28759b3fd2df80283fd8d3fba831aaadee569433 — K1 Trusted document_targets
 Verified K1 Merge Commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
@@ -29,7 +29,10 @@ Verified K2 Merge Commit: d512feb1100c7d1fa791340bcfb9eac92b3cbb84
 Verified K3 Feature Commit:
 - 21ea644202f03d0430682d4e37c4464d4205b8fa — K3 Hybrid Local Query Embedding / Retrieval
 Verified K3 Merge Commit: c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b
-Documentation Baseline: تم تسجيل اكتمال K3 وتسليم K4 — user / document / run filters كمهمة حالية. أضافت K3 مسار Hybrid Local retrieval داخل FastAPI: يحول query محلياً باستخدام نفس `BAAI/bge-m3` ونفس Local embedding semantics المستخدمة لفهرسة الوثائق وبُعد `1024`، مع إعادة استخدام `LocalModelCoordinator` دون lifecycle منفصل. تستخدم `HybridLocalRetrievalService` و`QdrantHybridLocalDenseRetriever` Hybrid Local collection المحلولة Server-side وnamed vector `dense_vector`، وتفرض trusted scope على `user_id`, `document_id`, `processing_run_id`, و`processing_profile = hybrid_local` مع defensive validation للنتائج. تستخدم `with_vectors=False` وتعيد typed retrieval results فقط، وتفشل Fail-Closed عند runtime/model/inference/scope failures، ولا يوجد Local → Cloud fallback. لم تدخل K3 في K4/K5 أو BM25/RRF/reranking/generation. وفق الـMaster Plan تبدأ الخطوة التالية حرفياً من K4 — user / document / run filters.
+Verified K4 Feature Commit:
+- a69fd712c61e73b4100d95be542a7a4942bef9b0 — K4 Trusted User / Document / Run Retrieval Filters
+Verified K4 Merge Commit: 3c7be519fac934de2ce1f9264be202623c69f757
+Documentation Baseline: تم تسجيل اكتمال K4 وتسليم K5 — Per-profile Dense + BM25 + RRF كمهمة حالية. أضافت K4 abstraction مشتركة صغيرة باسم `RetrievalScope` تحمل القيم الموثوقة فقط: `user_id`, `document_id`, `processing_run_id`, و`processing_profile`. أصبح نفس الـscope المصدر الموحد لبناء exact Qdrant retrieval filter والتحقق الدفاعي post-query من كل result لمساري Cloud وHybrid Local. بقي Cloud مقيداً بـ`ProcessingProfile.CLOUD` وHybrid Local بـ`ProcessingProfile.HYBRID_LOCAL`، وبقي اختيار Collection Server-side عبر `resolve_qdrant_collection()` مع `DENSE_VECTOR_NAME`, `with_vectors=False`, وtyped retrieval results. لا يوجد unfiltered retrieval أو cross-user/document/run/profile leakage؛ أي result خارج trusted scope يفشل Fail-Closed. لم تعدل K4 Document Processing أو Laravel ولم تدخل في K5 أو BM25/RRF/reranking/generation.
 
 Current Working Branch: main
 
@@ -37,7 +40,7 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-K3 — Hybrid Local Query Embedding / Retrieval
+K4 — Trusted User / Document / Run Retrieval Filters
 
 Current Phase:
 K — Retrieval and Reranking
@@ -181,22 +184,28 @@ Architectural Result:
 - تقيد K3 retrieval بـ`user_id`, `document_id`, `processing_run_id`, و`processing_profile = hybrid_local`، وتتحقق دفاعياً من scope النتائج.
 - تستخدم K3 `with_vectors=False` وتعيد typed retrieval results فقط، وتفشل مغلقاً عند runtime/model/inference/scope failures دون Local → Cloud fallback.
 - لم تدخل K3 في K4/K5 أو BM25/RRF أو reranking أو generation.
+- أضافت K4 abstraction مشتركة صغيرة باسم `RetrievalScope` لقيم `user_id`, `document_id`, `processing_run_id`, و`processing_profile` الموثوقة فقط.
+- أصبح نفس `RetrievalScope` المصدر الموحد لبناء exact Qdrant retrieval filter والتحقق الدفاعي post-query من payload كل result.
+- بقي Cloud retrieval يفرض `ProcessingProfile.CLOUD` وبقي Hybrid Local retrieval يفرض `ProcessingProfile.HYBRID_LOCAL`، مع server-side collection resolution عبر `resolve_qdrant_collection()`.
+- بقي `DENSE_VECTOR_NAME` و`with_vectors=False` وtyped retrieval results كما هي، ولا يوجد unfiltered retrieval path.
+- لا يوجد cross-user أو cross-document أو cross-run أو cross-profile leakage؛ أي Qdrant result خارج trusted scope يفشل Fail-Closed.
+- لم تعدل K4 Document Processing أو Laravel ولم تدخل في K5 أو BM25/RRF/reranking/generation/citations.
 
 Latest Verification:
-PR #110 merged on GitHub: PASS
-PR title: feat(K3): add hybrid local query retrieval
-PR head commit: 21ea644202f03d0430682d4e37c4464d4205b8fa
-PR merge commit: c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b
-main verified at K3 merge commit c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b before this documentation update: PASS
+PR #111 merged on GitHub: PASS
+PR title: refactor(K4): centralize trusted retrieval filters
+PR head commit: a69fd712c61e73b4100d95be542a7a4942bef9b0
+PR merge commit: 3c7be519fac934de2ce1f9264be202623c69f757
+main verified at K4 merge commit 3c7be519fac934de2ce1f9264be202623c69f757 before this documentation update: PASS
 
-K3 focused/regression tests:
-44 passed
+K4 focused / K2-K3 regression tests:
+35 passed in 2.29s
 
 FastAPI full suite:
-192 passed
+192 passed in 10.52s
 
 Current Task:
-K4 — user / document / run filters
+K5 — Per-profile Dense + BM25 + RRF
 
 K1 Completion:
 - أضيف `TrustedDocumentTarget` كـimmutable typed DTO يحمل `documentId`, `processingRunId`, و`processingProfile`.
@@ -230,7 +239,17 @@ K3 Completion:
 - `with_vectors=False`؛ typed retrieval results فقط.
 - runtime/model/inference/scope failures تفشل Fail-Closed، ولا يوجد Local → Cloud fallback.
 - Out of Scope: K4 generalized filters، K5 Dense + BM25 + RRF، BM25/RRF، reranking، generation.
-- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K4 — user / document / run filters.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` كانت K4 — user / document / run filters.
+
+K4 Completion:
+- أضيف `RetrievalScope` كـshared immutable retrieval-scope abstraction صغيرة تحمل فقط `user_id`, `document_id`, `processing_run_id`, و`processing_profile`.
+- يستخدم نفس الـscope لبناء exact Qdrant filter والتحقق الدفاعي من results بعد الاستعلام، بدل تكرار قيم security boundary بين Cloud وHybrid Local.
+- Cloud retrieval يبقى مقيداً بـ`ProcessingProfile.CLOUD` وHybrid Local بـ`ProcessingProfile.HYBRID_LOCAL`.
+- اختيار Qdrant collection يبقى Server-side عبر `resolve_qdrant_collection()`، مع بقاء `DENSE_VECTOR_NAME`, `with_vectors=False`, وtyped results.
+- لا يوجد unfiltered retrieval path، ولا cross-user/document/run/profile leakage؛ أي mismatch في payload يفشل Fail-Closed.
+- security boundary أصبحت موحدة وقابلة لإعادة الاستخدام للمسارين دون دمجهما في provider abstraction واحدة.
+- Out of Scope: Document Processing، Laravel، K5 Dense + BM25 + RRF، BM25 query retrieval، sparse query generation، RRF، reranking، Jina reranker، BGE reranker، cross-profile fusion، generation، citations.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K5 — Per-profile Dense + BM25 + RRF.
 
 Open Blockers: none
 ```
@@ -1038,7 +1057,7 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 | K1 Trusted document_targets | DONE |
 | K2 Cloud query embedding / retrieval | DONE |
 | K3 Hybrid Local query embedding / retrieval | DONE |
-| K4 user / document / run filters | TODO |
+| K4 Trusted User / Document / Run Retrieval Filters | DONE |
 | K5 Per-profile Dense + BM25 + RRF | TODO |
 | K6 Cloud Jina reranker | TODO |
 | K7 Local BGE reranker | TODO |
@@ -1051,6 +1070,8 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 > **K2 completed in PR #109:** أضيف Cloud query embedding باستخدام Jina `retrieval.query` ببُعد `1024` ومسار dense retrieval عبر Qdrant مع Server-side collection resolution وnamed vector `dense_vector`. يرفض blank query قبل provider call، ويحافظ على Jina retry semantics، ويفشل مغلقًا عند malformed/wrong-dimension embeddings. يفرض retrieval دائماً `user_id/document_id/processing_run_id/processing_profile=cloud` ويتحقق دفاعياً من كل result، ولا يعيد raw vectors أو يسمح unfiltered retrieval أو fallback إلى Hybrid Local. المخرجات typed retrieval results فقط؛ لا LLM generation أو context/citations/Chat execution ضمن K2.
 
 > **K3 completed in PR #110:** أضيف Hybrid Local query embedding باستخدام نفس `BAAI/bge-m3` ونفس Local embedding semantics المستخدمة لفهرسة الوثائق وبُعد `1024`، مع إعادة استخدام `LocalModelCoordinator` نفسه. يستخدم dense retrieval عبر `dense_vector` داخل Hybrid Local Qdrant collection المحلولة Server-side، ويقيد كل retrieval بالـtrusted scope `user_id/document_id/processing_run_id/processing_profile=hybrid_local` مع defensive scope validation. تستخدم النتائج `with_vectors=False` وتعود typed فقط، ويفشل المسار مغلقاً عند runtime/model/inference/scope failures دون Local → Cloud fallback. لم تدخل K3 في K4/K5 أو BM25/RRF/reranking/generation.
+
+> **K4 completed in PR #111:** أضيفت `RetrievalScope` مشتركة لقيم `user_id/document_id/processing_run_id/processing_profile` الموثوقة، وأصبح نفس الـscope يبني exact Qdrant filter ويعيد التحقق دفاعياً من payload النتائج بعد retrieval لمساري Cloud وHybrid Local. بقيت profile enforcement والـcollection resolution Server-side، وبقي `DENSE_VECTOR_NAME`, `with_vectors=False`, وtyped results. لا يوجد unfiltered path أو cross-user/document/run/profile leakage، وأي mismatch يفشل Fail-Closed. لم تعدل K4 Document Processing أو Laravel ولم تنفذ K5/BM25/RRF/reranking/generation/citations.
 
 Cross-profile هنا يعني دمج نتائج وثائق مفهرسة مسبقاً بProfiles مختلفة داخل المحادثة، وليس Upload comparison workflow.
 
@@ -1489,6 +1510,30 @@ QdrantHybridLocalDenseRetriever
 - المخرجات typed retrieval results فقط.
 - runtime/model/inference/scope failures تفشل Fail-Closed، ولا يوجد Local → Cloud fallback.
 - K4/K5 وBM25/RRF/reranking/generation ليست ضمن K3.
+
+## 9.6 K4 Trusted User / Document / Run Retrieval Filters
+
+الموجود بعد PR #111:
+
+```text
+Trusted retrieval target
+→ shared RetrievalScope
+→ exact user/document/run/profile Qdrant filter
+→ dense retrieval
+→ defensive result scope validation
+→ typed safe results
+```
+
+العقد:
+
+- `RetrievalScope` abstraction مشتركة صغيرة تحتوي فقط على `user_id`, `document_id`, `processing_run_id`, و`processing_profile`.
+- نفس الـscope هو المصدر الموحد لبناء exact Qdrant retrieval filter وللتحقق الدفاعي post-query من payload النتائج.
+- Cloud retrieval يبقى مقيداً بـ`ProcessingProfile.CLOUD` وHybrid Local بـ`ProcessingProfile.HYBRID_LOCAL`.
+- Qdrant collection تبقى محلولة Server-side عبر `resolve_qdrant_collection()`؛ Browser لا يختار Collection موثوقة.
+- يبقى `DENSE_VECTOR_NAME`, `with_vectors=False`, وtyped retrieval results دون تغيير.
+- لا يوجد unfiltered retrieval path ولا cross-user/document/run/profile leakage؛ أي result خارج trusted scope يفشل Fail-Closed.
+- security boundary موحدة وقابلة لإعادة الاستخدام لمساري Cloud وHybrid Local.
+- K4 لم تعدل Document Processing أو Laravel ولم تدخل في K5/BM25/RRF/reranking/generation/citations.
 
 ---
 
@@ -2413,7 +2458,7 @@ Flaky regression note:
 - لا يصنف ذلك كـK2 defect.
 ```
 
-## آخر مهمة مكتملة — K3 Hybrid Local Query Embedding / Retrieval
+## المهمة السابقة المكتملة — K3 Hybrid Local Query Embedding / Retrieval
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #110، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `c2e488a8d45e07b86bb6d25f01cb78a9f70edf8b`.
 
@@ -2464,19 +2509,77 @@ FastAPI full suite:
 192 passed
 ```
 
+## آخر مهمة مكتملة — K4 Trusted User / Document / Run Retrieval Filters
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #111، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `3c7be519fac934de2ce1f9264be202623c69f757`.
+
+تم تنفيذ:
+
+- إضافة abstraction مشتركة صغيرة باسم `RetrievalScope` تحمل فقط:
+  - `user_id`
+  - `document_id`
+  - `processing_run_id`
+  - `processing_profile`
+- توحيد trusted retrieval scope لمساري Cloud وHybrid Local دون إلغاء استقلال خدمات كل Profile.
+- استخدام نفس `RetrievalScope` كمصدر موحد لـexact Qdrant retrieval filter وللتحقق الدفاعي post-query من payload النتائج.
+- بقاء Cloud retrieval مقيداً بـ`ProcessingProfile.CLOUD`.
+- بقاء Hybrid Local retrieval مقيداً بـ`ProcessingProfile.HYBRID_LOCAL`.
+- بقاء اختيار Qdrant collection Server-side عبر `resolve_qdrant_collection()`.
+- بقاء `DENSE_VECTOR_NAME`, `with_vectors=False`, وtyped retrieval results.
+- عدم وجود unfiltered retrieval path.
+- منع cross-user وcross-document وcross-run وcross-profile leakage عبر exact scope filter + defensive validation.
+- أي Qdrant result لا يطابق trusted scope يفشل Fail-Closed ولا يتحول إلى typed result آمن.
+- توحيد security boundary لتصبح قابلة لإعادة الاستخدام لمساري Cloud وHybrid Local.
+- عدم تعديل Document Processing.
+- عدم تعديل Laravel.
+
+حدود K4 / Out of Scope:
+
+- K5 Per-profile Dense + BM25 + RRF.
+- BM25 query retrieval.
+- sparse query generation.
+- Dense + BM25 fusion.
+- RRF.
+- reranking.
+- Jina reranker.
+- BGE reranker.
+- cross-profile fusion.
+- generation.
+- citations.
+
+### Verification K4
+
+```text
+PR #111 merged on GitHub: PASS
+PR title:
+- refactor(K4): centralize trusted retrieval filters
+Feature branch:
+- task/K4-user-document-run-filters
+Feature commit:
+- a69fd712c61e73b4100d95be542a7a4942bef9b0
+Merge commit:
+- 3c7be519fac934de2ce1f9264be202623c69f757
+
+Focused / K2-K3 regression:
+35 passed in 2.29s
+
+Full FastAPI suite:
+192 passed in 10.52s
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-K4 — user / document / run filters
+K5 — Per-profile Dense + BM25 + RRF
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت K3 ودمجت في main عبر PR #110. أصبح Hybrid Local query path يستخدم نفس BAAI/bge-m3 ونفس Local embedding semantics المستخدمة في document indexing وبُعد 1024، مع إعادة استخدام LocalModelCoordinator نفسه دون lifecycle منفصل للـquery.
-يستخدم المسار Hybrid Local Qdrant collection المحلولة Server-side وdense_vector، ويقيد retrieval بالـtrusted user/document/run/hybrid_local scope مع defensive result validation وwith_vectors=False وtyped retrieval results فقط.
-يفشل المسار مغلقاً عند runtime/model/inference/scope failures ولا يوجد Local → Cloud fallback. لم تدخل K3 في K4/K5 أو BM25/RRF/reranking/generation.
-يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K4 — user / document / run filters.
+اكتملت K4 ودمجت في main عبر PR #111. أصبح trusted retrieval target يمر عبر shared RetrievalScope موحدة تحمل user_id/document_id/processing_run_id/processing_profile فقط، ويستخدم نفس الـscope لبناء exact Qdrant retrieval filter والتحقق الدفاعي من النتائج بعد الاستعلام.
+بقي Cloud retrieval يفرض ProcessingProfile.CLOUD وبقي Hybrid Local يفرض ProcessingProfile.HYBRID_LOCAL، مع Qdrant collection محلولة Server-side عبر resolve_qdrant_collection() وبقاء DENSE_VECTOR_NAME وwith_vectors=False وtyped retrieval results.
+لا يوجد unfiltered retrieval path أو cross-user/document/run/profile leakage؛ أي result خارج trusted scope يفشل Fail-Closed. لم تعدل K4 Document Processing أو Laravel ولم تدخل في K5 أو BM25/RRF/reranking/generation/citations.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K5 — Per-profile Dense + BM25 + RRF.
 تبقى K وما بعدها دون تغيير من حيث الترقيم، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
