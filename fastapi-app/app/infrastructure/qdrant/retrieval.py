@@ -9,6 +9,10 @@ from app.services.cloud_retrieval import (
     CloudRetrievalResult,
     CloudRetrievalTarget,
 )
+from app.services.hybrid_local_retrieval import (
+    HybridLocalRetrievalResult,
+    HybridLocalRetrievalTarget,
+)
 
 
 RETRIEVAL_PAYLOAD_FIELDS = [
@@ -24,8 +28,118 @@ RETRIEVAL_PAYLOAD_FIELDS = [
 ]
 
 
+def _build_scope_filter(
+    *,
+    user_id: int,
+    document_id: int,
+    processing_run_id: int,
+    processing_profile: ProcessingProfile,
+) -> models.Filter:
+    return models.Filter(
+        must=[
+            models.FieldCondition(
+                key="user_id",
+                match=models.MatchValue(
+                    value=user_id,
+                ),
+            ),
+            models.FieldCondition(
+                key="document_id",
+                match=models.MatchValue(
+                    value=document_id,
+                ),
+            ),
+            models.FieldCondition(
+                key="processing_run_id",
+                match=models.MatchValue(
+                    value=processing_run_id,
+                ),
+            ),
+            models.FieldCondition(
+                key="processing_profile",
+                match=models.MatchValue(
+                    value=processing_profile.value,
+                ),
+            ),
+        ]
+    )
+
+
+def _validate_scope(
+    *,
+    payload: dict[str, Any],
+    user_id: int,
+    document_id: int,
+    processing_run_id: int,
+    processing_profile: ProcessingProfile,
+    error_code: str,
+    error_message: str,
+) -> None:
+    expected_scope = {
+        "user_id": user_id,
+        "document_id": document_id,
+        "processing_run_id": processing_run_id,
+        "processing_profile": processing_profile.value,
+    }
+
+    if any(
+        payload.get(key) != expected_value
+        for key, expected_value in expected_scope.items()
+    ):
+        raise ApplicationException(
+            code=error_code,
+            message=error_message,
+        )
+
+
+def _result_values(
+    *,
+    point: Any,
+    payload: dict[str, Any],
+    invalid_code: str,
+    invalid_message: str,
+) -> dict[str, Any]:
+    try:
+        page = payload["page"]
+        section = payload["section"]
+
+        return {
+            "point_id": str(point.id),
+            "score": float(point.score),
+            "document_id": int(payload["document_id"]),
+            "processing_run_id": int(
+                payload["processing_run_id"]
+            ),
+            "processing_profile": ProcessingProfile(
+                payload["processing_profile"]
+            ),
+            "chunk_index": int(payload["chunk_index"]),
+            "text": str(payload["text"]),
+            "page": (
+                int(page)
+                if page is not None
+                else None
+            ),
+            "section": (
+                str(section)
+                if section is not None
+                else None
+            ),
+            "source": str(payload["source"]),
+        }
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ApplicationException(
+            code=invalid_code,
+            message=invalid_message,
+        ) from exc
+
+
 class QdrantCloudDenseRetriever:
-    def __init__(self, *, client: QdrantClient) -> None:
+    def __init__(
+        self,
+        *,
+        client: QdrantClient,
+    ) -> None:
         self._client = client
 
     def retrieve(
@@ -37,29 +151,11 @@ class QdrantCloudDenseRetriever:
         query_vector: list[float],
         limit: int,
     ) -> list[CloudRetrievalResult]:
-        query_filter = models.Filter(
-            must=[
-                models.FieldCondition(
-                    key="user_id",
-                    match=models.MatchValue(value=user_id),
-                ),
-                models.FieldCondition(
-                    key="document_id",
-                    match=models.MatchValue(value=target.document_id),
-                ),
-                models.FieldCondition(
-                    key="processing_run_id",
-                    match=models.MatchValue(
-                        value=target.processing_run_id,
-                    ),
-                ),
-                models.FieldCondition(
-                    key="processing_profile",
-                    match=models.MatchValue(
-                        value=ProcessingProfile.CLOUD.value,
-                    ),
-                ),
-            ]
+        query_filter = _build_scope_filter(
+            user_id=user_id,
+            document_id=target.document_id,
+            processing_run_id=target.processing_run_id,
+            processing_profile=ProcessingProfile.CLOUD,
         )
 
         response = self._client.query_points(
@@ -96,45 +192,115 @@ class QdrantCloudDenseRetriever:
                 message="Cloud retrieval result payload is invalid.",
             )
 
-        expected_scope = {
-            "user_id": user_id,
-            "document_id": target.document_id,
-            "processing_run_id": target.processing_run_id,
-            "processing_profile": ProcessingProfile.CLOUD.value,
-        }
+        _validate_scope(
+            payload=payload,
+            user_id=user_id,
+            document_id=target.document_id,
+            processing_run_id=target.processing_run_id,
+            processing_profile=ProcessingProfile.CLOUD,
+            error_code="cloud_retrieval_result_scope_invalid",
+            error_message=(
+                "Cloud retrieval result does not belong "
+                "to the trusted retrieval scope."
+            ),
+        )
 
-        if any(
-            payload.get(key) != expected_value
-            for key, expected_value in expected_scope.items()
-        ):
+        values = _result_values(
+            point=point,
+            payload=payload,
+            invalid_code="cloud_retrieval_result_invalid",
+            invalid_message=(
+                "Cloud retrieval result payload is invalid."
+            ),
+        )
+
+        return CloudRetrievalResult(**values)
+
+
+class QdrantHybridLocalDenseRetriever:
+    def __init__(
+        self,
+        *,
+        client: QdrantClient,
+    ) -> None:
+        self._client = client
+
+    def retrieve(
+        self,
+        *,
+        collection_name: str,
+        user_id: int,
+        target: HybridLocalRetrievalTarget,
+        query_vector: list[float],
+        limit: int,
+    ) -> list[HybridLocalRetrievalResult]:
+        query_filter = _build_scope_filter(
+            user_id=user_id,
+            document_id=target.document_id,
+            processing_run_id=target.processing_run_id,
+            processing_profile=ProcessingProfile.HYBRID_LOCAL,
+        )
+
+        response = self._client.query_points(
+            collection_name=collection_name,
+            query=query_vector,
+            using=DENSE_VECTOR_NAME,
+            query_filter=query_filter,
+            limit=limit,
+            with_payload=RETRIEVAL_PAYLOAD_FIELDS,
+            with_vectors=False,
+        )
+
+        return [
+            self._map_result(
+                point=point,
+                user_id=user_id,
+                target=target,
+            )
+            for point in response.points
+        ]
+
+    @staticmethod
+    def _map_result(
+        *,
+        point: Any,
+        user_id: int,
+        target: HybridLocalRetrievalTarget,
+    ) -> HybridLocalRetrievalResult:
+        payload = point.payload
+
+        if not isinstance(payload, dict):
             raise ApplicationException(
-                code="cloud_retrieval_result_scope_invalid",
+                code="hybrid_local_retrieval_result_invalid",
                 message=(
-                    "Cloud retrieval result does not belong to "
-                    "the trusted retrieval scope."
+                    "Hybrid Local retrieval result payload is invalid."
                 ),
             )
 
-        try:
-            page = payload["page"]
-            section = payload["section"]
+        _validate_scope(
+            payload=payload,
+            user_id=user_id,
+            document_id=target.document_id,
+            processing_run_id=target.processing_run_id,
+            processing_profile=ProcessingProfile.HYBRID_LOCAL,
+            error_code=(
+                "hybrid_local_retrieval_result_scope_invalid"
+            ),
+            error_message=(
+                "Hybrid Local retrieval result does not belong "
+                "to the trusted retrieval scope."
+            ),
+        )
 
-            return CloudRetrievalResult(
-                point_id=str(point.id),
-                score=float(point.score),
-                document_id=int(payload["document_id"]),
-                processing_run_id=int(payload["processing_run_id"]),
-                processing_profile=ProcessingProfile(
-                    payload["processing_profile"]
-                ),
-                chunk_index=int(payload["chunk_index"]),
-                text=str(payload["text"]),
-                page=int(page) if page is not None else None,
-                section=str(section) if section is not None else None,
-                source=str(payload["source"]),
-            )
-        except (KeyError, TypeError, ValueError) as exc:
-            raise ApplicationException(
-                code="cloud_retrieval_result_invalid",
-                message="Cloud retrieval result payload is invalid.",
-            ) from exc
+        values = _result_values(
+            point=point,
+            payload=payload,
+            invalid_code=(
+                "hybrid_local_retrieval_result_invalid"
+            ),
+            invalid_message=(
+                "Hybrid Local retrieval result payload is invalid."
+            ),
+        )
+
+        return HybridLocalRetrievalResult(**values)
