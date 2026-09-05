@@ -32,19 +32,22 @@ class HybridLocalQueryEmbedder(Protocol):
     def embed(
         self,
         question: str,
-    ) -> list[float]: ...
+    ) -> list[float]:
+        ...
 
 
-class HybridLocalDenseRetriever(Protocol):
+class HybridLocalRetriever(Protocol):
     def retrieve(
         self,
         *,
         collection_name: str,
         user_id: int,
         target: HybridLocalRetrievalTarget,
+        question: str,
         query_vector: list[float],
         limit: int,
-    ) -> list[HybridLocalRetrievalResult]: ...
+    ) -> list[HybridLocalRetrievalResult]:
+        ...
 
 
 class HybridLocalRetrievalService:
@@ -53,11 +56,11 @@ class HybridLocalRetrievalService:
         *,
         settings: Settings,
         query_embedder: HybridLocalQueryEmbedder,
-        dense_retriever: HybridLocalDenseRetriever,
+        dense_retriever: HybridLocalRetriever,
     ) -> None:
         self._settings = settings
         self._query_embedder = query_embedder
-        self._dense_retriever = dense_retriever
+        self._retriever = dense_retriever
 
     def retrieve(
         self,
@@ -85,13 +88,14 @@ class HybridLocalRetrievalService:
         )
 
         query_vector = self._query_embedder.embed(
-            question,
+            question
         )
 
-        return self._dense_retriever.retrieve(
+        return self._retriever.retrieve(
             collection_name=collection_name,
             user_id=user_id,
             target=target,
+            question=question,
             query_vector=query_vector,
             limit=limit,
         )

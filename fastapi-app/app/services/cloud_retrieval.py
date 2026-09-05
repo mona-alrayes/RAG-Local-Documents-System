@@ -29,19 +29,25 @@ class CloudRetrievalResult:
 
 
 class CloudQueryEmbedder(Protocol):
-    def embed(self, question: str) -> list[float]: ...
+    def embed(
+        self,
+        question: str,
+    ) -> list[float]:
+        ...
 
 
-class CloudDenseRetriever(Protocol):
+class CloudRetriever(Protocol):
     def retrieve(
         self,
         *,
         collection_name: str,
         user_id: int,
         target: CloudRetrievalTarget,
+        question: str,
         query_vector: list[float],
         limit: int,
-    ) -> list[CloudRetrievalResult]: ...
+    ) -> list[CloudRetrievalResult]:
+        ...
 
 
 class CloudRetrievalService:
@@ -50,11 +56,11 @@ class CloudRetrievalService:
         *,
         settings: Settings,
         query_embedder: CloudQueryEmbedder,
-        dense_retriever: CloudDenseRetriever,
+        dense_retriever: CloudRetriever,
     ) -> None:
         self._settings = settings
         self._query_embedder = query_embedder
-        self._dense_retriever = dense_retriever
+        self._retriever = dense_retriever
 
     def retrieve(
         self,
@@ -64,10 +70,16 @@ class CloudRetrievalService:
         question: str,
         limit: int,
     ) -> list[CloudRetrievalResult]:
-        if target.processing_profile is not ProcessingProfile.CLOUD:
+        if (
+            target.processing_profile
+            is not ProcessingProfile.CLOUD
+        ):
             raise ApplicationException(
                 code="cloud_retrieval_target_invalid",
-                message="Cloud retrieval requires a cloud processing target.",
+                message=(
+                    "Cloud retrieval requires "
+                    "a cloud processing target."
+                ),
             )
 
         collection_name = resolve_qdrant_collection(
@@ -75,12 +87,15 @@ class CloudRetrievalService:
             settings=self._settings,
         )
 
-        query_vector = self._query_embedder.embed(question)
+        query_vector = self._query_embedder.embed(
+            question
+        )
 
-        return self._dense_retriever.retrieve(
+        return self._retriever.retrieve(
             collection_name=collection_name,
             user_id=user_id,
             target=target,
+            question=question,
             query_vector=query_vector,
             limit=limit,
         )
