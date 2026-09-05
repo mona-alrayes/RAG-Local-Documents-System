@@ -7,6 +7,9 @@ from app.processing.base import ProcessingProfile
 from app.processing.indexing import resolve_qdrant_collection
 
 
+HYBRID_LOCAL_RERANK_CANDIDATE_MULTIPLIER = 2
+
+
 @dataclass(frozen=True, slots=True)
 class HybridLocalRetrievalTarget:
     document_id: int
@@ -50,6 +53,19 @@ class HybridLocalRetriever(Protocol):
         ...
 
 
+class HybridLocalReranker(Protocol):
+    def rerank(
+        self,
+        *,
+        question: str,
+        candidates: list[
+            HybridLocalRetrievalResult
+        ],
+        limit: int,
+    ) -> list[HybridLocalRetrievalResult]:
+        ...
+
+
 class HybridLocalRetrievalService:
     def __init__(
         self,
@@ -57,10 +73,12 @@ class HybridLocalRetrievalService:
         settings: Settings,
         query_embedder: HybridLocalQueryEmbedder,
         dense_retriever: HybridLocalRetriever,
+        reranker: HybridLocalReranker,
     ) -> None:
         self._settings = settings
         self._query_embedder = query_embedder
         self._retriever = dense_retriever
+        self._reranker = reranker
 
     def retrieve(
         self,
@@ -82,6 +100,19 @@ class HybridLocalRetrievalService:
                 ),
             )
 
+        if (
+            isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or limit < 1
+        ):
+            raise ApplicationException(
+                code="hybrid_local_retrieval_limit_invalid",
+                message=(
+                    "Hybrid Local retrieval limit "
+                    "must be a positive integer."
+                ),
+            )
+
         collection_name = resolve_qdrant_collection(
             profile=target.processing_profile,
             settings=self._settings,
@@ -91,11 +122,25 @@ class HybridLocalRetrievalService:
             question
         )
 
-        return self._retriever.retrieve(
+        candidate_limit = (
+            limit
+            * HYBRID_LOCAL_RERANK_CANDIDATE_MULTIPLIER
+        )
+
+        candidates = self._retriever.retrieve(
             collection_name=collection_name,
             user_id=user_id,
             target=target,
             question=question,
             query_vector=query_vector,
+            limit=candidate_limit,
+        )
+
+        if not candidates:
+            return []
+
+        return self._reranker.rerank(
+            question=question,
+            candidates=candidates,
             limit=limit,
         )

@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     max_retries: int = Field(default=5, ge=0)
 
     local_embed_model: str = "BAAI/bge-m3"
+    local_rerank_model: str = "BAAI/bge-reranker-v2-m3"
 
     local_min_available_memory_ratio: float = Field(
         default=0.15,

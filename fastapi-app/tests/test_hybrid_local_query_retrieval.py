@@ -259,6 +259,20 @@ class FakeCoordinator:
         )
 
 
+class NeverCalledReranker:
+    def __init__(self) -> None:
+        self.called = False
+
+    def rerank(
+        self,
+        **kwargs: Any,
+    ) -> list[Any]:
+        self.called = True
+        raise AssertionError(
+            "Reranker must not be called."
+        )
+
+
 def test_query_and_document_use_same_bge_m3_primitive(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -426,6 +440,7 @@ def test_hybrid_service_resolves_local_collection() -> None:
         ),
         query_embedder=QueryEmbedder(),
         dense_retriever=retriever,
+        reranker=NeverCalledReranker(),
     )
 
     target = HybridLocalRetrievalTarget(
@@ -451,7 +466,7 @@ def test_hybrid_service_resolves_local_collection() -> None:
         == "local-k3"
     )
     assert retriever.call["user_id"] == 7
-    assert retriever.call["limit"] == 6
+    assert retriever.call["limit"] == 12
     assert (
         len(retriever.call["query_vector"])
         == DENSE_VECTOR_SIZE
@@ -488,6 +503,7 @@ def test_hybrid_service_rejects_cloud_target_before_work() -> None:
         settings=Settings(),
         query_embedder=embedder,
         dense_retriever=retriever,
+        reranker=NeverCalledReranker(),
     )
 
     target = HybridLocalRetrievalTarget(
@@ -545,6 +561,7 @@ def test_local_failure_has_no_retrieval_fallback() -> None:
         ),
         query_embedder=FailingEmbedder(),
         dense_retriever=retriever,
+        reranker=NeverCalledReranker(),
     )
 
     target = HybridLocalRetrievalTarget(
