@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-05
-> **الحالة العامة:** قيد التنفيذ — K5 مكتملة ومدموجة في PR #112؛ أصبح كل Processing Profile يستخدم Dense + BM25 مع Qdrant-native RRF داخلياً ضمن trusted RetrievalScope، والمهمة الحالية هي K6 — Cloud Jina Reranker وفق الـMaster Plan
+> **الحالة العامة:** قيد التنفيذ — K6 مكتملة ومدموجة في PR #113؛ أضيف Jina reranking لمسار `cloud` بعد Dense + BM25 + RRF مع الحفاظ على trusted RetrievalScope، والمهمة الحالية هي K7 — Local BGE reranker وفق الـMaster Plan
 
 ---
 
@@ -17,9 +17,9 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: cc5dcc4f951ffac00e07db592a1d32091bf9a602
-Last Merged Feature PR on main: #112 — K5 Per-Profile Dense + BM25 + RRF Retrieval
-Latest Task PR: #112 — K5 Per-Profile Dense + BM25 + RRF Retrieval
+Verified Main Commit: 9b2301875077c1a6a0dc1999a7ed3101bd49eaa7
+Last Merged Feature PR on main: #113 — K6 Cloud Jina Reranker
+Latest Task PR: #113 — K6 Cloud Jina Reranker
 Verified K1 Feature Commit:
 - 28759b3fd2df80283fd8d3fba831aaadee569433 — K1 Trusted document_targets
 Verified K1 Merge Commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
@@ -35,7 +35,10 @@ Verified K4 Merge Commit: 3c7be519fac934de2ce1f9264be202623c69f757
 Verified K5 Feature Commit:
 - 45470543615ab6c9d2e5edf7d7ee2c055af0c721 — K5 Per-Profile Dense + BM25 + RRF Retrieval
 Verified K5 Merge Commit: cc5dcc4f951ffac00e07db592a1d32091bf9a602
-Documentation Baseline: تم تسجيل اكتمال K5 وتسليم K6 — Cloud Jina Reranker كمهمة حالية. أصبح كل Processing Profile يستخدم Hybrid Retrieval داخلياً بصورة مستقلة: Cloud يجمع Jina dense query embedding مع Cloud BM25 query representation باستخدام `Qdrant/bm25` و`multilingual` tokenizer، وHybrid Local يجمع Local BGE-M3 dense query embedding مع Local BM25 query representation باستخدام نفس primitive المستخدمة في فهرسة الوثائق. يستخدم المساران Qdrant-native Dense prefetch + Sparse/BM25 prefetch ثم RRF fusion، مع candidate expansion قبل الـfusion وfinal limit مستقل. بقيت `RetrievalScope` من K4 المصدر الموحد للـexact trusted filters على `user_id`, `document_id`, `processing_run_id`, و`processing_profile` لكل Dense/Sparse candidate path وللـfinal fused query، وتبقى defensive post-result scope validation Fail-Closed. بقي `with_vectors=False`، واختيار Qdrant collections محلولاً Server-side، والنتائج typed. لا يوجد cross-profile fusion أو Local → Cloud fallback، ولم تتغير Qdrant schema أو indexing semantics. K5 لا تتضمن reranking؛ المهمة التالية K6 هي Cloud Jina Reranker.
+Verified K6 Feature Commit:
+- a2fd18f6535f99099e69a7ed764158136334da9c — K6 Cloud Jina Reranker
+Verified K6 Merge Commit: 9b2301875077c1a6a0dc1999a7ed3101bd49eaa7
+Documentation Baseline: تم تسجيل اكتمال K6 وتسليم K7 — Local BGE reranker كمهمة حالية. أضاف K6 إعادة ترتيب نتائج `cloud` باستخدام `jina-reranker-v2-base-multilingual` بعد Dense + BM25 + RRF، مع توسيع candidate pool قبل reranking وتطبيق final limit بعده. يعاد ترتيب نفس trusted candidates بالاعتماد على indexes التي يعيدها Jina دون إعادة بناء النتائج من محتوى المزود، مع Fail-Closed validation للاستجابات malformed والـduplicate/out-of-range indexes والـinvalid scores، وإعادة استخدام Jina retry/error handling. بقي trusted scope على `user_id`, `document_id`, `processing_run_id`, و`processing_profile` محفوظاً، ولم يتغير Hybrid Local أو Qdrant schema/indexing أو generation.
 
 Current Working Branch: main
 
@@ -43,10 +46,10 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-K5 — Per-Profile Dense + BM25 + RRF
+K6 — Cloud Jina Reranker
 
 Current Task:
-K6 — Cloud Jina Reranker
+K7 — Local BGE reranker
 
 Current Phase:
 K — Retrieval and Reranking
@@ -203,16 +206,24 @@ Architectural Result:
 - بقي `with_vectors=False`، وserver-resolved Qdrant collections، وtyped retrieval results كما هي.
 - لا يوجد cross-user/document/run/profile leakage، ولا cross-profile fusion، ولا Local → Cloud fallback ضمن K5.
 - لم تغير K5 Qdrant schema أو indexing semantics، ولا تتضمن reranking؛ K6 هي Cloud Jina Reranker.
+- أضافت K6 Jina reranking لمسار `cloud` باستخدام `jina-reranker-v2-base-multilingual` بعد Dense + BM25 + RRF.
+- توسع K6 candidate pool قبل reranking ثم تطبق final limit بعد إعادة الترتيب.
+- تعيد K6 ترتيب نفس trusted candidates باستخدام provider result indexes دون إعادة بناء النتائج من محتوى Jina.
+- تفشل K6 مغلقًا عند malformed responses أو duplicate/out-of-range indexes أو invalid/non-finite scores، وتعيد استخدام retry/error handling الخاصة بمزود Jina.
+- يبقى trusted scope `user_id/document_id/processing_run_id/processing_profile` محفوظًا بالكامل خلال reranking.
+- لم تعدل K6 Hybrid Local أو Qdrant schema/indexing أو generation.
 
 Latest Verification:
-PR #112 merged on GitHub: PASS
-PR title: feat(K5): add per-profile dense BM25 RRF retrieval
-PR head commit: 45470543615ab6c9d2e5edf7d7ee2c055af0c721
-PR merge commit: cc5dcc4f951ffac00e07db592a1d32091bf9a602
-main verified at K5 merge commit cc5dcc4f951ffac00e07db592a1d32091bf9a602 before this documentation update: PASS
+PR #113 merged on GitHub: PASS
+PR title: feat(K6): add cloud Jina reranker
+PR head commit: a2fd18f6535f99099e69a7ed764158136334da9c
+PR merge commit: 9b2301875077c1a6a0dc1999a7ed3101bd49eaa7
+main verified at K6 merge commit 9b2301875077c1a6a0dc1999a7ed3101bd49eaa7 before this documentation update: PASS
+Focused regression suite: 90 passed
+Full FastAPI suite: 218 passed
 
 Current Task:
-K6 — Cloud Jina Reranker
+K7 — Local BGE reranker
 
 K1 Completion:
 - أضيف `TrustedDocumentTarget` كـimmutable typed DTO يحمل `documentId`, `processingRunId`, و`processingProfile`.
@@ -270,6 +281,17 @@ K5 Completion:
 - لم تتغير Qdrant schema أو indexing semantics.
 - Out of Scope: K6 Cloud Jina reranker، K7 Local BGE reranker، K8 cross-profile rank fusion، generation، citations.
 - المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K6 — Cloud Jina Reranker.
+
+K6 Completion:
+- أضيف Jina reranking لمسار `cloud` باستخدام `jina-reranker-v2-base-multilingual`.
+- تنفذ مرحلة reranking بعد Dense + BM25 + RRF، مع توسيع candidate pool قبلها وتطبيق final limit بعدها.
+- يعاد ترتيب نفس trusted candidates اعتمادًا على indexes العائدة من Jina و`return_documents=false`، دون إعادة بناء النتائج من محتوى المزود.
+- malformed responses والـduplicate/out-of-range indexes والـinvalid/non-finite relevance scores تفشل Fail-Closed.
+- يعاد استخدام retry/error handling الخاصة بمزود Jina.
+- يبقى trusted scope على `user_id`, `document_id`, `processing_run_id`, و`processing_profile` دون تغيير.
+- لم تعدل K6 Hybrid Local أو Qdrant schema/indexing أو generation.
+- Verification: focused regression suite = `90 passed`، وFull FastAPI suite = `218 passed`.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K7 — Local BGE reranker.
 
 Open Blockers: none
 ```
@@ -1079,7 +1101,7 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 | K3 Hybrid Local query embedding / retrieval | DONE |
 | K4 Trusted User / Document / Run Retrieval Filters | DONE |
 | K5 Per-profile Dense + BM25 + RRF | DONE |
-| K6 Cloud Jina reranker | TODO |
+| K6 Cloud Jina reranker | DONE |
 | K7 Local BGE reranker | TODO |
 | K8 Cross-profile rank fusion | TODO |
 | K9 Metadata / source preservation | TODO |
@@ -1094,6 +1116,8 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 > **K4 completed in PR #111:** أضيفت `RetrievalScope` مشتركة لقيم `user_id/document_id/processing_run_id/processing_profile` الموثوقة، وأصبح نفس الـscope يبني exact Qdrant filter ويعيد التحقق دفاعياً من payload النتائج بعد retrieval لمساري Cloud وHybrid Local. بقيت profile enforcement والـcollection resolution Server-side، وبقي `DENSE_VECTOR_NAME`, `with_vectors=False`, وtyped results. لا يوجد unfiltered path أو cross-user/document/run/profile leakage، وأي mismatch يفشل Fail-Closed. لم تعدل K4 Document Processing أو Laravel ولم تنفذ K5/BM25/RRF/reranking/generation/citations.
 
 > **K5 completed in PR #112:** أصبح كل Profile يستخدم Hybrid Retrieval داخلياً بصورة مستقلة. Cloud يجمع Jina dense query embedding مع `Qdrant/bm25` وmultilingual tokenizer، وHybrid Local يجمع BGE-M3 dense query embedding مع Local BM25 باستخدام نفس primitive الخاصة بفهرسة الوثائق. يستخدم المساران Dense/Sparse prefetch مع candidate expansion ثم Qdrant-native RRF، مع إعادة استخدام `RetrievalScope` نفسها على كل candidate path والـfinal fused query والتحقق الدفاعي Fail-Closed من النتائج. بقي `with_vectors=False` وserver-resolved collections والtyped results، ولا يوجد cross-profile fusion أو Local → Cloud fallback أو reranking ضمن K5، ولم تتغير Qdrant schema أو indexing semantics.
+
+> **K6 completed in PR #113:** أضيف Jina reranking لمسار `cloud` باستخدام `jina-reranker-v2-base-multilingual` بعد Dense + BM25 + RRF، مع candidate expansion قبل reranking وfinal limit بعده. يعاد ترتيب نفس trusted candidates باستخدام result indexes العائدة من Jina دون إعادة بناء النتائج من محتوى المزود، وتفشل الاستجابات malformed والـduplicate/out-of-range indexes والـinvalid scores مغلقًا. أعيد استخدام Jina retry/error handling وبقي trusted scope على `user_id/document_id/processing_run_id/processing_profile` محفوظًا. لم يتغير Hybrid Local أو Qdrant schema/indexing أو generation. التحقق: focused regression `90 passed`، وFull FastAPI `218 passed`.
 
 Cross-profile هنا يعني دمج نتائج وثائق مفهرسة مسبقاً بProfiles مختلفة داخل المحادثة، وليس Upload comparison workflow.
 
@@ -1588,6 +1612,30 @@ BGE-M3 dense query embedding + Local BM25
 - لا يوجد Local → Cloud fallback.
 - لم تتغير Qdrant schema أو indexing semantics.
 - لا يوجد reranking ضمن K5؛ K6 هي Cloud Jina Reranker.
+
+## 9.8 K6 Cloud Jina Reranker
+
+الموجود بعد PR #113:
+
+```text
+Cloud Dense + BM25 + RRF
+→ expanded trusted candidate pool
+→ Jina jina-reranker-v2-base-multilingual
+→ map provider result indexes back to the same trusted candidates
+→ final limit
+```
+
+العقد:
+
+- reranking خاص بمسار `cloud` فقط ويعمل بعد Dense + BM25 + RRF.
+- يستخدم `jina-reranker-v2-base-multilingual`.
+- يوسع candidate pool قبل reranking ثم يطبق final limit بعد إعادة الترتيب.
+- يستخدم `return_documents=false` ويعتمد على result indexes لإعادة ترتيب كائنات `CloudRetrievalResult` الأصلية الموثوقة، دون إعادة بناء النتائج من محتوى Jina.
+- malformed responses أو duplicate indexes أو out-of-range indexes أو invalid/non-finite relevance scores تفشل Fail-Closed.
+- يعاد استخدام retry/error handling الخاصة بمزود Jina.
+- يبقى trusted scope `user_id`, `document_id`, `processing_run_id`, و`processing_profile` كما خرج من Retrieval؛ لا ينشئ reranker نطاقًا جديدًا أو Qdrant query إضافية.
+- لم يتغير Hybrid Local أو Qdrant schema/indexing أو generation.
+- Verification: focused regression suite `90 passed`، وFull FastAPI suite `218 passed`.
 
 ---
 
@@ -2621,7 +2669,7 @@ Full FastAPI suite:
 192 passed in 10.52s
 ```
 
-## آخر مهمة مكتملة — K5 Per-Profile Dense + BM25 + RRF Retrieval
+## المهمة السابقة المكتملة — K5 Per-Profile Dense + BM25 + RRF Retrieval
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #112، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `cc5dcc4f951ffac00e07db592a1d32091bf9a602`.
 
@@ -2664,19 +2712,59 @@ Merge commit:
 - cc5dcc4f951ffac00e07db592a1d32091bf9a602
 ```
 
+## آخر مهمة مكتملة — K6 Cloud Jina Reranker
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #113، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `9b2301875077c1a6a0dc1999a7ed3101bd49eaa7`.
+
+تم تنفيذ:
+
+- إضافة Jina reranking لمسار `cloud` باستخدام `jina-reranker-v2-base-multilingual`.
+- تنفيذ reranking بعد Dense + BM25 + RRF.
+- توسيع candidate pool قبل reranking ثم تطبيق final limit بعد إعادة الترتيب.
+- استخدام `return_documents=false` وإعادة ترتيب نفس trusted candidates بالاعتماد على provider result indexes دون إعادة بناء النتائج من محتوى Jina.
+- التحقق Fail-Closed من malformed responses والـduplicate indexes والـout-of-range indexes والـinvalid/non-finite relevance scores.
+- إعادة استخدام retry/error handling الخاصة بمزود Jina.
+- الحفاظ على trusted scope:
+  - `user_id`
+  - `document_id`
+  - `processing_run_id`
+  - `processing_profile`
+- عدم تعديل Hybrid Local أو Qdrant schema/indexing أو generation.
+
+### Verification K6
+
+```text
+PR #113 merged on GitHub: PASS
+PR title:
+- feat(K6): add cloud Jina reranker
+Feature branch:
+- task/K6-cloud-jina-reranker
+Feature commit:
+- a2fd18f6535f99099e69a7ed764158136334da9c
+Merge commit:
+- 9b2301875077c1a6a0dc1999a7ed3101bd49eaa7
+
+Focused regression suite:
+90 passed
+
+Full FastAPI suite:
+218 passed
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-K6 — Cloud Jina Reranker
+K7 — Local BGE reranker
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت K5 ودمجت في main عبر PR #112. أصبح كل Processing Profile ينفذ Hybrid Retrieval داخلياً بصورة مستقلة: Cloud = Jina Dense + Cloud BM25 → RRF، وHybrid Local = BGE-M3 Dense + Local BM25 → RRF.
-بقيت RetrievalScope من K4 المصدر الموحد للـexact trusted filters على user_id/document_id/processing_run_id/processing_profile، ويطبق نفس الـscope على Dense prefetch وSparse/BM25 prefetch والـfinal fused query، ثم تخضع final fused results للتحقق الدفاعي Fail-Closed.
-بقي with_vectors=False واختيار Qdrant collections Server-side والtyped retrieval results، ولا يوجد cross-profile fusion أو Local → Cloud fallback، ولم تتغير Qdrant schema أو indexing semantics.
-K5 لا تتضمن reranking. يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K6 — Cloud Jina Reranker، ولا تعتبر K6 مكتملة أو منفذة ضمن هذا handoff.
+اكتملت K6 ودمجت في main عبر PR #113. أصبح مسار cloud يطبق Jina reranking باستخدام jina-reranker-v2-base-multilingual بعد Dense + BM25 + RRF.
+يتم توسيع candidate pool قبل reranking ثم تطبيق final limit بعده، وتستخدم result indexes لإعادة ترتيب نفس trusted candidates دون إعادة بناء النتائج من محتوى Jina.
+تخضع استجابة المزود للتحقق Fail-Closed ضد malformed responses والـduplicate/out-of-range indexes والـinvalid scores، مع إعادة استخدام Jina retry/error handling.
+يبقى trusted scope على user_id/document_id/processing_run_id/processing_profile محفوظاً، ولا توجد تغييرات على Hybrid Local أو Qdrant schema/indexing أو generation.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K7 — Local BGE reranker.
 تبقى K وما بعدها دون تغيير من حيث الترقيم، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
