@@ -3,7 +3,7 @@
 > **المرجع المعماري:** `PROJECT_RAG_MASTER_PLAN.md`  
 > **الغرض:** حفظ الحالة التنفيذية الفعلية ونقطة الاستلام بين المحادثات  
 > **آخر تحديث:** 2026-09-05
-> **الحالة العامة:** قيد التنفيذ — K6 مكتملة ومدموجة في PR #113؛ أضيف Jina reranking لمسار `cloud` بعد Dense + BM25 + RRF مع الحفاظ على trusted RetrievalScope، والمهمة الحالية هي K7 — Local BGE reranker وفق الـMaster Plan
+> **الحالة العامة:** قيد التنفيذ — K7 مكتملة ومدموجة في PR #114؛ أضيف Hybrid Local BGE reranking باستخدام `BAAI/bge-reranker-v2-m3` بعد Dense + BM25 + RRF مع الحفاظ على trusted RetrievalScope، والمهمة الحالية هي K8 — Cross-profile rank fusion وفق الـMaster Plan
 
 ---
 
@@ -17,9 +17,9 @@ Repository: mona-alrayes/RAG-Local-Documents-System
 Default Branch: main
 Repository Status: Active Development
 
-Verified Main Commit: 9b2301875077c1a6a0dc1999a7ed3101bd49eaa7
-Last Merged Feature PR on main: #113 — K6 Cloud Jina Reranker
-Latest Task PR: #113 — K6 Cloud Jina Reranker
+Verified Main Commit: b94c81866700a47ce98a74efd8f0c8097ccb3149
+Last Merged Feature PR on main: #114 — K7 Hybrid Local BGE Reranker
+Latest Task PR: #114 — K7 Hybrid Local BGE Reranker
 Verified K1 Feature Commit:
 - 28759b3fd2df80283fd8d3fba831aaadee569433 — K1 Trusted document_targets
 Verified K1 Merge Commit: 3fc41d4490c46012d314f4a58bf446e3e1946fad
@@ -38,7 +38,10 @@ Verified K5 Merge Commit: cc5dcc4f951ffac00e07db592a1d32091bf9a602
 Verified K6 Feature Commit:
 - a2fd18f6535f99099e69a7ed764158136334da9c — K6 Cloud Jina Reranker
 Verified K6 Merge Commit: 9b2301875077c1a6a0dc1999a7ed3101bd49eaa7
-Documentation Baseline: تم تسجيل اكتمال K6 وتسليم K7 — Local BGE reranker كمهمة حالية. أضاف K6 إعادة ترتيب نتائج `cloud` باستخدام `jina-reranker-v2-base-multilingual` بعد Dense + BM25 + RRF، مع توسيع candidate pool قبل reranking وتطبيق final limit بعده. يعاد ترتيب نفس trusted candidates بالاعتماد على indexes التي يعيدها Jina دون إعادة بناء النتائج من محتوى المزود، مع Fail-Closed validation للاستجابات malformed والـduplicate/out-of-range indexes والـinvalid scores، وإعادة استخدام Jina retry/error handling. بقي trusted scope على `user_id`, `document_id`, `processing_run_id`, و`processing_profile` محفوظاً، ولم يتغير Hybrid Local أو Qdrant schema/indexing أو generation.
+Verified K7 Feature Commit:
+- 92e82b8e77dfc00d37ea8ce5a1c3ad0b2fd69d7c — K7 Hybrid Local BGE Reranker
+Verified K7 Merge Commit: b94c81866700a47ce98a74efd8f0c8097ccb3149
+Documentation Baseline: تم تسجيل اكتمال K7 وتسليم K8 — Cross-profile rank fusion كمهمة حالية. أضاف K7 إعادة ترتيب نتائج `hybrid_local` باستخدام `BAAI/bge-reranker-v2-m3` بعد Dense + BM25 + RRF، مع توسيع candidate pool إلى `limit * 2` قبل reranking وتطبيق final limit بعده. يعاد ترتيب نفس trusted candidates دون Qdrant query إضافية، مع بقاء `score` الحالي كـRRF score وعدم إضافة reranker metadata في K7. أعيد استخدام `LocalModelCoordinator` لإدارة lifecycle للموديل المحلي، وتفشل حالات runtime/model/inference/invalid output مغلقًا. بقي trusted scope على `user_id`, `document_id`, `processing_run_id`, و`processing_profile` محفوظاً، ولم يتغير Cloud reranking flow.
 
 Current Working Branch: main
 
@@ -46,10 +49,10 @@ Latest Completed Architectural Initiative:
 ARC-1 — Remove Compare/Winner lifecycle
 
 Latest Completed Task:
-K6 — Cloud Jina Reranker
+K7 — Hybrid Local BGE Reranker
 
 Current Task:
-K7 — Local BGE reranker
+K8 — Cross-profile rank fusion
 
 Current Phase:
 K — Retrieval and Reranking
@@ -212,18 +215,20 @@ Architectural Result:
 - تفشل K6 مغلقًا عند malformed responses أو duplicate/out-of-range indexes أو invalid/non-finite scores، وتعيد استخدام retry/error handling الخاصة بمزود Jina.
 - يبقى trusted scope `user_id/document_id/processing_run_id/processing_profile` محفوظًا بالكامل خلال reranking.
 - لم تعدل K6 Hybrid Local أو Qdrant schema/indexing أو generation.
+- أضافت K7 Hybrid Local reranking باستخدام `BAAI/bge-reranker-v2-m3` بعد Dense + BM25 + RRF، مع candidate pool موسعة قبل final limit.
+- تعيد K7 ترتيب نفس trusted candidates دون Qdrant query إضافية، ويبقى `score` كـRRF score دون reranker metadata؛ تعيد استخدام `LocalModelCoordinator` وتفشل مغلقًا عند runtime/model/inference/invalid output دون تغيير Cloud flow.
 
 Latest Verification:
-PR #113 merged on GitHub: PASS
-PR title: feat(K6): add cloud Jina reranker
-PR head commit: a2fd18f6535f99099e69a7ed764158136334da9c
-PR merge commit: 9b2301875077c1a6a0dc1999a7ed3101bd49eaa7
-main verified at K6 merge commit 9b2301875077c1a6a0dc1999a7ed3101bd49eaa7 before this documentation update: PASS
-Focused regression suite: 90 passed
-Full FastAPI suite: 218 passed
+PR #114 merged on GitHub: PASS
+PR title: feat(K7): add hybrid local BGE reranker
+PR head commit: 92e82b8e77dfc00d37ea8ce5a1c3ad0b2fd69d7c
+PR merge commit: b94c81866700a47ce98a74efd8f0c8097ccb3149
+main verified at K7 merge commit b94c81866700a47ce98a74efd8f0c8097ccb3149 before this documentation update: PASS
+Focused regression suite: 64 passed
+Full FastAPI suite: 236 passed
 
 Current Task:
-K7 — Local BGE reranker
+K8 — Cross-profile rank fusion
 
 K1 Completion:
 - أضيف `TrustedDocumentTarget` كـimmutable typed DTO يحمل `documentId`, `processingRunId`, و`processingProfile`.
@@ -292,6 +297,18 @@ K6 Completion:
 - لم تعدل K6 Hybrid Local أو Qdrant schema/indexing أو generation.
 - Verification: focused regression suite = `90 passed`، وFull FastAPI suite = `218 passed`.
 - المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K7 — Local BGE reranker.
+
+K7 Completion:
+- أضيف Hybrid Local reranking باستخدام `BAAI/bge-reranker-v2-m3`.
+- تنفذ مرحلة reranking بعد Dense + BM25 + RRF، مع candidate pool = `limit * 2` قبلها وfinal limit بعدها.
+- يعاد ترتيب نفس `HybridLocalRetrievalResult` trusted candidates دون Qdrant query إضافية.
+- يبقى `score` الحالي كـRRF score، ولا تضاف reranker metadata ضمن K7.
+- يعاد استخدام `LocalModelCoordinator` لإدارة lifecycle للموديل المحلي.
+- runtime/model load/inference/invalid/non-finite output failures تفشل Fail-Closed عبر `ApplicationException` آمنة.
+- يبقى trusted scope `user_id`, `document_id`, `processing_run_id`, و`processing_profile` محفوظًا.
+- Cloud reranking flow بقي دون تغيير.
+- Verification: focused regression suite = `64 passed`، وFull FastAPI suite = `236 passed`.
+- المهمة التالية وفق `PROJECT_RAG_MASTER_PLAN.md` هي K8 — Cross-profile rank fusion.
 
 Open Blockers: none
 ```
@@ -1102,7 +1119,7 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 | K4 Trusted User / Document / Run Retrieval Filters | DONE |
 | K5 Per-profile Dense + BM25 + RRF | DONE |
 | K6 Cloud Jina reranker | DONE |
-| K7 Local BGE reranker | TODO |
+| K7 Local BGE reranker | DONE |
 | K8 Cross-profile rank fusion | TODO |
 | K9 Metadata / source preservation | TODO |
 | K10 Retrieval quality / security tests | TODO |
@@ -1118,6 +1135,8 @@ I6 ← H8/H9/H10 safe states + J8 Livewire polling/navigation architecture
 > **K5 completed in PR #112:** أصبح كل Profile يستخدم Hybrid Retrieval داخلياً بصورة مستقلة. Cloud يجمع Jina dense query embedding مع `Qdrant/bm25` وmultilingual tokenizer، وHybrid Local يجمع BGE-M3 dense query embedding مع Local BM25 باستخدام نفس primitive الخاصة بفهرسة الوثائق. يستخدم المساران Dense/Sparse prefetch مع candidate expansion ثم Qdrant-native RRF، مع إعادة استخدام `RetrievalScope` نفسها على كل candidate path والـfinal fused query والتحقق الدفاعي Fail-Closed من النتائج. بقي `with_vectors=False` وserver-resolved collections والtyped results، ولا يوجد cross-profile fusion أو Local → Cloud fallback أو reranking ضمن K5، ولم تتغير Qdrant schema أو indexing semantics.
 
 > **K6 completed in PR #113:** أضيف Jina reranking لمسار `cloud` باستخدام `jina-reranker-v2-base-multilingual` بعد Dense + BM25 + RRF، مع candidate expansion قبل reranking وfinal limit بعده. يعاد ترتيب نفس trusted candidates باستخدام result indexes العائدة من Jina دون إعادة بناء النتائج من محتوى المزود، وتفشل الاستجابات malformed والـduplicate/out-of-range indexes والـinvalid scores مغلقًا. أعيد استخدام Jina retry/error handling وبقي trusted scope على `user_id/document_id/processing_run_id/processing_profile` محفوظًا. لم يتغير Hybrid Local أو Qdrant schema/indexing أو generation. التحقق: focused regression `90 passed`، وFull FastAPI `218 passed`.
+
+> **K7 completed in PR #114:** أضيف Hybrid Local reranking باستخدام `BAAI/bge-reranker-v2-m3` بعد Dense + BM25 + RRF. يوسع المسار candidate pool إلى `limit * 2` قبل reranking ثم يطبق final limit، ويعيد ترتيب نفس trusted candidates دون Qdrant query إضافية. يبقى `score` الحالي كـRRF score دون reranker metadata، ويعاد استخدام `LocalModelCoordinator` لإدارة lifecycle. runtime/model/inference/invalid output failures تفشل Fail-Closed، ويبقى trusted scope على `user_id/document_id/processing_run_id/processing_profile` محفوظًا، ولم يتغير Cloud reranking flow. التحقق: focused regression `64 passed`، وFull FastAPI `236 passed`.
 
 Cross-profile هنا يعني دمج نتائج وثائق مفهرسة مسبقاً بProfiles مختلفة داخل المحادثة، وليس Upload comparison workflow.
 
@@ -1636,6 +1655,31 @@ Cloud Dense + BM25 + RRF
 - يبقى trusted scope `user_id`, `document_id`, `processing_run_id`, و`processing_profile` كما خرج من Retrieval؛ لا ينشئ reranker نطاقًا جديدًا أو Qdrant query إضافية.
 - لم يتغير Hybrid Local أو Qdrant schema/indexing أو generation.
 - Verification: focused regression suite `90 passed`، وFull FastAPI suite `218 passed`.
+
+## 9.9 K7 Hybrid Local BGE Reranker
+
+الموجود بعد PR #114:
+
+```text
+Hybrid Local Dense + BM25 + RRF
+→ expanded trusted candidate pool (`limit * 2`)
+→ BAAI/bge-reranker-v2-m3
+→ reorder the same trusted candidates
+→ final limit
+```
+
+العقد:
+
+- reranking خاص بمسار `hybrid_local` ويعمل بعد Dense + BM25 + RRF.
+- يستخدم `BAAI/bge-reranker-v2-m3` من `LOCAL_RERANK_MODEL`.
+- يوسع candidate pool قبل reranking ثم يطبق final limit بعد إعادة الترتيب.
+- يعيد ترتيب نفس كائنات `HybridLocalRetrievalResult` الموثوقة دون تنفيذ Qdrant query جديدة.
+- لا يستبدل `score` الحالي؛ يبقى RRF score، ولا تضيف K7 reranker metadata إلى result contract.
+- يعاد استخدام `LocalModelCoordinator` لإدارة تحميل/lease/release الموديل المحلي ضمن lifecycle الموجود.
+- runtime غير الجاهز، model load/inference failures، malformed score count، والقيم غير الرقمية أو غير finite تفشل Fail-Closed برسائل `ApplicationException` مضبوطة.
+- يبقى trusted scope `user_id`, `document_id`, `processing_run_id`, و`processing_profile` محفوظًا بالكامل.
+- Cloud reranking flow لم يتغير في K7.
+- Verification: focused regression suite `64 passed`، وFull FastAPI suite `236 passed`.
 
 ---
 
@@ -2712,7 +2756,7 @@ Merge commit:
 - cc5dcc4f951ffac00e07db592a1d32091bf9a602
 ```
 
-## آخر مهمة مكتملة — K6 Cloud Jina Reranker
+## المهمة السابقة المكتملة — K6 Cloud Jina Reranker
 
 **الحالة:** `DONE` ومتحقق من دمجها في PR #113، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `9b2301875077c1a6a0dc1999a7ed3101bd49eaa7`.
 
@@ -2751,20 +2795,60 @@ Full FastAPI suite:
 218 passed
 ```
 
+## آخر مهمة مكتملة — K7 Hybrid Local BGE Reranker
+
+**الحالة:** `DONE` ومتحقق من دمجها في PR #114، والمدمجة في `main` بتاريخ 2026-09-05 عند merge commit `b94c81866700a47ce98a74efd8f0c8097ccb3149`.
+
+تم تنفيذ:
+
+- إضافة Hybrid Local reranking باستخدام `BAAI/bge-reranker-v2-m3`.
+- تنفيذ reranking بعد Dense + BM25 + RRF.
+- توسيع candidate pool إلى `limit * 2` قبل reranking ثم تطبيق final limit بعد إعادة الترتيب.
+- إعادة ترتيب نفس trusted `HybridLocalRetrievalResult` candidates دون تنفيذ Qdrant query جديدة.
+- الحفاظ على trusted scope:
+  - `user_id`
+  - `document_id`
+  - `processing_run_id`
+  - `processing_profile`
+- إبقاء `score` الحالي كما هو كـRRF score، وعدم إضافة reranker metadata ضمن K7.
+- إعادة استخدام `LocalModelCoordinator` لإدارة lifecycle للموديل المحلي.
+- Fail-Closed عند local runtime غير جاهز، model load/inference failures، أو invalid/non-finite reranker output.
+- عدم تغيير Cloud reranking flow.
+
+### Verification K7
+
+```text
+PR #114 merged on GitHub: PASS
+PR title:
+- feat(K7): add hybrid local BGE reranker
+Feature branch:
+- task/K7-hybrid-local-bge-reranker
+Feature commit:
+- 92e82b8e77dfc00d37ea8ce5a1c3ad0b2fd69d7c
+Merge commit:
+- b94c81866700a47ce98a74efd8f0c8097ccb3149
+
+Focused regression suite:
+64 passed
+
+Full FastAPI suite:
+236 passed
+```
+
 ## المهمة الحالية/التالية
 
 ```text
-K7 — Local BGE reranker
+K8 — Cross-profile rank fusion
 ```
 
 Baseline المهمة التالية:
 
 ```text
-اكتملت K6 ودمجت في main عبر PR #113. أصبح مسار cloud يطبق Jina reranking باستخدام jina-reranker-v2-base-multilingual بعد Dense + BM25 + RRF.
-يتم توسيع candidate pool قبل reranking ثم تطبيق final limit بعده، وتستخدم result indexes لإعادة ترتيب نفس trusted candidates دون إعادة بناء النتائج من محتوى Jina.
-تخضع استجابة المزود للتحقق Fail-Closed ضد malformed responses والـduplicate/out-of-range indexes والـinvalid scores، مع إعادة استخدام Jina retry/error handling.
-يبقى trusted scope على user_id/document_id/processing_run_id/processing_profile محفوظاً، ولا توجد تغييرات على Hybrid Local أو Qdrant schema/indexing أو generation.
-يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K7 — Local BGE reranker.
+اكتملت K7 ودمجت في main عبر PR #114. أصبح مسار hybrid_local يطبق BGE reranking باستخدام BAAI/bge-reranker-v2-m3 بعد Dense + BM25 + RRF.
+يتم توسيع candidate pool إلى limit * 2 قبل reranking ثم تطبيق final limit بعده، مع إعادة ترتيب نفس trusted candidates دون Qdrant query إضافية.
+يبقى score الحالي RRF score ولا تضيف K7 reranker metadata، ويعاد استخدام LocalModelCoordinator لإدارة lifecycle للموديل المحلي مع Fail-Closed عند runtime/model/inference/invalid output failures.
+يبقى trusted scope على user_id/document_id/processing_run_id/processing_profile محفوظاً، ولم يتغير Cloud reranking flow.
+يحدد PROJECT_RAG_MASTER_PLAN.md أن المهمة التالية حرفياً هي K8 — Cross-profile rank fusion.
 تبقى K وما بعدها دون تغيير من حيث الترقيم، ولا يوجد Compare/Winner/temporary artifact lifecycle في المعمارية المستهدفة.
 ```
 
