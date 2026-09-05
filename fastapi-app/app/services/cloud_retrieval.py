@@ -4,7 +4,12 @@ from typing import Protocol
 from app.core.config import Settings
 from app.core.exceptions import ApplicationException
 from app.processing.base import ProcessingProfile
-from app.processing.indexing import resolve_qdrant_collection
+from app.processing.indexing import (
+    resolve_qdrant_collection,
+)
+
+
+CLOUD_RERANK_CANDIDATE_MULTIPLIER = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +55,19 @@ class CloudRetriever(Protocol):
         ...
 
 
+class CloudReranker(Protocol):
+    def rerank(
+        self,
+        *,
+        question: str,
+        candidates: list[
+            CloudRetrievalResult
+        ],
+        limit: int,
+    ) -> list[CloudRetrievalResult]:
+        ...
+
+
 class CloudRetrievalService:
     def __init__(
         self,
@@ -57,10 +75,12 @@ class CloudRetrievalService:
         settings: Settings,
         query_embedder: CloudQueryEmbedder,
         dense_retriever: CloudRetriever,
+        reranker: CloudReranker,
     ) -> None:
         self._settings = settings
         self._query_embedder = query_embedder
         self._retriever = dense_retriever
+        self._reranker = reranker
 
     def retrieve(
         self,
@@ -75,27 +95,53 @@ class CloudRetrievalService:
             is not ProcessingProfile.CLOUD
         ):
             raise ApplicationException(
-                code="cloud_retrieval_target_invalid",
+                code=(
+                    "cloud_retrieval_target_invalid"
+                ),
                 message=(
                     "Cloud retrieval requires "
                     "a cloud processing target."
                 ),
             )
 
-        collection_name = resolve_qdrant_collection(
-            profile=target.processing_profile,
-            settings=self._settings,
+        collection_name = (
+            resolve_qdrant_collection(
+                profile=(
+                    target.processing_profile
+                ),
+                settings=self._settings,
+            )
         )
 
-        query_vector = self._query_embedder.embed(
-            question
+        query_vector = (
+            self._query_embedder.embed(
+                question
+            )
         )
 
-        return self._retriever.retrieve(
-            collection_name=collection_name,
-            user_id=user_id,
-            target=target,
+        candidate_limit = (
+            limit
+            * CLOUD_RERANK_CANDIDATE_MULTIPLIER
+        )
+
+        candidates = (
+            self._retriever.retrieve(
+                collection_name=(
+                    collection_name
+                ),
+                user_id=user_id,
+                target=target,
+                question=question,
+                query_vector=query_vector,
+                limit=candidate_limit,
+            )
+        )
+
+        if not candidates:
+            return []
+
+        return self._reranker.rerank(
             question=question,
-            query_vector=query_vector,
+            candidates=candidates,
             limit=limit,
         )

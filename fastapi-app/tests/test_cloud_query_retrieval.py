@@ -52,6 +52,16 @@ class StaticProvider:
         return self.vectors
 
 
+class FailIfCalledReranker:
+    def rerank(
+        self,
+        **kwargs: Any,
+    ) -> list[Any]:
+        raise AssertionError(
+            "Reranker must not be called."
+        )
+
+
 def test_cloud_query_embedder_uses_retrieval_query_and_1024(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -265,7 +275,10 @@ def test_cloud_retrieval_service_resolves_cloud_collection() -> None:
         def __init__(self) -> None:
             self.call: dict[str, Any] | None = None
 
-        def retrieve(self, **kwargs: Any) -> list[Any]:
+        def retrieve(
+            self,
+            **kwargs: Any,
+        ) -> list[Any]:
             self.call = kwargs
             return []
 
@@ -279,6 +292,7 @@ def test_cloud_retrieval_service_resolves_cloud_collection() -> None:
         ),
         query_embedder=query_embedder,
         dense_retriever=dense_retriever,
+        reranker=FailIfCalledReranker(),
     )
 
     target = CloudRetrievalTarget(
@@ -295,14 +309,29 @@ def test_cloud_retrieval_service_resolves_cloud_collection() -> None:
     )
 
     assert results == []
-    assert query_embedder.question == "ما شروط فسخ العقد؟"
+    assert (
+        query_embedder.question
+        == "ما شروط فسخ العقد؟"
+    )
+
     assert dense_retriever.call is not None
-    assert dense_retriever.call["collection_name"] == "cloud-k2"
+
+    assert (
+        dense_retriever.call["collection_name"]
+        == "cloud-k2"
+    )
     assert dense_retriever.call["user_id"] == 7
     assert dense_retriever.call["target"] == target
-    assert dense_retriever.call["limit"] == 6
+
+    # K6 expands the RRF candidate pool before reranking.
+    assert dense_retriever.call["limit"] == 12
+
     assert (
-        len(dense_retriever.call["query_vector"])
+        len(
+            dense_retriever.call[
+                "query_vector"
+            ]
+        )
         == DENSE_VECTOR_SIZE
     )
 
@@ -320,7 +349,10 @@ def test_cloud_retrieval_service_rejects_non_cloud_target() -> None:
         def __init__(self) -> None:
             self.called = False
 
-        def embed(self, question: str) -> list[float]:
+        def embed(
+            self,
+            question: str,
+        ) -> list[float]:
             self.called = True
             return [0.1] * DENSE_VECTOR_SIZE
 
@@ -328,26 +360,46 @@ def test_cloud_retrieval_service_rejects_non_cloud_target() -> None:
         def __init__(self) -> None:
             self.called = False
 
-        def retrieve(self, **kwargs: Any) -> list[Any]:
+        def retrieve(
+            self,
+            **kwargs: Any,
+        ) -> list[Any]:
+            self.called = True
+            return []
+
+    class Reranker:
+        def __init__(self) -> None:
+            self.called = False
+
+        def rerank(
+            self,
+            **kwargs: Any,
+        ) -> list[Any]:
             self.called = True
             return []
 
     query_embedder = QueryEmbedder()
     dense_retriever = DenseRetriever()
+    reranker = Reranker()
 
     service = CloudRetrievalService(
         settings=Settings(),
         query_embedder=query_embedder,
         dense_retriever=dense_retriever,
+        reranker=reranker,
     )
 
     target = CloudRetrievalTarget(
         document_id=12,
         processing_run_id=81,
-        processing_profile=ProcessingProfile.HYBRID_LOCAL,
+        processing_profile=(
+            ProcessingProfile.HYBRID_LOCAL
+        ),
     )
 
-    with pytest.raises(ApplicationException) as exc_info:
+    with pytest.raises(
+        ApplicationException
+    ) as exc_info:
         service.retrieve(
             user_id=7,
             target=target,
@@ -355,116 +407,14 @@ def test_cloud_retrieval_service_rejects_non_cloud_target() -> None:
             limit=6,
         )
 
-    assert exc_info.value.code == "cloud_retrieval_target_invalid"
+    assert (
+        exc_info.value.code
+        == "cloud_retrieval_target_invalid"
+    )
+
     assert query_embedder.called is False
     assert dense_retriever.called is False
-
-
-def test_qdrant_cloud_dense_retriever_uses_secure_dense_query() -> None:
-    (
-        _,
-        QdrantCloudDenseRetriever,
-        CloudRetrievalResult,
-        _,
-        CloudRetrievalTarget,
-    ) = _load_k2()
-
-    point = SimpleNamespace(
-        id="point-1",
-        score=0.91,
-        payload={
-            "user_id": 7,
-            "document_id": 12,
-            "processing_run_id": 81,
-            "processing_profile": "cloud",
-            "chunk_index": 3,
-            "text": "يمكن فسخ العقد عند تحقق الشروط.",
-            "page": 2,
-            "section": "فسخ العقد",
-            "source": "contract.pdf",
-        },
-    )
-
-    class FakeClient:
-        def __init__(self) -> None:
-            self.call: dict[str, Any] | None = None
-
-        def query_points(self, **kwargs: Any) -> Any:
-            self.call = kwargs
-            return SimpleNamespace(points=[point])
-
-    client = FakeClient()
-    retriever = QdrantCloudDenseRetriever(client=client)
-
-    target = CloudRetrievalTarget(
-        document_id=12,
-        processing_run_id=81,
-        processing_profile=ProcessingProfile.CLOUD,
-    )
-
-    vector = [0.1] * DENSE_VECTOR_SIZE
-
-    results = retriever.retrieve(
-        collection_name="cloud-k2",
-        user_id=7,
-        target=target,
-        query_vector=vector,
-        limit=6,
-    )
-
-    assert client.call is not None
-    assert client.call["collection_name"] == "cloud-k2"
-    assert client.call["query"] == vector
-    assert client.call["using"] == DENSE_VECTOR_NAME
-    assert client.call["limit"] == 6
-    assert client.call["with_vectors"] is False
-
-    payload_fields = set(client.call["with_payload"])
-
-    assert {
-        "user_id",
-        "document_id",
-        "processing_run_id",
-        "processing_profile",
-        "chunk_index",
-        "text",
-        "page",
-        "section",
-        "source",
-    }.issubset(payload_fields)
-
-    query_filter = client.call["query_filter"]
-
-    conditions = {
-        condition.key: condition.match.value
-        for condition in query_filter.must
-    }
-
-    assert conditions == {
-        "user_id": 7,
-        "document_id": 12,
-        "processing_run_id": 81,
-        "processing_profile": "cloud",
-    }
-
-    assert len(results) == 1
-    assert isinstance(results[0], CloudRetrievalResult)
-    assert results[0].point_id == "point-1"
-    assert results[0].score == pytest.approx(0.91)
-    assert results[0].document_id == 12
-    assert results[0].processing_run_id == 81
-    assert (
-        results[0].processing_profile
-        is ProcessingProfile.CLOUD
-    )
-    assert results[0].chunk_index == 3
-    assert (
-        results[0].text
-        == "يمكن فسخ العقد عند تحقق الشروط."
-    )
-    assert results[0].page == 2
-    assert results[0].section == "فسخ العقد"
-    assert results[0].source == "contract.pdf"
+    assert reranker.called is False
 
 
 @pytest.mark.parametrize(

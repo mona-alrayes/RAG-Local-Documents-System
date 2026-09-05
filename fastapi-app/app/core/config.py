@@ -77,6 +77,7 @@ class Settings(BaseSettings):
 
     jinaai_api_key: SecretStr = SecretStr("")
     cloud_embed_model: str = "jina-embeddings-v3"
+    cloud_rerank_model: str = "jina-reranker-v2-base-multilingual"
     embed_batch_size: int = Field(default=6, ge=1)
     wait_between_batches: float = Field(default=3, ge=0)
     rate_limit_retry_wait: float = Field(default=30, ge=0)
